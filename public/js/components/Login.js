@@ -12,7 +12,10 @@ export default {
                 <div class="small text-muted mt-1">{{ store.auth.secret }}</div>
             </div>
             <input type="text" v-model="store.auth.token" class="form-control text-center mb-3" placeholder="2FA Code" maxlength="6" @keyup.enter="login">
-            <button class="btn btn-primary w-100" @click="login">验证</button>
+            <button class="btn btn-primary w-100 mb-3" @click="login">验证</button>
+            <button class="btn btn-sm btn-outline-secondary w-100 border-0" @click="toggleTheme">
+                <i class="fa-solid fa-circle-half-stroke me-2"></i>Switch Theme
+            </button>
         </div>
     </div>
     `,
@@ -28,6 +31,13 @@ export default {
                 }
             } catch (e) { showToast('请求失败', 'danger'); }
         };
-        return { store, login };
+
+        const toggleTheme = () => {
+            const newTheme = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        };
+
+        return { store, login, toggleTheme };
     }
 };

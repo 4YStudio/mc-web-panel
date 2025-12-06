@@ -1,4 +1,4 @@
-import { createApp, watch, onMounted } from '/js/vue.esm-browser.js';
+import { createApp, watch, onMounted, ref } from '/js/vue.esm-browser.js';
 import { store } from './store.js';
 import { api } from './api.js';
 import { toasts, removeToast, modalData, confirmModalAction, initModal, showToast } from './utils.js';
@@ -36,7 +36,13 @@ const app = createApp({
         VoicechatManager
     },
     setup() {
+        const sidebarOpen = ref(false);
+
         const init = async () => {
+            // Theme Init using localStorage
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+
             try {
                 const { data } = await api.get('/api/auth/check');
                 store.auth.isSetup = data.isSetup;
@@ -105,7 +111,8 @@ const app = createApp({
             toasts,
             removeToast,
             modalData,
-            confirmModalAction
+            confirmModalAction,
+            sidebarOpen
         };
     }
 });

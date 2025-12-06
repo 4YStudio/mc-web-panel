@@ -61,19 +61,32 @@
 
         <!-- 主视图 -->
         <template v-else>
-            <sidebar></sidebar>
+            <!-- 移动端遮罩 -->
+            <div class="mobile-overlay" :class="{show: sidebarOpen}" @click="sidebarOpen = false"></div>
 
-            <div class="content bg-body">
-                <!-- 动态组件切换：使用 kebab-case -->
-                <dashboard v-if="store.view === 'dashboard'"></dashboard>
-                <server-properties-manager v-if="store.view === 'properties'"></server-properties-manager>
-                <mods-manager v-if="store.view === 'mods'"></mods-manager>
-                <file-manager v-if="store.view === 'files'"></file-manager>
-                <backup-manager v-if="store.view === 'backups'"></backup-manager>
-                <easy-auth-manager v-if="store.view === 'easyauth'"></easy-auth-manager>
-                <voicechat-manager v-if="store.view === 'voicechat'"></voicechat-manager>
-                <player-manager v-if="store.view === 'players'"></player-manager>
-            </div>
+            <!-- 侧栏：添加 show 类控制显示 -->
+            <sidebar class="sidebar" :class="{show: sidebarOpen}"></sidebar>
+
+            <div class="d-flex flex-column w-100 overflow-hidden">
+                <!-- 移动端顶部栏 -->
+                <div class="mobile-header">
+                    <button class="btn btn-link text-body p-0 me-3" @click="sidebarOpen = true">
+                        <i class="fa-solid fa-bars fa-lg"></i>
+                    </button>
+                    <h5 class="m-0 fw-bold">MC Panel</h5>
+                </div>
+
+                <div class="content bg-body">
+                    <!-- 动态组件切换：使用 kebab-case -->
+                    <dashboard v-if="store.view === 'dashboard'"></dashboard>
+                    <server-properties-manager v-if="store.view === 'properties'"></server-properties-manager>
+                    <mods-manager v-if="store.view === 'mods'"></mods-manager>
+                    <file-manager v-if="store.view === 'files'"></file-manager>
+                    <backup-manager v-if="store.view === 'backups'"></backup-manager>
+                    <easy-auth-manager v-if="store.view === 'easyauth'"></easy-auth-manager>
+                    <voicechat-manager v-if="store.view === 'voicechat'"></voicechat-manager>
+                    <player-manager v-if="store.view === 'players'"></player-manager>
+                </div>
         </template>
 
     </div>

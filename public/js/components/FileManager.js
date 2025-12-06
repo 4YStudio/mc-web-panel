@@ -29,7 +29,7 @@ export default {
             </div>
 
             <!-- 操作工具栏 -->
-            <div class="card mb-3 bg-dark border-secondary flex-shrink-0">
+            <div class="card mb-3 bg-body-tertiary border-secondary flex-shrink-0">
                 <div class="card-body p-2 d-flex flex-wrap gap-2 align-items-center">
                     <div class="btn-group">
                         <button class="btn btn-sm btn-outline-secondary" @click="refreshFiles" title="刷新"><i class="fa-solid fa-rotate"></i></button>
@@ -85,7 +85,7 @@ export default {
                                     <button v-if="!f.isDir" class="btn btn-xs btn-link text-info" @click.stop="editFile(f.name)" title="编辑">
                                         <i class="fa-solid fa-pen-to-square"></i>
                                     </button>
-                                    <button v-if="!f.isDir" class="btn btn-xs btn-link text-light" @click.stop="downloadFile(f.name)" title="下载">
+                                    <button v-if="!f.isDir" class="btn btn-xs btn-link text-secondary" @click.stop="downloadFile(f.name)" title="下载">
                                         <i class="fa-solid fa-download"></i>
                                     </button>
                                     <button class="btn btn-xs btn-link text-danger" @click.stop="askDelete([f.name])" title="删除">
@@ -124,7 +124,7 @@ export default {
                 <!-- 文本输入框 -->
                 <textarea 
                     ref="editorArea"
-                    class="form-control border-0 rounded-0 bg-dark text-light flex-grow-1 p-3" 
+                    class="form-control border-0 rounded-0 flex-grow-1 p-3" 
                     style="font-family: 'Consolas', 'Monaco', monospace; resize: none; font-size: 14px; line-height: 1.5;" 
                     v-model="fileContent"
                     @keydown.ctrl.s.prevent="saveFile"
@@ -140,7 +140,7 @@ export default {
         const selectedFiles = ref([]);
         const selectAll = ref(false);
         const searchQuery = ref('');
-        
+
         // 编辑器状态
         const editingFile = ref(null);
         const fileContent = ref('');
@@ -155,7 +155,7 @@ export default {
         const pathParts = computed(() => currentPath.value ? currentPath.value.split('/') : []);
         const joinPath = (base, name) => base ? `${base}/${name}` : name;
         const goUp = () => {
-            if(!currentPath.value) return;
+            if (!currentPath.value) return;
             const parts = currentPath.value.split('/');
             parts.pop();
             changeDir(parts.join('/'));
@@ -173,7 +173,7 @@ export default {
                 });
                 selectedFiles.value = [];
                 selectAll.value = false;
-            } catch(e) { showToast('加载失败', 'danger'); }
+            } catch (e) { showToast('加载失败', 'danger'); }
         };
 
         const filteredFiles = computed(() => fileList.value.filter(f => f.name.toLowerCase().includes(searchQuery.value.toLowerCase())));
@@ -200,12 +200,12 @@ export default {
         // --- 文件编辑逻辑 (增强版) ---
         // 支持的后缀列表
         const EDITABLE_EXTS = ['txt', 'log', 'json', 'yml', 'yaml', 'properties', 'conf', 'toml', 'cfg', 'ini', 'sh', 'bat', 'js', 'md', 'xml'];
-        
+
         const editFile = async (name) => {
             const ext = name.split('.').pop().toLowerCase();
             // 如果不是常见文本格式，且文件没有点号（如 LICENSE），也尝试允许编辑
             if (!EDITABLE_EXTS.includes(ext) && name.includes('.')) {
-                if(!confirm(`文件 ${name} 可能不是文本文件，确定要编辑吗？`)) return;
+                if (!confirm(`文件 ${name} 可能不是文本文件，确定要编辑吗？`)) return;
             }
 
             const fullPath = joinPath(currentPath.value, name);
@@ -214,7 +214,7 @@ export default {
                 fileContent.value = res.data.content;
                 originalContent.value = res.data.content; // 记录原始内容
                 editingFile.value = fullPath;
-            } catch(e) { showToast('无法读取文件内容', 'danger'); }
+            } catch (e) { showToast('无法读取文件内容', 'danger'); }
         };
 
         const hasUnsavedChanges = computed(() => fileContent.value !== originalContent.value);
@@ -224,12 +224,12 @@ export default {
                 await api.post('/api/files/save', { filepath: editingFile.value, content: fileContent.value });
                 originalContent.value = fileContent.value; // 更新原始值
                 showToast('保存成功');
-            } catch(e) { showToast('保存失败', 'danger'); }
+            } catch (e) { showToast('保存失败', 'danger'); }
         };
 
         const closeEditor = () => {
             if (hasUnsavedChanges.value) {
-                if(!confirm('有未保存的修改，确定关闭吗？')) return;
+                if (!confirm('有未保存的修改，确定关闭吗？')) return;
             }
             editingFile.value = null;
             fileContent.value = '';
@@ -241,20 +241,20 @@ export default {
             if (!files.length) return;
             const fd = new FormData();
             let total = 0;
-            for (let i=0; i<files.length; i++) { fd.append('files', files[i]); total += files[i].size; }
+            for (let i = 0; i < files.length; i++) { fd.append('files', files[i]); total += files[i].size; }
             fd.append('path', currentPath.value);
-            
+
             store.task.visible = true; store.task.title = '上传中'; store.task.percent = 0;
             try {
                 await api.post('/api/files/upload', fd, {
                     onUploadProgress: (p) => {
-                        if(p.total) store.task.percent = Math.round((p.loaded*100)/p.total);
+                        if (p.total) store.task.percent = Math.round((p.loaded * 100) / p.total);
                         store.task.message = `${formatSize(p.loaded)} / ${formatSize(p.total)}`;
                     }
                 });
                 showToast('上传成功'); loadFiles();
-            } catch(e){ showToast('失败','danger'); }
-            finally { setTimeout(()=>store.task.visible=false, 500); e.target.value=''; }
+            } catch (e) { showToast('失败', 'danger'); }
+            finally { setTimeout(() => store.task.visible = false, 500); e.target.value = ''; }
         };
 
         const operateFiles = async (action, files, dest = '', extra = {}) => {
@@ -262,12 +262,12 @@ export default {
             try {
                 await api.post('/api/files/operate', { action, sources: fullFiles, destination: dest, ...extra });
                 showToast('操作成功'); loadFiles();
-            } catch(e) { showToast('操作失败', 'danger'); }
+            } catch (e) { showToast('操作失败', 'danger'); }
         };
 
         const copyToClipboard = (action) => {
             clipboard.value = { action, files: [...selectedFiles.value], sourcePath: currentPath.value };
-            showToast(`已${action==='copy'?'复制':'剪切'} ${selectedFiles.value.length} 个项目`);
+            showToast(`已${action === 'copy' ? '复制' : '剪切'} ${selectedFiles.value.length} 个项目`);
             selectedFiles.value = [];
         };
 
@@ -277,15 +277,15 @@ export default {
                 await api.post('/api/files/operate', { action: clipboard.value.action, sources: sources, destination: currentPath.value });
                 showToast('粘贴完成'); loadFiles();
                 if (clipboard.value.action === 'move') clipboard.value.files = [];
-            } catch(e) { showToast('粘贴失败', 'danger'); }
+            } catch (e) { showToast('粘贴失败', 'danger'); }
         };
 
         const askCompress = () => openModal({
             title: '压缩', message: '压缩包名称 (.zip):', mode: 'input', placeholder: 'archive.zip',
-            callback: (name) => operateFiles('compress', selectedFiles.value, currentPath.value, { compressName: name.endsWith('.zip')?name:name+'.zip' })
+            callback: (name) => operateFiles('compress', selectedFiles.value, currentPath.value, { compressName: name.endsWith('.zip') ? name : name + '.zip' })
         });
         const askDelete = (files) => openModal({ title: '确认删除', message: `删除 ${files.length} 个项目？`, callback: () => operateFiles('delete', files) });
-        
+
         const downloadFile = (name) => window.open(`/api/files/download?path=${joinPath(currentPath.value, name)}`, '_blank');
 
         const refreshFiles = () => loadFiles();

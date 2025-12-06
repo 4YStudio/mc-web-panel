@@ -43,11 +43,11 @@ export default {
         <!-- 图形化编辑器 -->
         <div v-if="editMode === 'gui'" class="row g-4 pb-4">
             <div class="col-md-6" v-for="(group, idx) in VC_GROUPS" :key="idx">
-                <div class="card h-100 border-secondary bg-dark">
+                <div class="card h-100 border-secondary">
                     <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
                     <div class="card-body">
                         <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                            <label class="col-sm-5 col-form-label text-light small">{{ item.label }}</label>
+                            <label class="col-sm-5 col-form-label small">{{ item.label }}</label>
                             <div class="col-sm-7">
                                 
                                 <div v-if="item.type === 'boolean'" class="form-check form-switch">
@@ -78,7 +78,7 @@ export default {
         <div v-else class="h-100">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-body-tertiary small text-muted">mc_server/config/voicechat/voicechat-server.properties</div>
-                <textarea class="form-control border-0 rounded-0 bg-dark text-light h-100" 
+                <textarea class="form-control border-0 rounded-0 h-100"  
                     style="font-family: monospace; resize: none; min-height: 65vh;" 
                     v-model="fileContent" 
                     spellcheck="false"
