@@ -13,6 +13,7 @@ export default {
             <a class="nav-link" :class="{active: store.view === 'files'}" @click="store.view='files'"><i class="fa-solid fa-folder-open me-2"></i> 文件管理</a>
             <a v-if="store.hasBackupMod" class="nav-link" :class="{active: store.view === 'backups'}" @click="store.view='backups'"><i class="fa-solid fa-clock-rotate-left me-2"></i> 备份管理</a>
             <a v-if="store.hasEasyAuth" class="nav-link" :class="{active: store.view === 'easyauth'}" @click="store.view='easyauth'"><i class="fa-solid fa-user-shield me-2"></i> 认证管理</a>
+            <a v-if="store.hasVoicechat" class="nav-link" :class="{active: store.view === 'voicechat'}" @click="store.view='voicechat'"><i class="fa-solid fa-microphone me-2"></i> 语音设置</a>
             <a class="nav-link" :class="{active: store.view === 'players'}" @click="store.view='players'"><i class="fa-solid fa-users me-2"></i> 玩家管理</a>
         </nav>
 

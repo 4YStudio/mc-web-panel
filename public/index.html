@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN" data-bs-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,72 +13,80 @@
     <!-- 自定义样式 -->
     <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
 
-<div id="app" class="d-flex h-100" v-cloak>
-    
-    <!-- 全局提示 Toast -->
-    <div class="toast-container">
-        <div v-for="t in toasts" :key="t.id" class="toast show align-items-center text-white border-0" :class="'bg-' + t.type">
-            <div class="d-flex"><div class="toast-body">{{ t.message }}</div><button class="btn-close btn-close-white me-2 m-auto" @click="removeToast(t.id)"></button></div>
-        </div>
-    </div>
+    <div id="app" class="d-flex h-100" v-cloak>
 
-    <!-- 进度条组件 (注意这里改成了小写加横线) -->
-    <progress-modal></progress-modal>
-
-    <!-- 全局 Modal -->
-    <div class="modal fade" id="confirmModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ modalData.title }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-3">{{ modalData.message }}</p>
-                    <input v-if="modalData.mode === 'input'" v-model="modalData.inputValue" class="form-control" :placeholder="modalData.placeholder" @keyup.enter="confirmModalAction">
-                    <select v-if="modalData.mode === 'select'" v-model="modalData.inputValue" class="form-select">
-                        <option v-for="opt in modalData.options" :value="opt.value">{{ opt.label }}</option>
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button class="btn btn-primary" @click="confirmModalAction">执行</button>
+        <!-- 全局提示 Toast -->
+        <div class="toast-container">
+            <div v-for="t in toasts" :key="t.id" class="toast show align-items-center text-white border-0"
+                :class="'bg-' + t.type">
+                <div class="d-flex">
+                    <div class="toast-body">{{ t.message }}</div><button class="btn-close btn-close-white me-2 m-auto"
+                        @click="removeToast(t.id)"></button>
                 </div>
             </div>
         </div>
+
+        <!-- 进度条组件 (注意这里改成了小写加横线) -->
+        <progress-modal></progress-modal>
+
+        <!-- 全局 Modal -->
+        <div class="modal fade" id="confirmModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ modalData.title }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">{{ modalData.message }}</p>
+                        <input v-if="modalData.mode === 'input'" v-model="modalData.inputValue" class="form-control"
+                            :placeholder="modalData.placeholder" @keyup.enter="confirmModalAction">
+                        <select v-if="modalData.mode === 'select'" v-model="modalData.inputValue" class="form-select">
+                            <option v-for="opt in modalData.options" :value="opt.value">{{ opt.label }}</option>
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button class="btn btn-primary" @click="confirmModalAction">执行</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 登录视图 -->
+        <login v-if="!store.auth.loggedIn"></login>
+
+        <!-- 主视图 -->
+        <template v-else>
+            <sidebar></sidebar>
+
+            <div class="content bg-body">
+                <!-- 动态组件切换：使用 kebab-case -->
+                <dashboard v-if="store.view === 'dashboard'"></dashboard>
+                <server-properties-manager v-if="store.view === 'properties'"></server-properties-manager>
+                <mods-manager v-if="store.view === 'mods'"></mods-manager>
+                <file-manager v-if="store.view === 'files'"></file-manager>
+                <backup-manager v-if="store.view === 'backups'"></backup-manager>
+                <easy-auth-manager v-if="store.view === 'easyauth'"></easy-auth-manager>
+                <voicechat-manager v-if="store.view === 'voicechat'"></voicechat-manager>
+                <player-manager v-if="store.view === 'players'"></player-manager>
+            </div>
+        </template>
+
     </div>
 
-    <!-- 登录视图 -->
-    <login v-if="!store.auth.loggedIn"></login>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/axios.min.js"></script>
 
-    <!-- 主视图 -->
-    <template v-else>
-        <sidebar></sidebar>
+    <!-- 5. 修改 Bootstrap JS -->
+    <script src="/js/bootstrap.bundle.min.js"></script>
 
-        <div class="content bg-body">
-            <!-- 动态组件切换：使用 kebab-case -->
-            <dashboard v-if="store.view === 'dashboard'"></dashboard>
-            <server-properties-manager v-if="store.view === 'properties'"></server-properties-manager>
-            <mods-manager v-if="store.view === 'mods'"></mods-manager>
-            <file-manager v-if="store.view === 'files'"></file-manager>
-            <backup-manager v-if="store.view === 'backups'"></backup-manager>
-            <easy-auth-manager v-if="store.view === 'easyauth'"></easy-auth-manager>
-            <player-manager v-if="store.view === 'players'"></player-manager>
-        </div>
-    </template>
-
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="/js/axios.min.js"></script>
-
-<!-- 5. 修改 Bootstrap JS -->
-<script src="/js/bootstrap.bundle.min.js"></script>
-
-<!-- 主入口 -->
-<script type="module" src="js/app.js"></script>
+    <!-- 主入口 -->
+    <script type="module" src="js/app.js"></script>
 
 </body>
+
 </html>

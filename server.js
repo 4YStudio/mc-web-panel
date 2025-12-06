@@ -27,11 +27,12 @@ const DATA_DIR = path.join(__dirname, 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const SERVER_PROPERTIES = path.join(MC_DIR, 'server.properties');
-const JAR_NAME = 'fabric-server-launch.jar'; 
+const JAR_NAME = 'fabric-server-launch.jar';
 const JAVA_ARGS = ['-Xms1G', '-Xmx4G'];
 const EASYAUTH_DIR = path.join(MC_DIR, 'EasyAuth');
 const EASYAUTH_DB = path.join(EASYAUTH_DIR, 'easyauth.db');
 const EASYAUTH_CONFIG_DIR = path.join(MC_DIR, 'config', 'EasyAuth');
+const VOICECHAT_CONFIG_DIR = path.join(MC_DIR, 'config', 'voicechat'); // 新增 Voicechat 路径
 
 // 备份相关路径
 const BACKUP_ROOT = path.join(MC_DIR, 'backups');
@@ -62,14 +63,14 @@ if (fs.existsSync(LOG_FILE)) {
         const data = fs.readFileSync(LOG_FILE, 'utf8');
         const lines = data.slice(-50000).split('\n');
         logHistory = lines.slice(-MAX_LOG_HISTORY);
-    } catch (e) {}
+    } catch (e) { }
 }
 
 const appendLog = (msg) => {
     logHistory.push(msg);
     if (logHistory.length > MAX_LOG_HISTORY) logHistory.shift();
     io.emit('console', msg);
-    fs.appendFile(LOG_FILE, msg, () => {});
+    fs.appendFile(LOG_FILE, msg, () => { });
 };
 
 app.use(express.static('public'));
@@ -103,23 +104,25 @@ setInterval(async () => {
             // 检测是否有备份插件文件夹
             const hasBackupMod = fs.existsSync(BACKUP_ROOT);
             const hasEasyAuth = fs.existsSync(EASYAUTH_DIR) && fs.existsSync(EASYAUTH_DB);
-            
+            const hasVoicechat = fs.existsSync(VOICECHAT_CONFIG_DIR); // 新增 check
+
             if (fs.existsSync(SERVER_PROPERTIES)) {
                 try {
                     const props = PropertiesReader(SERVER_PROPERTIES);
                     serverInfo.port = props.get('server-port') || '25565';
                     serverInfo.maxPlayers = props.get('max-players') || '20';
                     serverInfo.motd = props.get('motd') || 'Minecraft Server';
-                } catch(e) {}
+                } catch (e) { }
             }
             io.emit('system_stats', {
                 cpu: load.currentLoad.toFixed(1),
-                mem: { total: (mem.total/1024/1024/1024).toFixed(1), used: (mem.active/1024/1024/1024).toFixed(1), percentage: ((mem.active/mem.total)*100).toFixed(1) },
+                mem: { total: (mem.total / 1024 / 1024 / 1024).toFixed(1), used: (mem.active / 1024 / 1024 / 1024).toFixed(1), percentage: ((mem.active / mem.total) * 100).toFixed(1) },
                 mc: { port: serverInfo.port, maxPlayers: serverInfo.maxPlayers, motd: serverInfo.motd, online: onlinePlayers.size },
                 hasBackupMod: hasBackupMod, // 通知前端显示备份菜单
-                hasEasyAuth: hasEasyAuth // 通知前端显示 EasyAuth 菜单
+                hasEasyAuth: hasEasyAuth, // 通知前端显示 EasyAuth 菜单
+                hasVoicechat: hasVoicechat // 通知前端显示 Voicechat 菜单
             });
-        } catch (e) {}
+        } catch (e) { }
     }
 }, 2000);
 
@@ -145,7 +148,7 @@ const dbHelper = {
     },
     run: (db, sql, params = []) => {
         return new Promise((resolve, reject) => {
-            db.run(sql, params, function(err) {
+            db.run(sql, params, function (err) {
                 if (err) reject(err);
                 else resolve({ changes: this.changes });
             });
@@ -164,7 +167,7 @@ const dbHelper = {
 // 1. 获取玩家列表 (智能适配版)
 app.get('/api/easyauth/users', requireAuth, async (req, res) => {
     if (!fs.existsSync(EASYAUTH_DB)) return res.json([]);
-    
+
     let db;
     try {
         db = await dbHelper.open(EASYAUTH_DB, sqlite3.OPEN_READONLY);
@@ -172,7 +175,7 @@ app.get('/api/easyauth/users', requireAuth, async (req, res) => {
         // 1. 确定表名
         const tables = await dbHelper.all(db, "SELECT name FROM sqlite_master WHERE type='table'");
         const tableNames = tables.map(t => t.name);
-        
+
         let tableName = '';
         if (tableNames.includes('easyauth')) tableName = 'easyauth';
         else if (tableNames.includes('users')) tableName = 'users';
@@ -197,7 +200,7 @@ app.get('/api/easyauth/users', requireAuth, async (req, res) => {
         // 构造 SQL: SELECT id, username as username, is_registered FROM table
         // 使用 'as username' 确保前端收到的 JSON key 始终是 username
         const sql = `SELECT ${idCol || "'' as id"}, ${nameCol} as username, ${regCol} FROM ${tableName}`;
-        
+
         const users = await dbHelper.all(db, sql);
         res.json(users);
 
@@ -213,11 +216,11 @@ app.get('/api/easyauth/users', requireAuth, async (req, res) => {
 app.post('/api/easyauth/delete', requireAuth, async (req, res) => {
     const { username } = req.body;
     if (!fs.existsSync(EASYAUTH_DB)) return res.status(404).json({ error: '数据库不存在' });
-    
+
     let db;
     try {
         db = await dbHelper.open(EASYAUTH_DB, sqlite3.OPEN_READWRITE);
-        
+
         // 1. 确定表名
         const tables = await dbHelper.all(db, "SELECT name FROM sqlite_master WHERE type='table'");
         const tableNames = tables.map(t => t.name);
@@ -236,7 +239,7 @@ app.post('/api/easyauth/delete', requireAuth, async (req, res) => {
 
         // 3. 执行删除 (使用检测到的列名)
         const result = await dbHelper.run(db, `DELETE FROM ${tableName} WHERE ${nameCol} = ?`, [username]);
-        
+
         if (result.changes > 0) {
             if (mcProcess) mcProcess.stdin.write(`kick ${username} 您的认证已被重置\n`);
             appendLog(`[EasyAuth] 管理员注销了玩家: ${username}\n`);
@@ -266,15 +269,15 @@ app.post('/api/easyauth/password', requireAuth, async (req, res) => {
     const { username, password } = req.body;
     if (!password || password.length < 3) return res.status(400).json({ error: '密码太短' });
     if (!fs.existsSync(EASYAUTH_DB)) return res.status(404).json({ error: '数据库不存在' });
-    
+
     let db;
     try {
         db = await dbHelper.open(EASYAUTH_DB, sqlite3.OPEN_READWRITE);
-        
+
         // 1. 再次检测表名 (确保兼容性)
         const tables = await dbHelper.all(db, "SELECT name FROM sqlite_master WHERE type='table'");
         const tableNames = tables.map(t => t.name);
-        
+
         let tableName = '';
         if (tableNames.includes('easyauth')) tableName = 'easyauth';
         else if (tableNames.includes('users')) tableName = 'users';
@@ -293,7 +296,7 @@ app.post('/api/easyauth/password', requireAuth, async (req, res) => {
 
         // 4. 更新数据库
         const result = await dbHelper.run(db, `UPDATE ${tableName} SET password = ? WHERE ${nameCol} = ?`, [hashedPassword, username]);
-        
+
         if (result.changes > 0) {
             // 可选：踢出玩家强制重新登录
             if (mcProcess) mcProcess.stdin.write(`kick ${username} 管理员修改了您的密码，请使用新密码重新登录\n`);
@@ -309,13 +312,36 @@ app.post('/api/easyauth/password', requireAuth, async (req, res) => {
         if (db) await dbHelper.close(db);
     }
 });
+// 5. Voicechat Config API (新增)
+app.get('/api/voicechat/config', requireAuth, async (req, res) => {
+    const vcPropFile = path.join(VOICECHAT_CONFIG_DIR, 'voicechat-server.properties');
+    try {
+        if (!fs.existsSync(vcPropFile)) {
+            // 如果目录存在但文件不存在，尝试创建一个空的或返回空
+            if (fs.existsSync(VOICECHAT_CONFIG_DIR)) return res.json({ content: '' });
+            return res.status(404).json({ error: '配置文件不存在' });
+        }
+        const content = await fs.readFile(vcPropFile, 'utf8');
+        res.json({ content });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/voicechat/save', requireAuth, async (req, res) => {
+    const vcPropFile = path.join(VOICECHAT_CONFIG_DIR, 'voicechat-server.properties');
+    try {
+        if (!fs.existsSync(VOICECHAT_CONFIG_DIR)) fs.ensureDirSync(VOICECHAT_CONFIG_DIR);
+        await fs.writeFile(vcPropFile, req.body.content);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // --- 备份管理 API (新增) ---
 
 // 1. 获取备份列表
 app.get('/api/backups/list', requireAuth, async (req, res) => {
     try {
         const backups = [];
-        
+
         const scanDir = async (dir, type) => {
             if (fs.existsSync(dir)) {
                 const files = await fs.readdir(dir);
@@ -339,7 +365,7 @@ app.get('/api/backups/list', requireAuth, async (req, res) => {
 
         await scanDir(BACKUP_DIFF_DIR, 'differential');
         await scanDir(BACKUP_SNAP_DIR, 'snapshots');
-        
+
         // 按时间倒序排列
         backups.sort((a, b) => b.mtime - a.mtime);
         res.json(backups);
@@ -359,12 +385,12 @@ app.post('/api/backups/create', requireAuth, (req, res) => {
 // 3. 还原备份
 app.post('/api/backups/restore', requireAuth, async (req, res) => {
     const { filename, folder, type } = req.body;
-    
+
     // 发送进度辅助函数
     const sendProgress = (step, total, msg) => {
-        io.emit('restore_progress', { 
-            percent: Math.round((step / total) * 100), 
-            message: msg 
+        io.emit('restore_progress', {
+            percent: Math.round((step / total) * 100),
+            message: msg
         });
     };
 
@@ -372,9 +398,9 @@ app.post('/api/backups/restore', requireAuth, async (req, res) => {
         mcProcess.stdin.write('stop\n');
         appendLog('[系统] 正在停止服务器以进行回档...\n');
         sendProgress(10, 100, '正在停止服务器...');
-        
+
         let checks = 0;
-        while(mcProcess && checks < 30) {
+        while (mcProcess && checks < 30) {
             await new Promise(r => setTimeout(r, 1000));
             checks++;
         }
@@ -392,7 +418,7 @@ app.post('/api/backups/restore', requireAuth, async (req, res) => {
             await fs.rename(WORLD_DIR, path.join(MC_DIR, backupName));
             appendLog(`[系统] 已将当前存档重命名为 ${backupName}\n`);
         }
-        
+
         await fs.ensureDir(WORLD_DIR);
 
         // 确定解压列表
@@ -414,17 +440,17 @@ app.post('/api/backups/restore', requireAuth, async (req, res) => {
         for (let i = 0; i < totalSteps; i++) {
             const zipPath = filesToUnzip[i];
             const currentProgress = 50 + Math.round(((i + 1) / totalSteps) * 40); // 50% -> 90%
-            
-            sendProgress(currentProgress, 100, `正在解压 (${i+1}/${totalSteps}): ${path.basename(zipPath)}`);
+
+            sendProgress(currentProgress, 100, `正在解压 (${i + 1}/${totalSteps}): ${path.basename(zipPath)}`);
             appendLog(`[系统] 解压中: ${path.basename(zipPath)}...\n`);
-            
+
             const zip = new AdmZip(zipPath);
             zip.extractAllTo(WORLD_DIR, true);
         }
 
         sendProgress(100, 100, '回档完成');
         appendLog(`[系统] 回档完成！请启动服务器。\n`);
-        
+
         setTimeout(() => io.emit('restore_completed'), 1000);
         res.json({ success: true });
 
@@ -453,7 +479,7 @@ app.get('/api/server/status', requireAuth, (req, res) => res.json({ running: !!m
 app.post('/api/server/start', requireAuth, async (req, res) => {
     if (mcProcess) return res.json({ message: '已运行' });
     const eulaPath = path.join(MC_DIR, 'eula.txt');
-    try { if (!await fs.pathExists(eulaPath) || !(await fs.readFile(eulaPath, 'utf8')).includes('eula=true')) await fs.writeFile(eulaPath, 'eula=true'); } catch(e){}
+    try { if (!await fs.pathExists(eulaPath) || !(await fs.readFile(eulaPath, 'utf8')).includes('eula=true')) await fs.writeFile(eulaPath, 'eula=true'); } catch (e) { }
     onlinePlayers.clear();
     appendLog('[系统] --- 正在启动服务器 ---\n');
     mcProcess = spawn('java', [...JAVA_ARGS, '-jar', JAR_NAME, 'nogui'], { cwd: MC_DIR });
@@ -490,9 +516,9 @@ app.get('/api/files/list', requireAuth, async (req, res) => {
             try {
                 const stat = await fs.stat(path.join(targetPath, f));
                 return { name: f, isDir: stat.isDirectory(), size: stat.size, isDisabled: f.endsWith('.disabled'), mtime: stat.mtime };
-            } catch(e) { return null; }
+            } catch (e) { return null; }
         }));
-        res.json(fileStats.filter(f=>f));
+        res.json(fileStats.filter(f => f));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -528,8 +554,8 @@ app.post('/api/files/operate', requireAuth, async (req, res) => {
             }
             await archive.finalize();
         }
-        else if (action === 'disable') for (const src of sources) if(!src.endsWith('.disabled')) await fs.rename(path.join(MC_DIR, src), path.join(MC_DIR, src) + '.disabled');
-        else if (action === 'enable') for (const src of sources) if(src.endsWith('.disabled')) await fs.rename(path.join(MC_DIR, src), path.join(MC_DIR, src).replace('.disabled', ''));
+        else if (action === 'disable') for (const src of sources) if (!src.endsWith('.disabled')) await fs.rename(path.join(MC_DIR, src), path.join(MC_DIR, src) + '.disabled');
+        else if (action === 'enable') for (const src of sources) if (src.endsWith('.disabled')) await fs.rename(path.join(MC_DIR, src), path.join(MC_DIR, src).replace('.disabled', ''));
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -539,9 +565,9 @@ app.get('/api/files/download', requireAuth, async (req, res) => {
     if (!filePath.startsWith(MC_DIR)) return res.status(403).send('Denied');
     if (fs.existsSync(filePath)) res.download(filePath); else res.status(404).send('Not Found');
 });
-app.get('/api/files/content', requireAuth, async (req, res) => { try { res.json({ content: await fs.readFile(path.join(MC_DIR, req.query.path), 'utf8') }); } catch(e){ res.status(500).send('Err'); } });
-app.post('/api/files/save', requireAuth, async (req, res) => { try { await fs.writeFile(path.join(MC_DIR, req.body.filepath), req.body.content); res.json({success:true}); } catch(e){ res.status(500).send('Err'); } });
+app.get('/api/files/content', requireAuth, async (req, res) => { try { res.json({ content: await fs.readFile(path.join(MC_DIR, req.query.path), 'utf8') }); } catch (e) { res.status(500).send('Err'); } });
+app.post('/api/files/save', requireAuth, async (req, res) => { try { await fs.writeFile(path.join(MC_DIR, req.body.filepath), req.body.content); res.json({ success: true }); } catch (e) { res.status(500).send('Err'); } });
 
-app.get('/api/lists/:type', requireAuth, async (req, res) => { try { res.json(await fs.readJson(path.join(MC_DIR, `${req.params.type}.json`))); } catch(e){ res.json([]); } });
+app.get('/api/lists/:type', requireAuth, async (req, res) => { try { res.json(await fs.readJson(path.join(MC_DIR, `${req.params.type}.json`))); } catch (e) { res.json([]); } });
 
 server.listen(PORT, () => console.log(`MC Panel v6.0 running on http://localhost:${PORT}`));

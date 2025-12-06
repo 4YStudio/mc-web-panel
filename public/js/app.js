@@ -15,23 +15,25 @@ import ProgressModal from './components/ProgressModal.js';
 import EasyAuthManager from './components/EasyAuthManager.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
+import VoicechatManager from './components/VoicechatManager.js';
 
 const socket = io();
 
 const app = createApp({
     // 注册组件 (Vue 会自动处理 ProgressModal -> <progress-modal> 的映射)
-    components: { 
-        Login, 
-        Sidebar, 
-        Dashboard, 
-        ModsManager, 
-        FileManager, 
-        PlayerManager, 
-        BackupManager, 
+    components: {
+        Login,
+        Sidebar,
+        Dashboard,
+        ModsManager,
+        FileManager,
+        PlayerManager,
+        BackupManager,
         ProgressModal,
         EasyAuthManager,
         ServerPropertiesManager,
-        Avatar
+        Avatar,
+        VoicechatManager
     },
     setup() {
         const init = async () => {
@@ -49,7 +51,7 @@ const app = createApp({
 
         const postLogin = () => {
             api.get('/api/server/status').then(res => store.isRunning = res.data.running);
-            
+
             // Socket 监听
             socket.emit('req_history');
             socket.on('console_history', history => store.logs = history);
@@ -63,6 +65,7 @@ const app = createApp({
                 store.stats = d;
                 store.hasBackupMod = d.hasBackupMod;
                 store.hasEasyAuth = d.hasEasyAuth;
+                store.hasVoicechat = d.hasVoicechat;
             });
 
             // 回档进度监听
@@ -94,7 +97,7 @@ const app = createApp({
         onMounted(() => {
             init();
             initModal(); // 初始化 Bootstrap Modal
-            if(store.auth.loggedIn) postLogin();
+            if (store.auth.loggedIn) postLogin();
         });
 
         return {
