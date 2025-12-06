@@ -82,8 +82,11 @@ export default {
                             <td class="text-end">
                                 <div class="btn-group">
                                     <!-- 编辑按钮：如果是文本文件显示 -->
-                                    <button v-if="!f.isDir" class="btn btn-xs btn-link text-info" @click.stop="editFile(f.name)" title="编辑">
-                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    <button v-if="!f.isDir" class="btn btn-xs btn-link text-info" @click.stop="editFile(f.name)" title="编辑内容">
+                                        <i class="fa-solid fa-file-pen"></i>
+                                    </button>
+                                    <button class="btn btn-xs btn-link text-primary" @click.stop="askRename(f)" title="重命名">
+                                        <i class="fa-solid fa-pen"></i>
                                     </button>
                                     <button v-if="!f.isDir" class="btn btn-xs btn-link text-secondary" @click.stop="downloadFile(f.name)" title="下载">
                                         <i class="fa-solid fa-download"></i>
@@ -286,6 +289,17 @@ export default {
         });
         const askDelete = (files) => openModal({ title: '确认删除', message: `删除 ${files.length} 个项目？`, callback: () => operateFiles('delete', files) });
 
+        const askRename = (file) => openModal({
+            title: '重命名', message: `重命名 ${file.name}:`, mode: 'input', inputValue: file.name,
+            callback: async (newName) => {
+                if (!newName || newName === file.name) return;
+                try {
+                    await api.post('/api/files/rename', { oldPath: joinPath(currentPath.value, file.name), newPath: joinPath(currentPath.value, newName) });
+                    showToast('重命名成功'); loadFiles();
+                } catch (e) { showToast('重命名失败', 'danger'); }
+            }
+        });
+
         const downloadFile = (name) => window.open(`/api/files/download?path=${joinPath(currentPath.value, name)}`, '_blank');
 
         const refreshFiles = () => loadFiles();
@@ -297,7 +311,7 @@ export default {
             editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp,
             changeDir, goUp, joinPath, getIcon, formatSize,
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
-            editFile, saveFile, closeEditor, refreshFiles
+            editFile, saveFile, closeEditor, refreshFiles, askRename
         };
     }
 };
