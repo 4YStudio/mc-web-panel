@@ -476,6 +476,27 @@ app.post('/api/auth/logout', (req, res) => { req.session.destroy(); res.json({ s
 
 // 服务器控制
 app.get('/api/server/status', requireAuth, (req, res) => res.json({ running: !!mcProcess, onlinePlayers: Array.from(onlinePlayers) }));
+
+// Server Icon API
+app.get('/api/server/icon', (req, res) => {
+    const iconPath = path.join(MC_DIR, 'server-icon.png');
+    if (fs.existsSync(iconPath)) res.sendFile(iconPath);
+    else res.status(404).send('No icon');
+});
+app.post('/api/server/icon', requireAuth, upload.single('icon'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file' });
+        await fs.move(req.file.path, path.join(MC_DIR, 'server-icon.png'), { overwrite: true });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/server/icon', requireAuth, async (req, res) => {
+    try {
+        await fs.remove(path.join(MC_DIR, 'server-icon.png'));
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/server/start', requireAuth, async (req, res) => {
     if (mcProcess) return res.json({ message: '已运行' });
     const eulaPath = path.join(MC_DIR, 'eula.txt');

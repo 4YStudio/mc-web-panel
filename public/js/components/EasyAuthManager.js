@@ -82,18 +82,18 @@ export default {
                 </div>
             </div>
             <div class="col-md-9 h-100">
-                <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm">
+                <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm border-secondary-subtle">
                     <div class="card-header bg-body-tertiary small text-muted">{{ currentFile || '请选择文件' }}</div>
-                    <textarea v-if="currentFile" class="form-control border-0 rounded-0 bg-dark text-light h-100" style="font-family: monospace; resize: none;" v-model="fileContent" spellcheck="false"></textarea>
+                    <textarea v-if="currentFile" class="form-control border-0 rounded-0 bg-body text-body h-100" style="font-family: monospace; resize: none;" v-model="fileContent" spellcheck="false"></textarea>
                 </div>
                 <div v-else class="h-100 overflow-auto pr-2">
                     <div class="row g-3">
                         <div class="col-md-12" v-for="(group, idx) in currentSchema" :key="idx">
-                            <div class="card border-secondary bg-dark">
+                            <div class="card border-secondary-subtle">
                                 <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
                                 <div class="card-body">
                                     <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                                        <label class="col-sm-5 col-form-label text-light small">{{ item.label }}</label>
+                                        <label class="col-sm-5 col-form-label small">{{ item.label }}</label>
                                         <div class="col-sm-7">
                                             <div v-if="item.type === 'boolean'" class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
                                             <input v-else-if="item.type === 'number'" type="number" class="form-control form-control-sm" v-model="formModel[item.key]">
@@ -121,8 +121,8 @@ export default {
         const formModel = reactive({});
         const currentSchema = computed(() => SCHEMAS[currentFile.value] || null);
 
-        const loadUsers = async () => { try { const res = await api.get('/api/easyauth/users'); userList.value = res.data; } catch(e) { showToast('DB错误','danger'); } };
-        
+        const loadUsers = async () => { try { const res = await api.get('/api/easyauth/users'); userList.value = res.data; } catch (e) { showToast('DB错误', 'danger'); } };
+
         // --- 修改密码逻辑 ---
         const askChangePass = (username) => {
             openModal({
@@ -131,12 +131,12 @@ export default {
                 mode: 'input',
                 placeholder: '新密码...',
                 callback: async (newPass) => {
-                    if(!newPass) return;
+                    if (!newPass) return;
                     try {
                         const res = await api.post('/api/easyauth/password', { username, password: newPass });
                         if (res.data.success) showToast('密码修改成功');
                         else showToast(res.data.message, 'warning');
-                    } catch(e) { showToast('修改失败: ' + (e.response?.data?.error || e.message), 'danger'); }
+                    } catch (e) { showToast('修改失败: ' + (e.response?.data?.error || e.message), 'danger'); }
                 }
             });
         };
@@ -147,44 +147,44 @@ export default {
                 callback: async () => {
                     try {
                         const res = await api.post('/api/easyauth/delete', { username });
-                        if(res.data.success) { showToast('已注销'); loadUsers(); } else showToast('失败','warning');
-                    } catch(e){ showToast('失败','danger'); }
+                        if (res.data.success) { showToast('已注销'); loadUsers(); } else showToast('失败', 'warning');
+                    } catch (e) { showToast('失败', 'danger'); }
                 }
             });
         };
 
-        const loadFileList = async () => { try { const res = await api.get('/api/easyauth/configs'); configFiles.value = res.data; if(res.data.length && !currentFile.value) loadFile(res.data.find(f=>f.includes('main'))||res.data[0]); } catch(e){} };
-        const loadFile = async (fn) => { try { const res = await api.get(`/api/files/content?path=config/EasyAuth/${fn}`); fileContent.value = res.data.content; currentFile.value = fn; if(currentSchema.value){ editMode.value='gui'; parseToGui(); } else { editMode.value='text'; } } catch(e){} };
-        
+        const loadFileList = async () => { try { const res = await api.get('/api/easyauth/configs'); configFiles.value = res.data; if (res.data.length && !currentFile.value) loadFile(res.data.find(f => f.includes('main')) || res.data[0]); } catch (e) { } };
+        const loadFile = async (fn) => { try { const res = await api.get(`/api/files/content?path=config/EasyAuth/${fn}`); fileContent.value = res.data.content; currentFile.value = fn; if (currentSchema.value) { editMode.value = 'gui'; parseToGui(); } else { editMode.value = 'text'; } } catch (e) { } };
+
         const parseToGui = () => {
             const text = fileContent.value;
             currentSchema.value.forEach(g => g.items.forEach(i => {
                 const match = text.match(createRegex(i.key));
-                if(match) {
+                if (match) {
                     let v = match[2].trim().split('#')[0].trim().replace(/^['"](.*)['"]$/, '$1');
-                    if(i.type==='boolean') formModel[i.key] = (v==='true');
-                    else if(i.type==='number') formModel[i.key] = Number(v);
+                    if (i.type === 'boolean') formModel[i.key] = (v === 'true');
+                    else if (i.type === 'number') formModel[i.key] = Number(v);
                     else formModel[i.key] = v;
-                } else formModel[i.key] = i.type==='boolean'?false:'';
+                } else formModel[i.key] = i.type === 'boolean' ? false : '';
             }));
         };
         const syncToText = () => {
             let text = fileContent.value;
             currentSchema.value.forEach(g => g.items.forEach(i => {
-                if(formModel[i.key]!==undefined) text = text.replace(createRegex(i.key), (m, p) => p + String(formModel[i.key]));
+                if (formModel[i.key] !== undefined) text = text.replace(createRegex(i.key), (m, p) => p + String(formModel[i.key]));
             }));
             fileContent.value = text;
         };
         const saveConfig = async () => {
-            if(!currentFile.value) return;
-            if(editMode.value==='gui') syncToText();
-            try { await api.post('/api/files/save', { filepath: `config/EasyAuth/${currentFile.value}`, content: fileContent.value }); showToast('保存成功'); } catch(e){ showToast('失败','danger'); }
+            if (!currentFile.value) return;
+            if (editMode.value === 'gui') syncToText();
+            try { await api.post('/api/files/save', { filepath: `config/EasyAuth/${currentFile.value}`, content: fileContent.value }); showToast('保存成功'); } catch (e) { showToast('失败', 'danger'); }
         };
-        const toggleEditMode = () => { if(editMode.value==='text'){ parseToGui(); editMode.value='gui'; } else { syncToText(); editMode.value='text'; } };
+        const toggleEditMode = () => { if (editMode.value === 'text') { parseToGui(); editMode.value = 'gui'; } else { syncToText(); editMode.value = 'text'; } };
 
         const filteredUsers = ref([]);
         watch([userList, searchUser], () => filteredUsers.value = userList.value.filter(u => u.username.toLowerCase().includes(searchUser.value.toLowerCase())));
-        watch(currentTab, (val) => { if(val==='users') loadUsers(); if(val==='config') loadFileList(); });
+        watch(currentTab, (val) => { if (val === 'users') loadUsers(); if (val === 'config') loadFileList(); });
         onMounted(loadUsers);
 
         return { currentTab, filteredUsers, searchUser, configFiles, currentFile, fileContent, editMode, currentSchema, formModel, loadUsers, askDeleteUser, askChangePass, loadFile, saveConfig, toggleEditMode };

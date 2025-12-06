@@ -52,7 +52,7 @@ export default {
         <div v-if="currentTab === 'config'">
             <div v-if="editMode === 'gui'" class="row g-4">
                 <div class="col-md-6" v-for="(group, idx) in CONFIG_GROUPS" :key="idx">
-                    <div class="card h-100 border-secondary bg-dark">
+                    <div class="card h-100 border-secondary-subtle">
                         <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
                         <div class="card-body">
                             <div v-for="item in group.items" :key="item.key" class="mb-3">
@@ -65,7 +65,7 @@ export default {
                     </div>
                 </div>
             </div>
-            <div v-else class="h-100"><textarea class="form-control bg-dark text-light border-secondary" style="font-family: monospace; height: 65vh;" v-model="rawContent"></textarea></div>
+            <div v-else class="h-100"><textarea class="form-control bg-body text-body border-secondary" style="font-family: monospace; height: 65vh;" v-model="rawContent"></textarea></div>
         </div>
     </div>
     `,
@@ -107,19 +107,19 @@ export default {
             }).join('\n');
         };
 
-        const loadBackups = async () => { try { const res = await api.get('/api/backups/list'); backupList.value = res.data; } catch(e) {} };
-        const loadConfig = async () => { try { const res = await api.get(`/api/files/content?path=${CONFIG_PATH}`); rawContent.value = res.data.content; parseProperties(rawContent.value); } catch(e) { rawContent.value = '# Error'; } };
+        const loadBackups = async () => { try { const res = await api.get('/api/backups/list'); backupList.value = res.data; } catch (e) { } };
+        const loadConfig = async () => { try { const res = await api.get(`/api/files/content?path=${CONFIG_PATH}`); rawContent.value = res.data.content; parseProperties(rawContent.value); } catch (e) { rawContent.value = '# Error'; } };
         const saveConfig = async () => {
             let content = rawContent.value;
             if (editMode.value === 'gui') { content = stringifyProperties(rawContent.value, formModel); rawContent.value = content; }
-            try { await api.post('/api/files/save', { filepath: CONFIG_PATH, content }); showToast('保存成功'); } catch(e) { showToast('保存失败', 'danger'); }
+            try { await api.post('/api/files/save', { filepath: CONFIG_PATH, content }); showToast('保存成功'); } catch (e) { showToast('保存失败', 'danger'); }
         };
         const createBackup = async () => { await api.post('/api/backups/create'); showToast('指令已发送'); setTimeout(loadBackups, 3000); };
         const toggleEditMode = () => { if (editMode.value === 'text') parseProperties(rawContent.value); editMode.value = editMode.value === 'gui' ? 'text' : 'gui'; };
 
         const askRestore = (b) => {
             openModal({
-                title: '确认回档', message: `确定要回滚到 [${b.name}] 吗？服务器将自动停止。`, 
+                title: '确认回档', message: `确定要回滚到 [${b.name}] 吗？服务器将自动停止。`,
                 callback: async () => {
                     // 初始化进度条
                     store.task.visible = true;
@@ -127,13 +127,13 @@ export default {
                     store.task.percent = 0;
                     store.task.message = '正在发送请求...';
                     store.task.subMessage = '请勿关闭页面';
-                    
+
                     try {
                         await api.post('/api/backups/restore', { filename: b.name, folder: b.folder, type: b.type });
                         // 成功的回调会通过 socket 'restore_completed' 触发
-                    } catch(e) { 
+                    } catch (e) {
                         store.task.visible = false;
-                        showToast('请求失败: ' + (e.response?.data?.error || e.message), 'danger'); 
+                        showToast('请求失败: ' + (e.response?.data?.error || e.message), 'danger');
                     }
                 }
             });

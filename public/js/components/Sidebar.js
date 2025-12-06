@@ -1,10 +1,15 @@
+import { ref, watch, onMounted } from '/js/vue.esm-browser.js';
 import { store } from '../store.js';
 import { api } from '../api.js';
 
 export default {
     template: `
     <div class="sidebar p-3 d-flex flex-column h-100 overflow-auto">
-        <h5 class="mb-4 px-2 fw-bold"><i class="fa-solid fa-cube me-2 text-primary"></i>MC Panel</h5>
+        <h5 class="mb-4 px-2 fw-bold d-flex align-items-center">
+            <img v-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="me-2 rounded" width="32" height="32" style="object-fit: cover;">
+            <i v-else class="fa-solid fa-cube me-2 text-primary" style="font-size: 1.5rem;"></i>
+            MC Panel
+        </h5>
         
         <nav class="nav flex-column mb-auto">
             <a class="nav-link" :class="{active: store.view === 'dashboard'}" @click="selectView('dashboard')"><i class="fa-solid fa-terminal me-2"></i> 控制台</a>
@@ -24,6 +29,20 @@ export default {
     </div>
     `,
     setup(props, { emit }) {
+        const hasIcon = ref(false);
+
+        const checkIcon = async () => {
+            // Try to load the image to see if it exists
+            const img = new Image();
+            img.onload = () => hasIcon.value = true;
+            img.onerror = () => hasIcon.value = false;
+            img.src = '/api/server/icon?t=' + Date.now();
+        };
+
+        // Watch for version changes to re-check
+        watch(() => store.serverIconVersion, checkIcon);
+        onMounted(checkIcon);
+
         const toggleTheme = () => {
             const newTheme = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-bs-theme', newTheme);
@@ -36,6 +55,6 @@ export default {
             emit('close-sidebar');
         };
 
-        return { store, toggleTheme, logout, selectView };
+        return { store, toggleTheme, logout, selectView, hasIcon };
     }
 };

@@ -1,5 +1,6 @@
 import { ref, reactive, onMounted, watch } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
+import { store } from '../store.js';
 import { showToast } from '../utils.js';
 
 // --- 配置定义 (Schema) ---
@@ -73,6 +74,28 @@ export default {
             </div>
         </div>
 
+        <!-- 服务器图标管理 -->
+        <div class="card mb-4 border-secondary-subtle">
+            <div class="card-header bg-body-tertiary fw-bold">服务器图标 (Server Icon)</div>
+            <div class="card-body d-flex align-items-center gap-4">
+                <div class="position-relative">
+                    <img :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @error="iconLoadError">
+                </div>
+                <div>
+                    <div class="mb-2 text-muted small">建议尺寸: 64x64 PNG</div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
+                            <i class="fa-solid fa-upload me-1"></i>上传图标
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @click="deleteIcon">
+                            <i class="fa-solid fa-trash me-1"></i>重置
+                        </button>
+                    </div>
+                    <input type="file" ref="iconInput" class="d-none" accept="image/png" @change="uploadIcon">
+                </div>
+            </div>
+        </div>
+
         <!-- 图形化编辑器 -->
         <div v-if="editMode === 'gui'" class="row g-4 pb-4">
             <div class="col-md-6" v-for="(group, idx) in PROP_GROUPS" :key="idx">
@@ -122,6 +145,47 @@ export default {
         const fileContent = ref('');
         const formModel = reactive({});
         const FILE_PATH = 'server.properties';
+        const iconUrl = ref('/api/server/icon');
+        const iconInput = ref(null);
+
+        const updateIconPreview = () => {
+            iconUrl.value = `/api/server/icon?t=${store.serverIconVersion}`;
+        }
+        const iconLoadError = (e) => {
+            // Fallback placeholder if no icon
+            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjNjg3NjhiIiBkPSJNMCUyNTZDMCUyNTYlMjAyNTYuc3ZnIi8+'; // Just a blank or keep broken? Better to use a placeholder or detect error.
+            // Actually, let's just use the FontAwesome logic in sidebar, but here we expect an image.
+            // Let's use a generic placeholder URL or a base64 gray box.
+            e.target.style.display = 'none'; // Hide if broken, but we need structure. 
+            // Better: reset to a placeholder image.
+            e.target.src = '/favicon.ico'; // Temporary fallback or similar
+            e.target.style.display = 'block';
+        };
+
+        // Watch global version
+        watch(() => store.serverIconVersion, updateIconPreview);
+
+        const uploadIcon = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const fd = new FormData();
+            fd.append('icon', file);
+            try {
+                await api.post('/api/server/icon', fd);
+                showToast('图标上传成功');
+                store.serverIconVersion = Date.now();
+                e.target.value = '';
+            } catch (err) { showToast('上传失败', 'danger'); }
+        };
+
+        const deleteIcon = async () => {
+            if (!confirm('确定要重置图标吗？')) return;
+            try {
+                await api.delete('/api/server/icon');
+                showToast('图标已重置');
+                store.serverIconVersion = Date.now();
+            } catch (err) { showToast('重置失败', 'danger'); }
+        };
 
         // 正则：匹配 key=value (兼容空格)
         const createRegex = (key) => new RegExp(`^${key}\\s*=\\s*(.*)$`, 'm');
@@ -198,8 +262,15 @@ export default {
             }
         };
 
-        onMounted(loadFile);
+        onMounted(() => {
+            loadFile();
+            updateIconPreview();
+        });
 
-        return { editMode, fileContent, formModel, PROP_GROUPS, saveConfig, toggleEditMode };
+        return {
+            editMode, fileContent, formModel, PROP_GROUPS,
+            saveConfig, toggleEditMode, iconUrl, iconInput,
+            uploadIcon, deleteIcon, updateIconPreview, iconLoadError
+        };
     }
 };

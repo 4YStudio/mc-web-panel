@@ -11,7 +11,7 @@ export default {
                 <img :src="store.auth.qrCode" class="img-fluid border p-1 rounded bg-white">
                 <div class="small text-muted mt-1">{{ store.auth.secret }}</div>
             </div>
-            <input type="text" v-model="store.auth.token" class="form-control text-center mb-3" placeholder="2FA Code" maxlength="6" @keyup.enter="login">
+            <input type="text" v-model="store.auth.token" class="form-control text-center mb-3" placeholder="2FA Code" maxlength="6" @keyup.enter="login" autofocus>
             <button class="btn btn-primary w-100 mb-3" @click="login">验证</button>
             <button class="btn btn-sm btn-outline-secondary w-100 border-0" @click="toggleTheme">
                 <i class="fa-solid fa-circle-half-stroke me-2"></i>Switch Theme
