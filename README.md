@@ -59,7 +59,7 @@
 ### 2. 安装依赖
 ```bash
 # 克隆或下载本项目到本地
-git clone <your-repo-url>
+git clone https://github.com/4YStudio/mc-web-panel.git
 cd mc-web-panel
 
 # 安装 npm 依赖
