@@ -65,7 +65,7 @@
             <div class="mobile-overlay" :class="{show: sidebarOpen}" @click="sidebarOpen = false"></div>
 
             <!-- 侧栏：添加 show 类控制显示 -->
-            <sidebar class="sidebar" :class="{show: sidebarOpen}"></sidebar>
+            <sidebar class="sidebar" :class="{show: sidebarOpen}" @close-sidebar="sidebarOpen = false"></sidebar>
 
             <div class="d-flex flex-column w-100 overflow-hidden">
                 <!-- 移动端顶部栏 -->
