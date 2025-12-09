@@ -16,6 +16,7 @@ import EasyAuthManager from './components/EasyAuthManager.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
 import VoicechatManager from './components/VoicechatManager.js';
+import PanelSettings from './components/PanelSettings.js';
 import { createI18n } from './i18n.js';
 
 const socket = io();
@@ -34,7 +35,8 @@ const app = createApp({
         EasyAuthManager,
         ServerPropertiesManager,
         Avatar,
-        VoicechatManager
+        VoicechatManager,
+        PanelSettings
     },
     setup() {
         const sidebarOpen = ref(false);

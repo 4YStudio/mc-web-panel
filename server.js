@@ -46,7 +46,21 @@ fs.ensureDirSync(MC_DIR);
 fs.ensureDirSync(DATA_DIR);
 fs.ensureDirSync(path.join(MC_DIR, 'mods'));
 
-let appConfig = fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE) : { secret: authenticator.generateSecret(), isSetup: false };
+// 默认配置
+const DEFAULT_CONFIG = {
+    secret: authenticator.generateSecret(),
+    isSetup: false,
+    port: 3000,
+    defaultLang: 'zh',
+    theme: 'auto',
+    jarName: 'fabric-server-launch.jar',
+    javaArgs: ['-Xms1G', '-Xmx4G'],
+    sessionTimeout: 7,
+    maxLogHistory: 1000,
+    monitorInterval: 2000
+};
+
+let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : DEFAULT_CONFIG;
 if (!fs.existsSync(CONFIG_FILE)) fs.writeJsonSync(CONFIG_FILE, appConfig);
 
 const app = express();
@@ -460,6 +474,101 @@ app.post('/api/backups/restore', requireAuth, async (req, res) => {
         io.emit('restore_error', e.message);
         res.status(500).json({ error: e.message });
     }
+});
+
+// --- 面板设置 API (新增) ---
+
+// 1. 获取面板配置
+app.get('/api/panel/config', requireAuth, (req, res) => {
+    try {
+        // 返回配置,但脱敏处理 secret
+        const config = { ...appConfig };
+        if (config.secret) {
+            config.secret = config.secret.substring(0, 4) + '****' + config.secret.substring(config.secret.length - 4);
+        }
+        res.json(config);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 2. 保存面板配置
+app.post('/api/panel/config', requireAuth, async (req, res) => {
+    try {
+        const { port, defaultLang, theme, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval } = req.body;
+
+        // 验证配置
+        if (port && (port < 1024 || port > 65535)) {
+            return res.status(400).json({ error: '端口必须在 1024-65535 之间' });
+        }
+        if (defaultLang && !['zh', 'en'].includes(defaultLang)) {
+            return res.status(400).json({ error: '语言必须是 zh 或 en' });
+        }
+        if (theme && !['light', 'dark', 'auto'].includes(theme)) {
+            return res.status(400).json({ error: '主题必须是 light, dark 或 auto' });
+        }
+        if (jarName && !jarName.endsWith('.jar')) {
+            return res.status(400).json({ error: 'JAR文件名必须以 .jar 结尾' });
+        }
+        if (sessionTimeout && (sessionTimeout < 1 || sessionTimeout > 365)) {
+            return res.status(400).json({ error: '会话超时必须在 1-365 天之间' });
+        }
+        if (maxLogHistory && (maxLogHistory < 100 || maxLogHistory > 10000)) {
+            return res.status(400).json({ error: '日志历史条数必须在 100-10000 之间' });
+        }
+        if (monitorInterval && (monitorInterval < 1000 || monitorInterval > 10000)) {
+            return res.status(400).json({ error: '监控刷新间隔必须在 1000-10000ms 之间' });
+        }
+
+        // 更新配置
+        if (port !== undefined) appConfig.port = port;
+        if (defaultLang !== undefined) appConfig.defaultLang = defaultLang;
+        if (theme !== undefined) appConfig.theme = theme;
+        if (jarName !== undefined) appConfig.jarName = jarName;
+        if (javaArgs !== undefined) appConfig.javaArgs = javaArgs;
+        if (sessionTimeout !== undefined) appConfig.sessionTimeout = sessionTimeout;
+        if (maxLogHistory !== undefined) appConfig.maxLogHistory = maxLogHistory;
+        if (monitorInterval !== undefined) appConfig.monitorInterval = monitorInterval;
+
+        // 保存到文件
+        await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
+
+        res.json({ success: true, message: '配置已保存,需要重启面板才能生效' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. 重置 2FA
+app.post('/api/panel/reset-2fa', requireAuth, async (req, res) => {
+    try {
+        const newSecret = authenticator.generateSecret();
+        appConfig.secret = newSecret;
+        appConfig.isSetup = false;
+
+        await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
+
+        // 生成二维码
+        QRCode.toDataURL(authenticator.keyuri('Admin', 'MC-Panel', newSecret), (err, qrUrl) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({
+                success: true,
+                secret: newSecret,
+                qr: qrUrl,
+                message: '2FA已重置,请重新扫描二维码设置'
+            });
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 4. 重启面板
+app.post('/api/panel/restart', requireAuth, (req, res) => {
+    res.json({ success: true, message: '面板正在重启...' });
+    setTimeout(() => {
+        process.exit(0);
+    }, 1000);
 });
 
 // --- 原有 API (保持不变) ---

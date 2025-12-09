@@ -41,7 +41,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="mb-3">{{ modalData.message }}</p>
+                        <div v-html="modalData.message" class="mb-3"></div>
                         <input v-if="modalData.mode === 'input'" v-model="modalData.inputValue" class="form-control"
                             :placeholder="modalData.placeholder" @keyup.enter="confirmModalAction">
                         <select v-if="modalData.mode === 'select'" v-model="modalData.inputValue" class="form-select">
@@ -85,6 +85,7 @@
                     <backup-manager v-if="store.view === 'backups'"></backup-manager>
                     <easy-auth-manager v-if="store.view === 'easyauth'"></easy-auth-manager>
                     <voicechat-manager v-if="store.view === 'voicechat'"></voicechat-manager>
+                    <panel-settings v-if="store.view === 'panel-settings'"></panel-settings>
                     <player-manager v-if="store.view === 'players'"></player-manager>
                 </div>
         </template>

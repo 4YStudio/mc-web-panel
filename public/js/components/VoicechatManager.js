@@ -79,16 +79,16 @@ export default {
                     { key: 'port', label: $t('voice.port'), type: 'number', desc: 'Default 24454 (UDP)' },
                     { key: 'voice_host', label: $t('voice.host'), type: 'text', desc: $t('voice.host_desc') },
                     { key: 'voice_chat_password', label: $t('voice.password'), type: 'text', desc: 'Not recommended' },
-                    { key: 'max_packet_weight', label: 'Max Packet Weight', type: 'number', desc: 'Limit packet size' }
+                    { key: 'max_packet_weight', label: $t('voice.max_packet_weight'), type: 'number', desc: 'Limit packet size' }
                 ]
             },
             {
-                title: 'Quality & Distance',
+                title: $t('voice.quality_distance'),
                 items: [
-                    { key: 'voice_distance', label: 'Max Distance', type: 'number', desc: 'Default 48' },
-                    { key: 'crouch_distance', label: 'Crouch Distance', type: 'number', desc: 'Default 48' },
-                    { key: 'whisper_distance', label: 'Whisper Distance', type: 'number' },
-                    { key: 'audio_bitrate', label: 'Bitrate', type: 'select', options: ['16000', '32000', '48000', '64000', '96000'] }
+                    { key: 'voice_distance', label: $t('voice.max_distance'), type: 'number', desc: 'Default 48' },
+                    { key: 'crouch_distance', label: $t('voice.crouch_distance'), type: 'number', desc: 'Default 48' },
+                    { key: 'whisper_distance', label: $t('voice.whisper_distance'), type: 'number' },
+                    { key: 'audio_bitrate', label: $t('voice.bitrate'), type: 'select', options: ['16000', '32000', '48000', '64000', '96000'] }
                 ]
             }
         ]);

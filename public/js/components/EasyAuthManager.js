@@ -12,15 +12,15 @@ const createRegex = (key) => new RegExp(`("^|\\n|\\s)${key}\\s*[:=]\\s*([^\\n#]+
 // Will rely on users understanding English config terms or update them later.
 const SCHEMAS = {
     'main.conf': [
-        { title: 'Login & Session', items: [{ key: 'premium-auto-login', label: 'Premium Auto Login', type: 'boolean' }, { key: 'offline-by-default', label: 'Offline by Default', type: 'boolean' }, { key: 'session-timeout', label: 'Session Timeout (s)', type: 'number' }, { key: 'max-login-tries', label: 'Max Login Tries', type: 'number' }, { key: 'kick-timeout', label: 'Kick Timeout (s)', type: 'number' }] },
-        { title: 'Global Password', items: [{ key: 'enable-global-password', label: 'Enable Global Password', type: 'boolean' }, { key: 'single-use-global-password', label: 'Single Use', type: 'boolean' }] },
-        { title: 'Others', items: [{ key: 'hide-player-coords', label: 'Hide Coords', type: 'boolean' }, { key: 'debug', label: 'Debug Mode', type: 'boolean' }] }
+        { titleKey: 'easyauth.config_groups.login_session', items: [{ key: 'premium-auto-login', labelKey: 'easyauth.config_labels.premium_auto_login', type: 'boolean' }, { key: 'offline-by-default', labelKey: 'easyauth.config_labels.offline_by_default', type: 'boolean' }, { key: 'session-timeout', labelKey: 'easyauth.config_labels.session_timeout', type: 'number' }, { key: 'max-login-tries', labelKey: 'easyauth.config_labels.max_login_tries', type: 'number' }, { key: 'kick-timeout', labelKey: 'easyauth.config_labels.kick_timeout', type: 'number' }] },
+        { titleKey: 'easyauth.config_groups.global_password', items: [{ key: 'enable-global-password', labelKey: 'easyauth.config_labels.enable_global_password', type: 'boolean' }, { key: 'single-use-global-password', labelKey: 'easyauth.config_labels.single_use_global_password', type: 'boolean' }] },
+        { titleKey: 'easyauth.config_groups.others', items: [{ key: 'hide-player-coords', labelKey: 'easyauth.config_labels.hide_player_coords', type: 'boolean' }, { key: 'debug', labelKey: 'easyauth.config_labels.debug', type: 'boolean' }] }
     ],
     'extended.conf': [
-        { title: 'Restrictions (Unlogged)', items: [{ key: 'allow-chat', label: 'Allow Chat', type: 'boolean' }, { key: 'allow-commands', label: 'Allow Commands', type: 'boolean' }, { key: 'allow-movement', label: 'Allow Movement', type: 'boolean' }, { key: 'allow-block-interaction', label: 'Allow Interaction', type: 'boolean' }, { key: 'allow-block-breaking', label: 'Allow Breaking', type: 'boolean' }, { key: 'hide-inventory', label: 'Hide Inventory', type: 'boolean' }, { key: 'player-invulnerable', label: 'Invulnerable', type: 'boolean' }] },
-        { title: 'Rules', items: [{ key: 'min-password-length', label: 'Min Password Length', type: 'number' }, { key: 'max-password-length', label: 'Max Password Length', type: 'number' }, { key: 'username-regexp', label: 'Username Regex', type: 'text' }] }
+        { titleKey: 'easyauth.config_groups.restrictions', items: [{ key: 'allow-chat', labelKey: 'easyauth.config_labels.allow_chat', type: 'boolean' }, { key: 'allow-commands', labelKey: 'easyauth.config_labels.allow_commands', type: 'boolean' }, { key: 'allow-movement', labelKey: 'easyauth.config_labels.allow_movement', type: 'boolean' }, { key: 'allow-block-interaction', labelKey: 'easyauth.config_labels.allow_block_interaction', type: 'boolean' }, { key: 'allow-block-breaking', labelKey: 'easyauth.config_labels.allow_block_breaking', type: 'boolean' }, { key: 'hide-inventory', labelKey: 'easyauth.config_labels.hide_inventory', type: 'boolean' }, { key: 'player-invulnerable', labelKey: 'easyauth.config_labels.player_invulnerable', type: 'boolean' }] },
+        { titleKey: 'easyauth.config_groups.rules', items: [{ key: 'min-password-length', labelKey: 'easyauth.config_labels.min_password_length', type: 'number' }, { key: 'max-password-length', labelKey: 'easyauth.config_labels.max_password_length', type: 'number' }, { key: 'username-regexp', labelKey: 'easyauth.config_labels.username_regexp', type: 'text' }] }
     ],
-    'translation.conf': [{ title: 'Translation', items: [{ key: 'enable-server-side-translation', label: 'Server Side Translation', type: 'boolean' }] }]
+    'translation.conf': [{ titleKey: 'easyauth.config_groups.others', items: [{ key: 'enable-server-side-translation', labelKey: 'easyauth.config_labels.enable_server_side_translation', type: 'boolean' }] }]
 };
 
 export default {
@@ -37,7 +37,7 @@ export default {
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='users'}" @click="currentTab='users'">{{ $t('easyauth.users') }}</a></li>
-            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">Config</a></li>
+            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">{{ $t('easyauth.config') }}</a></li>
         </ul>
 
         <!-- 1. 用户列表 -->
@@ -92,10 +92,10 @@ export default {
                     <div class="row g-3">
                         <div class="col-md-12" v-for="(group, idx) in currentSchema" :key="idx">
                             <div class="card border-secondary-subtle">
-                                <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
+                                <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
                                 <div class="card-body">
                                     <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                                        <label class="col-sm-5 col-form-label small">{{ item.label }}</label>
+                                        <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
                                         <div class="col-sm-7">
                                             <div v-if="item.type === 'boolean'" class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
                                             <input v-else-if="item.type === 'number'" type="number" class="form-control form-control-sm" v-model="formModel[item.key]">
@@ -131,9 +131,9 @@ export default {
         const askChangePass = (username) => {
             openModal({
                 title: `${$t('easyauth.password')}: ${username}`,
-                message: 'Enter new password (>4 chars):',
+                message: $t('easyauth.new_password_prompt'),
                 mode: 'input',
-                placeholder: 'New Password...',
+                placeholder: $t('easyauth.new_password_placeholder'),
                 callback: async (newPass) => {
                     if (!newPass) return;
                     try {

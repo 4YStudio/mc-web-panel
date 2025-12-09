@@ -6,10 +6,10 @@ import { showToast, openModal } from '../utils.js';
 // 这里为了简单，配置项的 label 暂时保留硬编码或需要后端提供 i18n key。
 // 假设用户接受配置项本身是技术性的英文或中文。在此演示中，主要汉化界面元素。
 const CONFIG_GROUPS = [
-    { title: '基础设置', items: [{ key: 'config.advancedbackups.enabled', label: '启用自动备份', type: 'boolean' }, { key: 'config.advancedbackups.type', label: '备份类型', type: 'select', options: ['zip', 'differential', 'incremental'] }, { key: 'config.advancedbackups.activity', label: '仅活动时备份', type: 'boolean' }, { key: 'config.advancedbackups.save', label: '备份前保存', type: 'boolean' }] },
-    { title: '计划与频率', items: [{ key: 'config.advancedbackups.frequency.min', label: '最小间隔(小时)', type: 'number', step: 0.1 }, { key: 'config.advancedbackups.frequency.max', label: '最大间隔(小时)', type: 'number', step: 0.5 }, { key: 'config.advancedbackups.frequency.uptime', label: '使用运行时间', type: 'boolean' }, { key: 'config.advancedbackups.frequency.schedule', label: '定时计划', type: 'text' }] },
-    { title: '清理策略', items: [{ key: 'config.advancedbackups.purge.size', label: '最大占用(GB)', type: 'number' }, { key: 'config.advancedbackups.purge.days', label: '保留天数', type: 'number' }, { key: 'config.advancedbackups.purge.count', label: '保留数量', type: 'number' }] },
-    { title: '高级选项', items: [{ key: 'config.advancedbackups.zips.compression', label: '压缩等级', type: 'range', min: 1, max: 9 }, { key: 'config.advancedbackups.buffer', label: 'Buffer', type: 'number' }, { key: 'config.advancedbackups.path', label: '备份路径', type: 'text' }, { key: 'config.advancedbackups.blacklist', label: '黑名单', type: 'text' }] }
+    { titleKey: 'backups.config_groups.basic', items: [{ key: 'config.advancedbackups.enabled', labelKey: 'backups.config_labels.enabled', type: 'boolean' }, { key: 'config.advancedbackups.type', labelKey: 'backups.config_labels.type', type: 'select', options: ['zip', 'differential', 'incremental'] }, { key: 'config.advancedbackups.activity', labelKey: 'backups.config_labels.activity', type: 'boolean' }, { key: 'config.advancedbackups.save', labelKey: 'backups.config_labels.save', type: 'boolean' }] },
+    { titleKey: 'backups.config_groups.schedule', items: [{ key: 'config.advancedbackups.frequency.min', labelKey: 'backups.config_labels.freq_min', type: 'number', step: 0.1 }, { key: 'config.advancedbackups.frequency.max', labelKey: 'backups.config_labels.freq_max', type: 'number', step: 0.5 }, { key: 'config.advancedbackups.frequency.uptime', labelKey: 'backups.config_labels.freq_uptime', type: 'boolean' }, { key: 'config.advancedbackups.frequency.schedule', labelKey: 'backups.config_labels.freq_schedule', type: 'text' }] },
+    { titleKey: 'backups.config_groups.purge', items: [{ key: 'config.advancedbackups.purge.size', labelKey: 'backups.config_labels.purge_size', type: 'number' }, { key: 'config.advancedbackups.purge.days', labelKey: 'backups.config_labels.purge_days', type: 'number' }, { key: 'config.advancedbackups.purge.count', labelKey: 'backups.config_labels.purge_count', type: 'number' }] },
+    { titleKey: 'backups.config_groups.advanced', items: [{ key: 'config.advancedbackups.zips.compression', labelKey: 'backups.config_labels.compression', type: 'range', min: 1, max: 9 }, { key: 'config.advancedbackups.buffer', labelKey: 'backups.config_labels.buffer', type: 'number' }, { key: 'config.advancedbackups.path', labelKey: 'backups.config_labels.path', type: 'text' }, { key: 'config.advancedbackups.blacklist', labelKey: 'backups.config_labels.blacklist', type: 'text' }] }
 ];
 
 export default {
@@ -28,7 +28,7 @@ export default {
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='list'}" @click="currentTab='list'">{{ $t('backups.list_title') }}</a></li>
-            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">Config</a></li>
+            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">{{ $t('backups.config') }}</a></li>
         </ul>
 
         <div v-if="currentTab === 'list'">
@@ -54,13 +54,13 @@ export default {
             <div v-if="editMode === 'gui'" class="row g-4">
                 <div class="col-md-6" v-for="(group, idx) in CONFIG_GROUPS" :key="idx">
                     <div class="card h-100 border-secondary-subtle">
-                        <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
+                        <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
                         <div class="card-body">
                             <div v-for="item in group.items" :key="item.key" class="mb-3">
-                                <div v-if="item.type === 'boolean'" class="form-check form-switch d-flex justify-content-between"><label class="form-check-label">{{ item.label }}</label><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
-                                <div v-else-if="item.type === 'select'"><label class="form-label small text-muted">{{ item.label }}</label><select class="form-select form-select-sm" v-model="formModel[item.key]"><option v-for="opt in item.options" :value="opt">{{ opt }}</option></select></div>
-                                <div v-else-if="item.type === 'range'"><label class="form-label small text-muted d-flex justify-content-between"><span>{{ item.label }}</span><span class="text-primary">{{ formModel[item.key] }}</span></label><input type="range" class="form-range" :min="item.min" :max="item.max" v-model="formModel[item.key]"></div>
-                                <div v-else><label class="form-label small text-muted">{{ item.label }}</label><input :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]" :step="item.step"></div>
+                                <div v-if="item.type === 'boolean'" class="form-check form-switch d-flex justify-content-between"><label class="form-check-label">{{ $t(item.labelKey) }}</label><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
+                                <div v-else-if="item.type === 'select'"><label class="form-label small text-muted">{{ $t(item.labelKey) }}</label><select class="form-select form-select-sm" v-model="formModel[item.key]"><option v-for="opt in item.options" :value="opt">{{ opt }}</option></select></div>
+                                <div v-else-if="item.type === 'range'"><label class="form-label small text-muted d-flex justify-content-between"><span>{{ $t(item.labelKey) }}</span><span class="text-primary">{{ formModel[item.key] }}</span></label><input type="range" class="form-range" :min="item.min" :max="item.max" v-model="formModel[item.key]"></div>
+                                <div v-else><label class="form-label small text-muted">{{ $t(item.labelKey) }}</label><input :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]" :step="item.step"></div>
                             </div>
                         </div>
                     </div>

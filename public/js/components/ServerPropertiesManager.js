@@ -9,53 +9,53 @@ import { showToast } from '../utils.js';
 // Actually, I can wrap the whole PROP_GROUPS in a function or just use Title keys.
 const PROP_GROUPS = [
     {
-        title: '基础设置 (General)',
+        titleKey: 'properties.groups.general',
         items: [
-            { key: 'motd', label: 'Motd', type: 'text' },
-            { key: 'server-port', label: 'Port', type: 'number' },
-            { key: 'max-players', label: 'Max Players', type: 'number' },
-            { key: 'online-mode', label: 'Online Mode', type: 'boolean' },
-            { key: 'white-list', label: 'White List', type: 'boolean' },
-            { key: 'enable-rcon', label: 'Enable RCON', type: 'boolean' }
+            { key: 'motd', labelKey: 'properties.labels.motd', type: 'text' },
+            { key: 'server-port', labelKey: 'properties.labels.port', type: 'number' },
+            { key: 'max-players', labelKey: 'properties.labels.max_players', type: 'number' },
+            { key: 'online-mode', labelKey: 'properties.labels.online_mode', type: 'boolean' },
+            { key: 'white-list', labelKey: 'properties.labels.white_list', type: 'boolean' },
+            { key: 'enable-rcon', labelKey: 'properties.labels.enable_rcon', type: 'boolean' }
         ]
     },
     {
-        title: '游戏规则 (Gameplay)',
+        titleKey: 'properties.groups.gameplay',
         items: [
-            { key: 'gamemode', label: 'Gamemode', type: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
-            { key: 'force-gamemode', label: 'Force Gamemode', type: 'boolean' },
-            { key: 'difficulty', label: 'Difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
-            { key: 'hardcore', label: 'Hardcore', type: 'boolean' },
-            { key: 'pvp', label: 'PVP', type: 'boolean' },
-            { key: 'allow-flight', label: 'Allow Flight', type: 'boolean' }
+            { key: 'gamemode', labelKey: 'properties.labels.gamemode', type: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
+            { key: 'force-gamemode', labelKey: 'properties.labels.force_gamemode', type: 'boolean' },
+            { key: 'difficulty', labelKey: 'properties.labels.difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
+            { key: 'hardcore', labelKey: 'properties.labels.hardcore', type: 'boolean' },
+            { key: 'pvp', labelKey: 'properties.labels.pvp', type: 'boolean' },
+            { key: 'allow-flight', labelKey: 'properties.labels.allow_flight', type: 'boolean' }
         ]
     },
     {
-        title: '世界生成 (World)',
+        titleKey: 'properties.groups.world',
         items: [
-            { key: 'level-seed', label: 'Seed', type: 'text' },
-            { key: 'level-type', label: 'Level Type', type: 'select', options: ['minecraft:normal', 'minecraft:flat', 'minecraft:large_biomes', 'minecraft:amplified'] },
-            { key: 'level-name', label: 'Level Name', type: 'text' },
-            { key: 'generate-structures', label: 'Generate Structures', type: 'boolean' },
-            { key: 'allow-nether', label: 'Allow Nether', type: 'boolean' }
+            { key: 'level-seed', labelKey: 'properties.labels.level_seed', type: 'text' },
+            { key: 'level-type', labelKey: 'properties.labels.level_type', type: 'select', options: ['minecraft:normal', 'minecraft:flat', 'minecraft:large_biomes', 'minecraft:amplified'] },
+            { key: 'level-name', labelKey: 'properties.labels.level_name', type: 'text' },
+            { key: 'generate-structures', labelKey: 'properties.labels.generate_structures', type: 'boolean' },
+            { key: 'allow-nether', labelKey: 'properties.labels.allow_nether', type: 'boolean' }
         ]
     },
     {
-        title: '生成控制 (Spawning)',
+        titleKey: 'properties.groups.spawning',
         items: [
-            { key: 'spawn-monsters', label: 'Spawn Monsters', type: 'boolean' },
-            { key: 'spawn-animals', label: 'Spawn Animals', type: 'boolean' },
-            { key: 'spawn-npcs', label: 'Spawn NPCs', type: 'boolean' },
-            { key: 'difficulty', label: 'Difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] }
+            { key: 'spawn-monsters', labelKey: 'properties.labels.spawn_monsters', type: 'boolean' },
+            { key: 'spawn-animals', labelKey: 'properties.labels.spawn_animals', type: 'boolean' },
+            { key: 'spawn-npcs', labelKey: 'properties.labels.spawn_npcs', type: 'boolean' },
+            { key: 'difficulty', labelKey: 'properties.labels.difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] }
         ]
     },
     {
-        title: '性能与网络 (Network)',
+        titleKey: 'properties.groups.network',
         items: [
-            { key: 'view-distance', label: 'View Distance', type: 'number', min: 2, max: 32 },
-            { key: 'simulation-distance', label: 'Sim Distance', type: 'number', min: 2, max: 32 },
-            { key: 'max-tick-time', label: 'Max Tick Time', type: 'number' },
-            { key: 'rate-limit', label: 'Rate Limit', type: 'number' }
+            { key: 'view-distance', labelKey: 'properties.labels.view_distance', type: 'number', min: 2, max: 32 },
+            { key: 'simulation-distance', labelKey: 'properties.labels.simulation_distance', type: 'number', min: 2, max: 32 },
+            { key: 'max-tick-time', labelKey: 'properties.labels.max_tick_time', type: 'number' },
+            { key: 'rate-limit', labelKey: 'properties.labels.rate_limit', type: 'number' }
         ]
     }
 ];
@@ -102,10 +102,10 @@ export default {
         <div v-if="editMode === 'gui'" class="row g-4 pb-4">
             <div class="col-md-6" v-for="(group, idx) in PROP_GROUPS" :key="idx">
                 <div class="card h-100 border-secondary">
-                    <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
+                    <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
                     <div class="card-body">
                         <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                            <label class="col-sm-5 col-form-label small">{{ item.label }}</label>
+                            <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
                             <div class="col-sm-7">
                                 
                                 <!-- Boolean -->

@@ -21,6 +21,7 @@ export default {
             <a v-if="store.hasBackupMod" class="nav-link" :class="{active: store.view === 'backups'}" @click="selectView('backups')"><i class="fa-solid fa-clock-rotate-left"></i> {{ $t('sidebar.backups') }}</a>
             <a v-if="store.hasEasyAuth" class="nav-link" :class="{active: store.view === 'easyauth'}" @click="selectView('easyauth')"><i class="fa-solid fa-user-shield"></i> {{ $t('sidebar.auth') }}</a>
             <a v-if="store.hasVoicechat" class="nav-link" :class="{active: store.view === 'voicechat'}" @click="selectView('voicechat')"><i class="fa-solid fa-microphone"></i> {{ $t('sidebar.voicechat') }}</a>
+            <a class="nav-link" :class="{active: store.view === 'panel-settings'}" @click="selectView('panel-settings')"><i class="fa-solid fa-cog"></i> {{ $t('panel_settings.title') }}</a>
             <a class="nav-link" :class="{active: store.view === 'players'}" @click="selectView('players')"><i class="fa-solid fa-users"></i> {{ $t('sidebar.players') }}</a>
         </nav>
 
