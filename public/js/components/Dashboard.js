@@ -2,21 +2,28 @@ import { store } from '../store.js';
 import { api } from '../api.js';
 import { showToast, formatLog } from '../utils.js';
 import { ref, nextTick, watch } from '/js/vue.esm-browser.js';
+import SetupWizard from './SetupWizard.js';
 
 export default {
+    components: { SetupWizard },
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="fw-bold m-0 tracking-tight">{{ $t('dashboard.console_title') }}</h3>
-            <div>
-                <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-4 shadow-sm"><i class="fa-solid fa-play me-2"></i>{{ $t('dashboard.start') }}</button>
-                <button v-else @click="serverAction('stop')" class="btn btn-danger px-4 shadow-sm"><i class="fa-solid fa-stop me-2"></i>{{ $t('dashboard.stop') }}</button>
+        <!-- Setup Wizard -->
+        <SetupWizard v-if="!store.isSetup" @setup-complete="onSetupComplete" />
+
+        <!-- Normal Dashboard -->
+        <div v-else>
+            <div class="d-flex justify-content-between align-items-center mb-4 animate-in delay-100">
+                <h3 class="fw-bold m-0 tracking-tight">{{ $t('dashboard.console_title') }}</h3>
+                <div>
+                    <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-4 shadow-sm"><i class="fa-solid fa-play me-2"></i>{{ $t('dashboard.start') }}</button>
+                    <button v-else @click="serverAction('stop')" class="btn btn-danger px-4 shadow-sm"><i class="fa-solid fa-stop me-2"></i>{{ $t('dashboard.stop') }}</button>
+                </div>
             </div>
-        </div>
 
         <!-- System Stats Overview -->
         <div class="row g-4 mb-4">
-            <div class="col-md-6">
+            <div class="col-md-6 animate-in delay-200">
                 <div class="card h-100 border-0">
                     <div class="card-header bg-transparent border-0 pb-0 pt-4 px-4">
                         <div class="d-flex justify-content-between align-items-center">
@@ -33,11 +40,15 @@ export default {
                          <div class="progress mb-3" style="height: 8px; border-radius: 4px;">
                             <div class="progress-bar bg-success" :style="{width: (store.stats.mc.maxPlayers > 0 ? (store.stats.mc.online/store.stats.mc.maxPlayers*100) : 0) + '%'}"></div>
                          </div>
-                         <div class="text-truncate small text-muted font-monospace"><i class="fa-solid fa-quote-left me-2 opacity-50"></i>{{ store.stats.mc.motd }}</div>
+                         <div class="text-truncate small text-muted font-monospace mb-1"><i class="fa-solid fa-quote-left me-2 opacity-50"></i>{{ store.stats.mc.motd }}</div>
+                         <div class="d-flex justify-content-between small text-muted border-top pt-2 mt-2">
+                            <span>{{ $t('dashboard.target') }}: {{ store.stats.version?.mc || 'Unknown' }}</span>
+                            <span>{{ $t('dashboard.loader') }}: {{ store.stats.version?.loader || 'Unknown' }}</span>
+                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6 animate-in delay-300">
                  <div class="card h-100 border-0">
                     <div class="card-header bg-transparent border-0 pb-0 pt-4 px-4">
                         <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
@@ -66,13 +77,14 @@ export default {
             </div>
         </div>
 
-        <div class="console-output mb-3" id="consoleBox">
+        <div class="console-output mb-3 animate-in delay-300" id="consoleBox">
             <div v-for="(log,i) in store.logs" :key="i" v-html="formatLog(log)"></div>
         </div>
         <div class="input-group">
             <input type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')">
             <button class="btn btn-primary" @click="sendCommand">{{ $t('dashboard.send') }}</button>
         </div>
+        </div> <!-- End Normal Dashboard -->
     </div>
     `,
     setup() {
@@ -83,6 +95,12 @@ export default {
                 const el = document.getElementById('consoleBox');
                 if (el) el.scrollTop = el.scrollHeight;
             });
+        };
+
+        const onSetupComplete = () => {
+            store.isSetup = true; // Optimistic update
+            // Reload page or re-fetch status might be safer but this works for now
+            location.reload();
         };
 
         // 监听日志变化自动滚动
@@ -96,6 +114,6 @@ export default {
             }
         };
 
-        return { store, command, serverAction, sendCommand, formatLog };
+        return { store, command, serverAction, sendCommand, formatLog, onSetupComplete };
     }
 };

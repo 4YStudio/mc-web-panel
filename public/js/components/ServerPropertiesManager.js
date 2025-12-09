@@ -78,18 +78,21 @@ export default {
 
         <!-- 服务器图标管理 -->
         <div class="card mb-4 border-secondary-subtle">
-            <div class="card-header bg-body-tertiary fw-bold">Server Icon</div>
+            <div class="card-header bg-body-tertiary fw-bold">{{ $t('properties.server_icon') }}</div>
             <div class="card-body d-flex align-items-center gap-4">
                 <div class="position-relative">
-                    <img :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @error="iconLoadError">
+                    <img v-show="hasCustomIcon" :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @load="hasCustomIcon=true" @error="iconLoadError">
+                    <div v-show="!hasCustomIcon" class="rounded border d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;">
+                        <i class="fa-solid fa-cube fa-2x opacity-50"></i>
+                    </div>
                 </div>
                 <div>
-                    <div class="mb-2 text-muted small">64x64 PNG</div>
+                    <div class="mb-2 text-muted small">{{ $t('properties.icon_tips') }}</div>
                     <div class="btn-group">
                         <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
                             <i class="fa-solid fa-upload me-1"></i>{{ $t('common.upload') }}
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" @click="deleteIcon">
+                        <button class="btn btn-sm btn-outline-danger" @click="deleteIcon" :disabled="!hasCustomIcon">
                             <i class="fa-solid fa-trash me-1"></i>{{ $t('common.delete') }}
                         </button>
                     </div>
@@ -149,17 +152,18 @@ export default {
         const FILE_PATH = 'server.properties';
         const iconUrl = ref('/api/server/icon');
         const iconInput = ref(null);
+        const hasCustomIcon = ref(false);
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
 
         const updateIconPreview = () => {
+            // Force reload with timestamp. We assume it might exist, or let error handler catch it.
+            // Resetting hasCustomIcon to true optimistically? No, better let the img load event decide.
+            // But if we deleted it, we know it's gone.
             iconUrl.value = `/api/server/icon?t=${store.serverIconVersion}`;
         }
         const iconLoadError = (e) => {
-            e.target.style.display = 'none'; // Hide if broken, but we need structure. 
-            // Better: reset to a placeholder image.
-            e.target.src = '/favicon.ico'; // Temporary fallback or similar
-            e.target.style.display = 'block';
+            hasCustomIcon.value = false;
         };
 
         // Watch global version
@@ -179,11 +183,12 @@ export default {
         };
 
         const deleteIcon = async () => {
-            if (!confirm('Reset Icon?')) return;
+            if (!confirm($t('properties.reset_icon_confirm'))) return;
             try {
                 await api.delete('/api/server/icon');
                 showToast($t('common.success'));
                 store.serverIconVersion = Date.now();
+                hasCustomIcon.value = false; // Directly update state
             } catch (err) { showToast('Error', 'danger'); }
         };
 
@@ -270,7 +275,7 @@ export default {
         return {
             editMode, fileContent, formModel, PROP_GROUPS,
             saveConfig, toggleEditMode, iconUrl, iconInput,
-            uploadIcon, deleteIcon, updateIconPreview, iconLoadError
+            uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon
         };
     }
 };

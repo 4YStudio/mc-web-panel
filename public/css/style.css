@@ -342,3 +342,88 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(150, 150, 150, 0.5);
 }
+
+/* --- Animations --- */
+
+/* Fade Transition (View Switch) */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.fade-enter-from {
+    opacity: 0;
+    transform: translateY(5px);
+}
+
+.fade-leave-to {
+    opacity: 0;
+    transform: translateY(-5px);
+}
+
+/* List Transitions (File Manager, Players) */
+.list-enter-active,
+.list-leave-active {
+    transition: all 0.2s ease;
+}
+
+.list-enter-from,
+.list-leave-to {
+    opacity: 0;
+    transform: translateX(-10px);
+}
+
+.list-move {
+    transition: transform 0.2s ease;
+}
+
+/* Dashboard Cards Entrance */
+@keyframes slideUpFade {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-in {
+    animation: slideUpFade 0.25s ease-out forwards;
+    opacity: 0;
+    /*Start hidden*/
+}
+
+/* Stagger delays */
+.delay-100 {
+    animation-delay: 0.1s;
+}
+
+.delay-200 {
+    animation-delay: 0.2s;
+}
+
+.delay-300 {
+    animation-delay: 0.3s;
+}
+
+/* Enhanced Micro-interactions */
+.btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:active {
+    transform: scale(0.96);
+}
+
+/* Modal Animation Enhancement */
+.modal.fade .modal-dialog {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(0.9);
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1);
+}

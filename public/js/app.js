@@ -53,8 +53,9 @@ const app = createApp({
             try {
                 const { data } = await api.get('/api/auth/check');
                 store.auth.isSetup = data.isSetup;
+                store.isSetup = data.isSetup; // Update root property
                 store.auth.loggedIn = data.authenticated;
-                if (!store.auth.isSetup) {
+                if (!store.auth.isSetup || !store.isSetup) {
                     const qr = await api.get('/api/auth/qr');
                     store.auth.qrCode = qr.data.qr;
                     store.auth.secret = qr.data.secret;
@@ -79,6 +80,7 @@ const app = createApp({
                 store.hasBackupMod = d.hasBackupMod;
                 store.hasEasyAuth = d.hasEasyAuth;
                 store.hasVoicechat = d.hasVoicechat;
+                store.isSetup = d.isSetup; // Sync dynamic setup state
             });
 
             // 回档进度监听

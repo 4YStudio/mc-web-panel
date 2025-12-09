@@ -84,30 +84,32 @@ export default {
                 </div>
             </div>
             <div class="col-md-9 h-100">
-                <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm border-secondary-subtle">
-                    <div class="card-header bg-body-tertiary small text-muted">{{ currentFile || 'Select File' }}</div>
-                    <textarea v-if="currentFile" class="form-control border-0 rounded-0 bg-body text-body h-100" style="font-family: monospace; resize: none;" v-model="fileContent" spellcheck="false"></textarea>
-                </div>
-                <div v-else class="h-100 overflow-auto pr-2">
-                    <div class="row g-3">
-                        <div class="col-md-12" v-for="(group, idx) in currentSchema" :key="idx">
-                            <div class="card border-secondary-subtle">
-                                <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
-                                <div class="card-body">
-                                    <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                                        <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
-                                        <div class="col-sm-7">
-                                            <div v-if="item.type === 'boolean'" class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
-                                            <input v-else-if="item.type === 'number'" type="number" class="form-control form-control-sm" v-model="formModel[item.key]">
-                                            <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]"><option v-for="opt in item.options" :value="opt">{{ opt }}</option></select>
-                                            <input v-else type="text" class="form-control form-control-sm" v-model="formModel[item.key]">
+                <Transition name="fade" mode="out-in">
+                    <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm border-secondary-subtle" key="text">
+                        <div class="card-header bg-body-tertiary small text-muted">{{ currentFile || 'Select File' }}</div>
+                        <textarea v-if="currentFile" class="form-control border-0 rounded-0 bg-body text-body h-100" style="font-family: monospace; resize: none;" v-model="fileContent" spellcheck="false"></textarea>
+                    </div>
+                    <div v-else class="h-100 overflow-auto pr-2" key="gui">
+                        <div class="row g-3">
+                            <div class="col-md-12" v-for="(group, idx) in currentSchema" :key="idx">
+                                <div class="card border-secondary-subtle">
+                                    <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
+                                    <div class="card-body">
+                                        <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
+                                            <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
+                                            <div class="col-sm-7">
+                                                <div v-if="item.type === 'boolean'" class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
+                                                <input v-else-if="item.type === 'number'" type="number" class="form-control form-control-sm" v-model="formModel[item.key]">
+                                                <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]"><option v-for="opt in item.options" :value="opt">{{ opt }}</option></select>
+                                                <input v-else type="text" class="form-control form-control-sm" v-model="formModel[item.key]">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </Transition>
             </div>
         </div>
     </div>

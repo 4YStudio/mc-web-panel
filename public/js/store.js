@@ -1,7 +1,8 @@
 import { reactive } from '/js/vue.esm-browser.js';
 
 export const store = reactive({
-    auth: { loggedIn: false, isSetup: true, qrCode: '', secret: '', token: '' },
+    auth: { loggedIn: false, isSetup: false, qrCode: '', secret: '', token: '' },
+    isSetup: false, // Added root property for Setup Wizard
     lang: 'zh', // 默认语言
     // 在线玩家列表
     onlinePlayers: [],

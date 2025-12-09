@@ -70,7 +70,9 @@ export const messages = {
             send_cmd_placeholder: '发送指令...',
             send: '发送',
             toast_sent: '已发送',
-            system: '系统'
+            system: '系统',
+            target: '版本',
+            loader: '加载器'
         },
         files: {
             path: '路径',
@@ -89,7 +91,9 @@ export const messages = {
             modal_compress_title: '压缩文件',
             modal_compress_name: '压缩包名称 (.zip)',
             modal_new_folder: '文件夹名称',
-            modal_new_file: '文件名称'
+            modal_new_file: '文件名称',
+            modal_edit_warning_title: '警告',
+            modal_edit_warning_msg: '文件 {name} 可能不是文本格式。确定要编辑吗？'
         },
         mods: {
             title: '模组列表',
@@ -209,6 +213,9 @@ export const messages = {
         },
         properties: {
             title: '服务器设置 (server.properties)',
+            server_icon: '服务器图标',
+            reset_icon_confirm: '确定要重置图标与其删除吗？',
+            icon_tips: '支持 64x64 PNG',
             filter: '筛选设置...',
             restart_tips: '修改后需要重启服务器才能生效。',
             key: '键',
@@ -282,6 +289,22 @@ export const messages = {
             reset_2fa_instruction: '请使用认证器扫描新的二维码',
             restarting: '面板正在重启...',
             validation_error: '验证失败'
+        },
+        setup: {
+            welcome: '欢迎使用 MC Panel',
+            desc: '检测到您的服务器目录为空。请按照指引安装一个新的 Minecraft 服务器。',
+            select_mc: '选择游戏版本',
+            select_loader: '选择加载器版本',
+            choose: '请选择...',
+            install: '一键安装',
+            installing: '正在安装...',
+            install_start_toast: '开始安装，请稍候...',
+            install_success_toast: '安装成功！即将刷新...',
+            install_fail_toast: '安装失败',
+            install_timeout_toast: '安装超时，请检查日志',
+            fetch_fail_mc: '获取游戏版本失败',
+            fetch_fail_loader: '获取加载器版本失败',
+            loading_versions: '正在获取版本列表...'
         }
     },
     en: {
@@ -353,7 +376,9 @@ export const messages = {
             send_cmd_placeholder: 'Send command...',
             send: 'Send',
             toast_sent: 'Command Sent',
-            system: 'System'
+            system: 'System',
+            target: 'Version',
+            loader: 'Loader'
         },
         files: {
             path: 'Path',
@@ -372,7 +397,9 @@ export const messages = {
             modal_compress_title: 'Compress Files',
             modal_compress_name: 'Archive Name (.zip)',
             modal_new_folder: 'Folder Name',
-            modal_new_file: 'File Name'
+            modal_new_file: 'File Name',
+            modal_edit_warning_title: 'Warning',
+            modal_edit_warning_msg: 'File {name} may not be text. Edit anyway?'
         },
         mods: {
             title: 'Mods List',
@@ -492,6 +519,9 @@ export const messages = {
         },
         properties: {
             title: 'Server Settings (server.properties)',
+            server_icon: 'Server Icon',
+            reset_icon_confirm: 'Reset Icon (Delete)?',
+            icon_tips: '64x64 PNG Supported',
             filter: 'Filter settings...',
             restart_tips: 'Restart server to apply changes.',
             key: 'Key',
@@ -565,6 +595,22 @@ export const messages = {
             reset_2fa_instruction: 'Please scan the new QR code with your authenticator',
             restarting: 'Panel is restarting...',
             validation_error: 'Validation Failed'
+        },
+        setup: {
+            welcome: 'Welcome to MC Panel',
+            desc: 'Your server directory appears to be empty. Follow the steps to install a new Minecraft server.',
+            select_mc: 'Select Game Version',
+            select_loader: 'Select Loader Version',
+            choose: 'Choose...',
+            install: 'Install Server',
+            installing: 'Installing...',
+            install_start_toast: 'Installation started. Please wait...',
+            install_success_toast: 'Installation successful! Refreshing...',
+            install_fail_toast: 'Installation failed',
+            install_timeout_toast: 'Installation timed out (check logs)',
+            fetch_fail_mc: 'Failed to fetch MC versions',
+            fetch_fail_loader: 'Failed to fetch Loader versions',
+            loading_versions: 'Loading versions...'
         }
     }
 };

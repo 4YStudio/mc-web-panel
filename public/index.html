@@ -77,25 +77,30 @@
                 </div>
 
                 <div class="content bg-body">
-                    <!-- 动态组件切换：使用 kebab-case -->
-                    <dashboard v-if="store.view === 'dashboard'"></dashboard>
-                    <server-properties-manager v-if="store.view === 'properties'"></server-properties-manager>
-                    <mods-manager v-if="store.view === 'mods'"></mods-manager>
-                    <file-manager v-if="store.view === 'files'"></file-manager>
-                    <backup-manager v-if="store.view === 'backups'"></backup-manager>
-                    <easy-auth-manager v-if="store.view === 'easyauth'"></easy-auth-manager>
-                    <voicechat-manager v-if="store.view === 'voicechat'"></voicechat-manager>
-                    <panel-settings v-if="store.view === 'panel-settings'"></panel-settings>
-                    <player-manager v-if="store.view === 'players'"></player-manager>
+                    <!-- 动态组件切换：使用 Transition 包裹 -->
+                    <Transition name="fade" mode="out-in">
+                        <dashboard v-if="store.view === 'dashboard'" key="dashboard"></dashboard>
+                        <server-properties-manager v-else-if="store.view === 'properties'"
+                            key="properties"></server-properties-manager>
+                        <mods-manager v-else-if="store.view === 'mods'" key="mods"></mods-manager>
+                        <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
+                        <backup-manager v-else-if="store.view === 'backups'" key="backups"></backup-manager>
+                        <easy-auth-manager v-else-if="store.view === 'easyauth'" key="easyauth"></easy-auth-manager>
+                        <voicechat-manager v-else-if="store.view === 'voicechat'" key="voicechat"></voicechat-manager>
+                        <panel-settings v-else-if="store.view === 'panel-settings'"
+                            key="panel-settings"></panel-settings>
+                        <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
+                    </Transition>
                 </div>
+            </div>
         </template>
 
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
     <script src="/js/axios.min.js"></script>
-
-    <!-- 5. 修改 Bootstrap JS -->
+    <script src="/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/socket.io.js"></script>
+    <!-- Vue.js (Dev / Prod) -->
     <script src="/js/bootstrap.bundle.min.js"></script>
 
     <!-- 主入口 -->
