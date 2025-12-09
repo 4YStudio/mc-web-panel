@@ -130,6 +130,55 @@ body {
     opacity: 0.8;
 }
 
+/* --- Sidebar Bottom Buttons --- */
+.sidebar .btn-light {
+    background-color: rgba(var(--c-primary-rgb), 0.08);
+    border-color: var(--c-border);
+    color: var(--c-text-primary);
+    transition: all 0.2s ease;
+}
+
+.sidebar .btn-light:hover {
+    background-color: rgba(var(--c-primary-rgb), 0.15);
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(var(--c-primary-rgb), 0.2);
+}
+
+.sidebar .btn-light:active {
+    transform: translateY(0);
+}
+
+/* Logout button specific styling */
+.sidebar .btn-light.text-danger {
+    color: #dc3545 !important;
+}
+
+.sidebar .btn-light.text-danger:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: #dc3545;
+    color: #dc3545 !important;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+}
+
+[data-bs-theme="dark"] .sidebar .btn-light {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--c-border);
+    color: var(--c-text-primary);
+}
+
+[data-bs-theme="dark"] .sidebar .btn-light:hover {
+    background-color: rgba(var(--c-primary-rgb), 0.15);
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+}
+
+[data-bs-theme="dark"] .sidebar .btn-light.text-danger:hover {
+    background-color: rgba(220, 53, 69, 0.15);
+    border-color: #dc3545;
+}
+
 /* --- Console --- */
 .console-output {
     background: var(--c-surface);
