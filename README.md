@@ -98,6 +98,27 @@ const JAVA_ARGS = ['-Xms2G', '-Xmx4G'];      // 修改内存分配
 
 ```bash
 node server.js
+
+//为了保证面板的完整性和安全性，建议使用PM2来管理面板
+
+//安装PM2
+npm install -g pm2
+
+//启动面板
+pm2 start server.js
+
+//设置开机自启动
+pm2 startup
+pm2 save
+
+//查看面板状态
+pm2 status
+
+//停止面板
+pm2 stop mc_panel
+
+//重启面板
+pm2 restart mc_panel
 ```
 
 启动成功后，控制台会输出访问地址，默认为：
