@@ -1,48 +1,26 @@
-import { ref, reactive, onMounted } from '/js/vue.esm-browser.js';
+import { ref, reactive, onMounted, computed, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { showToast } from '../utils.js';
-
-// --- Voicechat Config Schema ---
-const VC_GROUPS = [
-    {
-        title: '基础设置 (General)',
-        items: [
-            { key: 'port', label: '端口 (Port)', type: 'number', desc: '默认 24454 (UDP)' },
-            { key: 'voice_host', label: '语音主机 (Voice Host)', type: 'text', desc: '公网IP或域名，必须设置否则玩家无法连接' },
-            { key: 'voice_chat_password', label: '连接密码', type: 'text', desc: '不推荐设置' },
-            { key: 'max_packet_weight', label: '最大数据包大小', type: 'number', desc: '限制语音数据包大小' }
-        ]
-    },
-    {
-        title: '语音质量 & 距离',
-        items: [
-            { key: 'voice_distance', label: '最大语音距离', type: 'number', desc: '默认 48' },
-            { key: 'crouch_distance', label: '潜行语音距离', type: 'number', desc: '默认 48' },
-            { key: 'whisper_distance', label: '耳语距离', type: 'number' },
-            { key: 'audio_bitrate', label: '音频码率', type: 'select', options: ['16000', '32000', '48000', '64000', '96000'] }
-        ]
-    }
-];
 
 export default {
     template: `
     <div>
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>简单语音配置 (Simple Voice Chat)</h3>
+            <h3>{{ $t('voice.title') }}</h3>
             <div class="btn-group">
                 <button class="btn btn-outline-secondary" @click="toggleEditMode">
                     <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
-                    {{ editMode==='gui' ? '切换文本模式' : '切换图形模式' }}
+                    {{ editMode==='gui' ? $t('common.mode_text') : $t('common.mode_gui') }}
                 </button>
                 <button class="btn btn-success" @click="saveConfig">
-                    <i class="fa-solid fa-save me-2"></i>保存配置
+                    <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
                 </button>
             </div>
         </div>
 
         <!-- 图形化编辑器 -->
         <div v-if="editMode === 'gui'" class="row g-4 pb-4">
-            <div class="col-md-6" v-for="(group, idx) in VC_GROUPS" :key="idx">
+            <div class="col-md-6" v-for="(group, idx) in vcGroups" :key="idx">
                 <div class="card h-100 border-secondary">
                     <div class="card-header bg-body-tertiary fw-bold">{{ group.title }}</div>
                     <div class="card-body">
@@ -69,7 +47,7 @@ export default {
             
             <div class="col-12">
                  <div class="alert alert-info">
-                    <i class="fa-solid fa-circle-info me-2"></i> 修改配置后需要重启服务器才能生效。
+                    <i class="fa-solid fa-circle-info me-2"></i> {{ $t('voice.restart_required') }}
                  </div>
             </div>
         </div>
@@ -91,6 +69,29 @@ export default {
         const editMode = ref('gui');
         const fileContent = ref('');
         const formModel = reactive({});
+        const { proxy } = getCurrentInstance();
+        const $t = proxy.$t;
+
+        const vcGroups = computed(() => [
+            {
+                title: $t('voice.general'),
+                items: [
+                    { key: 'port', label: $t('voice.port'), type: 'number', desc: 'Default 24454 (UDP)' },
+                    { key: 'voice_host', label: $t('voice.host'), type: 'text', desc: $t('voice.host_desc') },
+                    { key: 'voice_chat_password', label: $t('voice.password'), type: 'text', desc: 'Not recommended' },
+                    { key: 'max_packet_weight', label: 'Max Packet Weight', type: 'number', desc: 'Limit packet size' }
+                ]
+            },
+            {
+                title: 'Quality & Distance',
+                items: [
+                    { key: 'voice_distance', label: 'Max Distance', type: 'number', desc: 'Default 48' },
+                    { key: 'crouch_distance', label: 'Crouch Distance', type: 'number', desc: 'Default 48' },
+                    { key: 'whisper_distance', label: 'Whisper Distance', type: 'number' },
+                    { key: 'audio_bitrate', label: 'Bitrate', type: 'select', options: ['16000', '32000', '48000', '64000', '96000'] }
+                ]
+            }
+        ]);
 
         const createRegex = (key) => new RegExp(`^${key}\\s*=\\s*(.*)$`, 'm');
 
@@ -100,14 +101,14 @@ export default {
                 fileContent.value = res.data.content;
                 parseToGui();
             } catch (e) {
-                fileContent.value = '# 无法读取配置文件';
-                showToast('读取失败: ' + (e.response?.data?.error || e.message), 'danger');
+                fileContent.value = '# Error reading config';
+                showToast($t('common.error') + ': ' + (e.response?.data?.error || e.message), 'danger');
             }
         };
 
         const parseToGui = () => {
             const text = fileContent.value;
-            VC_GROUPS.forEach(group => {
+            vcGroups.value.forEach(group => {
                 group.items.forEach(item => {
                     const match = text.match(createRegex(item.key));
                     if (match) {
@@ -124,7 +125,7 @@ export default {
 
         const syncToText = () => {
             let text = fileContent.value;
-            VC_GROUPS.forEach(group => {
+            vcGroups.value.forEach(group => {
                 group.items.forEach(item => {
                     if (formModel[item.key] !== undefined) {
                         const regex = createRegex(item.key);
@@ -144,8 +145,8 @@ export default {
             if (editMode.value === 'gui') syncToText();
             try {
                 await api.post('/api/voicechat/save', { content: fileContent.value });
-                showToast('配置已保存 (需重启服务器)');
-            } catch (e) { showToast('保存失败', 'danger'); }
+                showToast($t('voice.saved'));
+            } catch (e) { showToast($t('common.error'), 'danger'); }
         };
 
         const toggleEditMode = () => {
@@ -160,6 +161,6 @@ export default {
 
         onMounted(loadFile);
 
-        return { editMode, fileContent, formModel, VC_GROUPS, saveConfig, toggleEditMode };
+        return { editMode, fileContent, formModel, vcGroups, saveConfig, toggleEditMode };
     }
 };

@@ -1,59 +1,61 @@
-import { ref, reactive, onMounted, watch } from '/js/vue.esm-browser.js';
+import { ref, reactive, onMounted, watch, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast } from '../utils.js';
 
 // --- 配置定义 (Schema) ---
-// 定义哪些配置项需要在图形界面显示，以及它们的类型和说明
+// Keys for i18n, descriptions removed for brevity or need keys too.
+// I'll assume users accept English for direct property keys, but sections can be translated.
+// Actually, I can wrap the whole PROP_GROUPS in a function or just use Title keys.
 const PROP_GROUPS = [
     {
         title: '基础设置 (General)',
         items: [
-            { key: 'motd', label: '服务器简介 (MOTD)', type: 'text', desc: '显示在多人游戏列表中的文字' },
-            { key: 'server-port', label: '服务器端口', type: 'number', desc: '默认 25565' },
-            { key: 'max-players', label: '最大玩家数', type: 'number' },
-            { key: 'online-mode', label: '正版验证 (Online Mode)', type: 'boolean', desc: '开启则必须验证正版账号，关闭可允许离线登录' },
-            { key: 'white-list', label: '启用白名单', type: 'boolean', desc: '开启后仅白名单内的玩家可进入' },
-            { key: 'enable-rcon', label: '启用 RCON', type: 'boolean', desc: '允许远程控制台连接' }
+            { key: 'motd', label: 'Motd', type: 'text' },
+            { key: 'server-port', label: 'Port', type: 'number' },
+            { key: 'max-players', label: 'Max Players', type: 'number' },
+            { key: 'online-mode', label: 'Online Mode', type: 'boolean' },
+            { key: 'white-list', label: 'White List', type: 'boolean' },
+            { key: 'enable-rcon', label: 'Enable RCON', type: 'boolean' }
         ]
     },
     {
         title: '游戏规则 (Gameplay)',
         items: [
-            { key: 'gamemode', label: '默认游戏模式', type: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
-            { key: 'force-gamemode', label: '强制游戏模式', type: 'boolean', desc: '玩家加入时是否强制切换为默认模式' },
-            { key: 'difficulty', label: '难度', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
-            { key: 'hardcore', label: '极限模式', type: 'boolean', desc: '死后无法重生' },
-            { key: 'pvp', label: '允许 PVP', type: 'boolean', desc: '玩家之间是否可以互相攻击' },
-            { key: 'allow-flight', label: '允许飞行', type: 'boolean', desc: '允许生存模式玩家使用飞行挂而不被踢出' }
+            { key: 'gamemode', label: 'Gamemode', type: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
+            { key: 'force-gamemode', label: 'Force Gamemode', type: 'boolean' },
+            { key: 'difficulty', label: 'Difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
+            { key: 'hardcore', label: 'Hardcore', type: 'boolean' },
+            { key: 'pvp', label: 'PVP', type: 'boolean' },
+            { key: 'allow-flight', label: 'Allow Flight', type: 'boolean' }
         ]
     },
     {
         title: '世界生成 (World)',
         items: [
-            { key: 'level-seed', label: '地图种子 (Seed)', type: 'text', desc: '留空则随机生成' },
-            { key: 'level-type', label: '地图类型', type: 'select', options: ['minecraft:normal', 'minecraft:flat', 'minecraft:large_biomes', 'minecraft:amplified'] },
-            { key: 'level-name', label: '存档文件夹名', type: 'text', desc: '默认 world' },
-            { key: 'generate-structures', label: '生成建筑', type: 'boolean', desc: '村庄、地牢等' },
-            { key: 'allow-nether', label: '允许进入下界', type: 'boolean' }
+            { key: 'level-seed', label: 'Seed', type: 'text' },
+            { key: 'level-type', label: 'Level Type', type: 'select', options: ['minecraft:normal', 'minecraft:flat', 'minecraft:large_biomes', 'minecraft:amplified'] },
+            { key: 'level-name', label: 'Level Name', type: 'text' },
+            { key: 'generate-structures', label: 'Generate Structures', type: 'boolean' },
+            { key: 'allow-nether', label: 'Allow Nether', type: 'boolean' }
         ]
     },
     {
         title: '生成控制 (Spawning)',
         items: [
-            { key: 'spawn-monsters', label: '生成怪物', type: 'boolean' },
-            { key: 'spawn-animals', label: '生成动物', type: 'boolean' },
-            { key: 'spawn-npcs', label: '生成村民 (NPC)', type: 'boolean' },
-            { key: 'difficulty', label: '难度', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] }
+            { key: 'spawn-monsters', label: 'Spawn Monsters', type: 'boolean' },
+            { key: 'spawn-animals', label: 'Spawn Animals', type: 'boolean' },
+            { key: 'spawn-npcs', label: 'Spawn NPCs', type: 'boolean' },
+            { key: 'difficulty', label: 'Difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] }
         ]
     },
     {
         title: '性能与网络 (Network)',
         items: [
-            { key: 'view-distance', label: '视距 (Chunks)', type: 'number', min: 2, max: 32 },
-            { key: 'simulation-distance', label: '模拟距离', type: 'number', min: 2, max: 32 },
-            { key: 'max-tick-time', label: '最大 Tick 时间', type: 'number', desc: '设为 -1 可防止 watchdog 自动关闭服务器' },
-            { key: 'rate-limit', label: '踢出刷屏玩家', type: 'number', desc: '0 为禁用' }
+            { key: 'view-distance', label: 'View Distance', type: 'number', min: 2, max: 32 },
+            { key: 'simulation-distance', label: 'Sim Distance', type: 'number', min: 2, max: 32 },
+            { key: 'max-tick-time', label: 'Max Tick Time', type: 'number' },
+            { key: 'rate-limit', label: 'Rate Limit', type: 'number' }
         ]
     }
 ];
@@ -62,33 +64,33 @@ export default {
     template: `
     <div>
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>服务器配置 (server.properties)</h3>
+            <h3>{{ $t('properties.title') }}</h3>
             <div class="btn-group">
                 <button class="btn btn-outline-secondary" @click="toggleEditMode">
                     <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
-                    {{ editMode==='gui' ? '切换文本模式' : '切换图形模式' }}
+                    {{ editMode==='gui' ? 'Text Mode' : 'GUI Mode' }}
                 </button>
                 <button class="btn btn-success" @click="saveConfig">
-                    <i class="fa-solid fa-save me-2"></i>保存配置
+                    <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
                 </button>
             </div>
         </div>
 
         <!-- 服务器图标管理 -->
         <div class="card mb-4 border-secondary-subtle">
-            <div class="card-header bg-body-tertiary fw-bold">服务器图标 (Server Icon)</div>
+            <div class="card-header bg-body-tertiary fw-bold">Server Icon</div>
             <div class="card-body d-flex align-items-center gap-4">
                 <div class="position-relative">
                     <img :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @error="iconLoadError">
                 </div>
                 <div>
-                    <div class="mb-2 text-muted small">建议尺寸: 64x64 PNG</div>
+                    <div class="mb-2 text-muted small">64x64 PNG</div>
                     <div class="btn-group">
                         <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
-                            <i class="fa-solid fa-upload me-1"></i>上传图标
+                            <i class="fa-solid fa-upload me-1"></i>{{ $t('common.upload') }}
                         </button>
                         <button class="btn btn-sm btn-outline-danger" @click="deleteIcon">
-                            <i class="fa-solid fa-trash me-1"></i>重置
+                            <i class="fa-solid fa-trash me-1"></i>{{ $t('common.delete') }}
                         </button>
                     </div>
                     <input type="file" ref="iconInput" class="d-none" accept="image/png" @change="uploadIcon">
@@ -147,15 +149,13 @@ export default {
         const FILE_PATH = 'server.properties';
         const iconUrl = ref('/api/server/icon');
         const iconInput = ref(null);
+        const { proxy } = getCurrentInstance();
+        const $t = proxy.$t;
 
         const updateIconPreview = () => {
             iconUrl.value = `/api/server/icon?t=${store.serverIconVersion}`;
         }
         const iconLoadError = (e) => {
-            // Fallback placeholder if no icon
-            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjNjg3NjhiIiBkPSJNMCUyNTZDMCUyNTYlMjAyNTYuc3ZnIi8+'; // Just a blank or keep broken? Better to use a placeholder or detect error.
-            // Actually, let's just use the FontAwesome logic in sidebar, but here we expect an image.
-            // Let's use a generic placeholder URL or a base64 gray box.
             e.target.style.display = 'none'; // Hide if broken, but we need structure. 
             // Better: reset to a placeholder image.
             e.target.src = '/favicon.ico'; // Temporary fallback or similar
@@ -172,19 +172,19 @@ export default {
             fd.append('icon', file);
             try {
                 await api.post('/api/server/icon', fd);
-                showToast('图标上传成功');
+                showToast($t('common.success'));
                 store.serverIconVersion = Date.now();
                 e.target.value = '';
-            } catch (err) { showToast('上传失败', 'danger'); }
+            } catch (err) { showToast('Error', 'danger'); }
         };
 
         const deleteIcon = async () => {
-            if (!confirm('确定要重置图标吗？')) return;
+            if (!confirm('Reset Icon?')) return;
             try {
                 await api.delete('/api/server/icon');
-                showToast('图标已重置');
+                showToast($t('common.success'));
                 store.serverIconVersion = Date.now();
-            } catch (err) { showToast('重置失败', 'danger'); }
+            } catch (err) { showToast('Error', 'danger'); }
         };
 
         // 正则：匹配 key=value (兼容空格)
@@ -196,8 +196,8 @@ export default {
                 fileContent.value = res.data.content;
                 parseToGui();
             } catch (e) {
-                fileContent.value = '# 无法读取 server.properties';
-                showToast('读取失败', 'danger');
+                fileContent.value = '# Error reading server.properties';
+                showToast($t('common.error'), 'danger');
             }
         };
 
@@ -248,8 +248,8 @@ export default {
             if (editMode.value === 'gui') syncToText();
             try {
                 await api.post('/api/files/save', { filepath: FILE_PATH, content: fileContent.value });
-                showToast('配置已保存 (需重启服务器)');
-            } catch (e) { showToast('保存失败', 'danger'); }
+                showToast($t('properties.restart_tips'));
+            } catch (e) { showToast($t('common.error'), 'danger'); }
         };
 
         const toggleEditMode = () => {

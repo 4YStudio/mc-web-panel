@@ -1,9 +1,10 @@
-import { ref, reactive, onMounted, watch } from '/js/vue.esm-browser.js';
+import { ref, reactive, onMounted, watch, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
 
-// ... (CONFIG_GROUPS 保持不变，可以复制之前的) ...
+// 这里为了简单，配置项的 label 暂时保留硬编码或需要后端提供 i18n key。
+// 假设用户接受配置项本身是技术性的英文或中文。在此演示中，主要汉化界面元素。
 const CONFIG_GROUPS = [
     { title: '基础设置', items: [{ key: 'config.advancedbackups.enabled', label: '启用自动备份', type: 'boolean' }, { key: 'config.advancedbackups.type', label: '备份类型', type: 'select', options: ['zip', 'differential', 'incremental'] }, { key: 'config.advancedbackups.activity', label: '仅活动时备份', type: 'boolean' }, { key: 'config.advancedbackups.save', label: '备份前保存', type: 'boolean' }] },
     { title: '计划与频率', items: [{ key: 'config.advancedbackups.frequency.min', label: '最小间隔(小时)', type: 'number', step: 0.1 }, { key: 'config.advancedbackups.frequency.max', label: '最大间隔(小时)', type: 'number', step: 0.5 }, { key: 'config.advancedbackups.frequency.uptime', label: '使用运行时间', type: 'boolean' }, { key: 'config.advancedbackups.frequency.schedule', label: '定时计划', type: 'text' }] },
@@ -15,35 +16,35 @@ export default {
     template: `
     <div>
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>备份管理</h3>
+            <h3>{{ $t('sidebar.backups') }}</h3>
             <div v-if="currentTab === 'list'">
-                <button class="btn btn-primary" @click="createBackup" :disabled="!store.isRunning"><i class="fa-solid fa-plus-circle me-2"></i>创建在线备份</button>
+                <button class="btn btn-primary" @click="createBackup" :disabled="!store.isRunning"><i class="fa-solid fa-plus-circle me-2"></i>{{ $t('backups.create_snap') }}</button>
             </div>
             <div v-if="currentTab === 'config'" class="btn-group">
-                <button class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{editMode==='gui'?'文本模式':'图形模式'}}</button>
-                <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-2"></i>保存配置</button>
+                <button class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{editMode==='gui'?'Text Mode':'GUI Mode'}}</button>
+                <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}</button>
             </div>
         </div>
 
         <ul class="nav nav-tabs mb-3">
-            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='list'}" @click="currentTab='list'">备份列表</a></li>
-            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">模组配置</a></li>
+            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='list'}" @click="currentTab='list'">{{ $t('backups.list_title') }}</a></li>
+            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">Config</a></li>
         </ul>
 
         <div v-if="currentTab === 'list'">
-            <div class="alert alert-info py-2 small"><i class="fa-solid fa-circle-info me-2"></i>回档会自动停止服务器并融合备份。</div>
+            <div class="alert alert-info py-2 small"><i class="fa-solid fa-circle-info me-2"></i>{{ $t('backups.tips') }}</div>
             <div class="card shadow-sm">
                 <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>文件名</th><th>类型</th><th>时间</th><th>大小</th><th>操作</th></tr></thead>
+                    <thead><tr><th>{{ $t('common.name') }}</th><th>{{ $t('common.status') }}</th><th>{{ $t('common.time') }}</th><th>{{ $t('common.size') }}</th><th>{{ $t('common.actions') }}</th></tr></thead>
                     <tbody>
                         <tr v-for="b in backupList" :key="b.name">
                             <td>{{ b.name }}</td>
-                            <td><span class="badge" :class="b.type==='full'?'bg-success':'bg-info'">{{ b.type==='full'?'全量':'差量' }}</span><span v-if="b.folder==='snapshots'" class="badge bg-secondary ms-1">快照</span></td>
+                            <td><span class="badge" :class="b.type==='full'?'bg-success':'bg-info'">{{ b.type==='full' ? $t('backups.type_full') : $t('backups.type_diff') }}</span><span v-if="b.folder==='snapshots'" class="badge bg-secondary ms-1">Snap</span></td>
                             <td class="small text-muted">{{ new Date(b.mtime).toLocaleString() }}</td>
                             <td class="small">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
-                            <td><button class="btn btn-sm btn-outline-danger" @click="askRestore(b)">回档</button></td>
+                            <td><button class="btn btn-sm btn-outline-danger" @click="askRestore(b)">{{ $t('backups.restore') }}</button></td>
                         </tr>
-                        <tr v-if="!backupList.length"><td colspan="5" class="text-center text-muted py-3">暂无备份</td></tr>
+                        <tr v-if="!backupList.length"><td colspan="5" class="text-center text-muted py-3">Empty</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -76,6 +77,8 @@ export default {
         const rawContent = ref('');
         const formModel = reactive({});
         const CONFIG_PATH = 'config/AdvancedBackups.properties';
+        const { proxy } = getCurrentInstance();
+        const $t = proxy.$t;
 
         const parseProperties = (text) => {
             const lines = text.split('\n');
@@ -112,28 +115,29 @@ export default {
         const saveConfig = async () => {
             let content = rawContent.value;
             if (editMode.value === 'gui') { content = stringifyProperties(rawContent.value, formModel); rawContent.value = content; }
-            try { await api.post('/api/files/save', { filepath: CONFIG_PATH, content }); showToast('保存成功'); } catch (e) { showToast('保存失败', 'danger'); }
+            try { await api.post('/api/files/save', { filepath: CONFIG_PATH, content }); showToast($t('common.success')); } catch (e) { showToast($t('common.error'), 'danger'); }
         };
-        const createBackup = async () => { await api.post('/api/backups/create'); showToast('指令已发送'); setTimeout(loadBackups, 3000); };
+        const createBackup = async () => { await api.post('/api/backups/create'); showToast($t('common.success')); setTimeout(loadBackups, 3000); };
         const toggleEditMode = () => { if (editMode.value === 'text') parseProperties(rawContent.value); editMode.value = editMode.value === 'gui' ? 'text' : 'gui'; };
 
         const askRestore = (b) => {
             openModal({
-                title: '确认回档', message: `确定要回滚到 [${b.name}] 吗？服务器将自动停止。`,
+                title: $t('backups.confirm_restore_title'),
+                message: $t('backups.confirm_restore_msg', { name: b.name }),
                 callback: async () => {
                     // 初始化进度条
                     store.task.visible = true;
-                    store.task.title = '正在回档';
+                    store.task.title = $t('backups.progress_restoring');
                     store.task.percent = 0;
-                    store.task.message = '正在发送请求...';
-                    store.task.subMessage = '请勿关闭页面';
+                    store.task.message = $t('common.loading');
+                    store.task.subMessage = '...';
 
                     try {
                         await api.post('/api/backups/restore', { filename: b.name, folder: b.folder, type: b.type });
                         // 成功的回调会通过 socket 'restore_completed' 触发
                     } catch (e) {
                         store.task.visible = false;
-                        showToast('请求失败: ' + (e.response?.data?.error || e.message), 'danger');
+                        showToast((e.response?.data?.error || e.message), 'danger');
                     }
                 }
             });

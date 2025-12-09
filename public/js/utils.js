@@ -1,4 +1,17 @@
 import { ref } from '/js/vue.esm-browser.js';
+import { store } from './store.js';
+import { messages } from './i18n.js';
+
+// Simple translation helper for non-component files
+const t = (key) => {
+    const keys = key.split('.');
+    let value = messages[store.lang];
+    for (const k of keys) {
+        value = value?.[k];
+        if (!value) return key;
+    }
+    return value;
+};
 
 export const toasts = ref([]);
 
@@ -17,10 +30,12 @@ export const formatLog = (log) => {
         .replace(/(\/INFO\])/g, '/<span class="log-info">INFO</span>]')
         .replace(/(\/WARN\])/g, '/<span class="log-warn">WARN</span>]')
         .replace(/(\/ERROR\])/g, '/<span class="log-error">ERROR</span>]')
-        .replace(/(\[系统\])/g, '<span class="log-system">$1</span>');
+        .replace(/(\[系统\])/g, `<span class="log-system">
+        [${t('dashboard.system')}]
+        </span>`);
 };
 
-// 全局 Modal 状态
+// Global Modal State
 export const modalData = ref({ title: '', message: '', mode: 'confirm', inputValue: '', options: [], placeholder: '', callback: null });
 let modalInstance = null;
 
@@ -31,7 +46,7 @@ export const initModal = () => {
 
 export const openModal = (opts) => {
     modalData.value = {
-        title: opts.title || '确认操作',
+        title: opts.title || t('common.confirm'),
         message: opts.message || '',
         mode: opts.mode || 'confirm',
         inputValue: opts.inputValue || '',

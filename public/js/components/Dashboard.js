@@ -6,55 +6,58 @@ import { ref, nextTick, watch } from '/js/vue.esm-browser.js';
 export default {
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>控制台</h3>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold m-0 tracking-tight">{{ $t('dashboard.console_title') }}</h3>
             <div>
-                <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success"><i class="fa-solid fa-play"></i></button>
-                <button v-else @click="serverAction('stop')" class="btn btn-danger"><i class="fa-solid fa-stop"></i></button>
+                <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-4 shadow-sm"><i class="fa-solid fa-play me-2"></i>{{ $t('dashboard.start') }}</button>
+                <button v-else @click="serverAction('stop')" class="btn btn-danger px-4 shadow-sm"><i class="fa-solid fa-stop me-2"></i>{{ $t('dashboard.stop') }}</button>
             </div>
         </div>
 
         <!-- System Stats Overview -->
-        <div class="row g-3 mb-3">
+        <div class="row g-4 mb-4">
             <div class="col-md-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header bg-body-tertiary fw-bold small text-muted"><i class="fa-solid fa-server me-2"></i>MC 服务器信息</div>
-                    <div class="card-body">
-                         <div class="d-flex justify-content-between align-items-center mb-2">
-                             <div class="d-flex align-items-center">
-                                 <div class="rounded-circle me-2" :class="store.isRunning?'bg-success':'bg-danger'" style="width: 10px; height: 10px;"></div>
-                                 <span class="fw-bold">{{ store.isRunning ? '运行中' : '停止' }}</span>
-                             </div>
-                             <span class="badge bg-secondary font-monospace">{{ store.stats.mc.port }}</span>
+                <div class="card h-100 border-0">
+                    <div class="card-header bg-transparent border-0 pb-0 pt-4 px-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1"><i class="fa-solid fa-server me-2"></i>{{ $t('dashboard.server_info') }}</h6>
+                             <span class="badge rounded-pill font-monospace" :class="store.isRunning?'bg-success-subtle text-success':'bg-danger-subtle text-danger'">{{ store.isRunning ? $t('dashboard.state_running') : $t('dashboard.state_stopped') }}</span>
+                        </div>
+                    </div>
+                    <div class="card-body px-4 pb-4">
+                         <div class="d-flex align-items-end mb-3">
+                             <div class="display-6 fw-bold me-2">{{ store.stats.mc.online }}</div>
+                             <div class="text-muted mb-2">/ {{ store.stats.mc.maxPlayers }} {{ $t('dashboard.online_players') }}</div>
                          </div>
                          
-                         <label class="small text-muted mb-1">在线人数 ({{ store.stats.mc.online }} / {{ store.stats.mc.maxPlayers }})</label>
-                         <div class="progress mb-2" style="height: 6px;">
+                         <div class="progress mb-3" style="height: 8px; border-radius: 4px;">
                             <div class="progress-bar bg-success" :style="{width: (store.stats.mc.maxPlayers > 0 ? (store.stats.mc.online/store.stats.mc.maxPlayers*100) : 0) + '%'}"></div>
                          </div>
-                         <div class="text-truncate small text-muted" :title="store.stats.mc.motd">{{ store.stats.mc.motd }}</div>
+                         <div class="text-truncate small text-muted font-monospace"><i class="fa-solid fa-quote-left me-2 opacity-50"></i>{{ store.stats.mc.motd }}</div>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
-                 <div class="card h-100 shadow-sm">
-                    <div class="card-header bg-body-tertiary fw-bold small text-muted"><i class="fa-solid fa-gauge-high me-2"></i>系统资源</div>
-                    <div class="card-body">
-                         <div class="mb-2">
-                             <div class="d-flex justify-content-between small mb-1">
-                                 <span class="text-muted">CPU</span>
-                                 <span>{{ store.stats.cpu }}%</span>
+                 <div class="card h-100 border-0">
+                    <div class="card-header bg-transparent border-0 pb-0 pt-4 px-4">
+                        <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
+                    </div>
+                    <div class="card-body px-4 pb-4">
+                         <div class="mb-4">
+                             <div class="d-flex justify-content-between small mb-1 fw-bold">
+                                 <span>{{ $t('dashboard.cpu_usage') }}</span>
+                                 <span :class="{'text-danger': store.stats.cpu > 80}">{{ store.stats.cpu }}%</span>
                              </div>
-                             <div class="progress" style="height: 6px;">
-                                <div class="progress-bar bg-info" :style="{width: store.stats.cpu + '%'}"></div>
+                             <div class="progress" style="height: 8px; border-radius: 4px;">
+                                <div class="progress-bar bg-primary" :style="{width: store.stats.cpu + '%'}"></div>
                              </div>
                          </div>
                          <div>
-                             <div class="d-flex justify-content-between small mb-1">
-                                 <span class="text-muted">内存 ({{ store.stats.mem.used }}G / {{ store.stats.mem.total }}G)</span>
-                                 <span>{{ store.stats.mem.percentage }}%</span>
+                             <div class="d-flex justify-content-between small mb-1 fw-bold">
+                                 <span>{{ $t('dashboard.mem_usage') }} ({{ store.stats.mem.percentage }}%)</span>
+                                 <span class="text-muted font-monospace">{{ store.stats.mem.used }}G / {{ store.stats.mem.total }}G</span>
                              </div>
-                             <div class="progress" style="height: 6px;">
+                             <div class="progress" style="height: 8px; border-radius: 4px;">
                                 <div class="progress-bar bg-warning" :style="{width: store.stats.mem.percentage + '%'}"></div>
                              </div>
                          </div>
@@ -67,8 +70,8 @@ export default {
             <div v-for="(log,i) in store.logs" :key="i" v-html="formatLog(log)"></div>
         </div>
         <div class="input-group">
-            <input type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" placeholder="发送指令...">
-            <button class="btn btn-primary" @click="sendCommand">发送</button>
+            <input type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')">
+            <button class="btn btn-primary" @click="sendCommand">{{ $t('dashboard.send') }}</button>
         </div>
     </div>
     `,

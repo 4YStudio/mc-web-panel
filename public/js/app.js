@@ -16,6 +16,7 @@ import EasyAuthManager from './components/EasyAuthManager.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
 import VoicechatManager from './components/VoicechatManager.js';
+import { createI18n } from './i18n.js';
 
 const socket = io();
 
@@ -42,6 +43,10 @@ const app = createApp({
             // Theme Init using localStorage
             const savedTheme = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-bs-theme', savedTheme);
+
+            // Language Init
+            const savedLang = localStorage.getItem('lang') || 'zh';
+            store.lang = savedLang;
 
             try {
                 const { data } = await api.get('/api/auth/check');
@@ -117,4 +122,5 @@ const app = createApp({
     }
 });
 
+app.config.globalProperties.$t = createI18n(store);
 app.mount('#app');

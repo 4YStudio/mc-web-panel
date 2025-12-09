@@ -2,6 +2,7 @@ import { reactive } from '/js/vue.esm-browser.js';
 
 export const store = reactive({
     auth: { loggedIn: false, isSetup: true, qrCode: '', secret: '', token: '' },
+    lang: 'zh', // 默认语言
     // 在线玩家列表
     onlinePlayers: [],
     // 系统状态
