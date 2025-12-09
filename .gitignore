@@ -1,3 +1,7 @@
 node_modules/
 mc_server/
 data/
+runner/
+mc-web-panel-linux
+mc-web-panel-win.exe
+mc-web-panel-mac
