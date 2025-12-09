@@ -199,12 +199,26 @@ export default {
                         message: $t('panel_settings.restart_confirm'),
                         callback: async () => {
                             try {
+                                // 记录当前端口和新端口
+                                const currentPort = window.location.port || '80';
+                                const newPort = config.port.toString();
+                                const portChanged = currentPort !== newPort;
+
                                 await api.post('/api/panel/restart');
                                 showToast($t('panel_settings.restarting'), 'info');
 
-                                // 3秒后刷新页面
+                                // 3秒后跳转或刷新
                                 setTimeout(() => {
-                                    window.location.reload();
+                                    if (portChanged) {
+                                        // 端口改变,跳转到新端口
+                                        const protocol = window.location.protocol;
+                                        const hostname = window.location.hostname;
+                                        const newUrl = `${protocol}//${hostname}:${newPort}`;
+                                        window.location.href = newUrl;
+                                    } else {
+                                        // 端口未改变,直接刷新
+                                        window.location.reload();
+                                    }
                                 }, 3000);
                             } catch (e) {
                                 showToast($t('common.error'), 'danger');

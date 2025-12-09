@@ -21,14 +21,11 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose(); // 新增
 
 // --- 配置区域 ---
-const PORT = 3000;
 const MC_DIR = path.join(__dirname, 'mc_server');
 const DATA_DIR = path.join(__dirname, 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const SERVER_PROPERTIES = path.join(MC_DIR, 'server.properties');
-const JAR_NAME = 'fabric-server-launch.jar';
-const JAVA_ARGS = ['-Xms1G', '-Xmx4G'];
 const EASYAUTH_DIR = path.join(MC_DIR, 'EasyAuth');
 const EASYAUTH_DB = path.join(EASYAUTH_DIR, 'easyauth.db');
 const EASYAUTH_CONFIG_DIR = path.join(MC_DIR, 'config', 'EasyAuth');
@@ -69,7 +66,8 @@ const io = new Server(server);
 
 let mcProcess = null;
 let onlinePlayers = new Set();
-const MAX_LOG_HISTORY = 1000;
+// 使用配置中的值
+let MAX_LOG_HISTORY = appConfig.maxLogHistory || 1000;
 let logHistory = [];
 
 if (fs.existsSync(LOG_FILE)) {
@@ -93,7 +91,7 @@ app.use(session({
     secret: 'mc-panel-secret-v6',
     resave: false,
     saveUninitialized: true,
-    cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
+    cookie: { maxAge: appConfig.sessionTimeout * 24 * 60 * 60 * 1000 }
 }));
 
 const requireAuth = (req, res, next) => {
@@ -138,7 +136,7 @@ setInterval(async () => {
             });
         } catch (e) { }
     }
-}, 2000);
+}, appConfig.monitorInterval);
 
 
 // --- EasyAuth 管理 API (sqlite3 兼容版 - 修复表名) ---
@@ -612,7 +610,7 @@ app.post('/api/server/start', requireAuth, async (req, res) => {
     try { if (!await fs.pathExists(eulaPath) || !(await fs.readFile(eulaPath, 'utf8')).includes('eula=true')) await fs.writeFile(eulaPath, 'eula=true'); } catch (e) { }
     onlinePlayers.clear();
     appendLog('[系统] --- 正在启动服务器 ---\n');
-    mcProcess = spawn('java', [...JAVA_ARGS, '-jar', JAR_NAME, 'nogui'], { cwd: MC_DIR });
+    mcProcess = spawn('java', [...appConfig.javaArgs, '-jar', appConfig.jarName, 'nogui'], { cwd: MC_DIR });
     mcProcess.stdout.on('data', (data) => {
         const line = data.toString();
         appendLog(line);
@@ -700,4 +698,4 @@ app.post('/api/files/save', requireAuth, async (req, res) => { try { await fs.wr
 
 app.get('/api/lists/:type', requireAuth, async (req, res) => { try { res.json(await fs.readJson(path.join(MC_DIR, `${req.params.type}.json`))); } catch (e) { res.json([]); } });
 
-server.listen(PORT, () => console.log(`MC Panel v6.0 running on http://localhost:${PORT}`));
+server.listen(appConfig.port, () => console.log(`MC Panel v6.0 running on http://localhost:${appConfig.port}`));
