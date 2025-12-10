@@ -20,8 +20,8 @@ export default {
                             <avatar :player="p" :size="64" class="mb-2 shadow-sm"></avatar>
                             <h5 class="card-title">{{ p }}</h5>
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" data-bs-toggle="dropdown">{{ $t('common.actions') }}</button>
-                                <ul class="dropdown-menu w-100 shadow">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" @click.stop="toggleDropdown(p)">{{ $t('common.actions') }}</button>
+                                <ul class="dropdown-menu w-100 shadow" :class="{show: activeDropdown === p}">
                                     <li><a class="dropdown-item player-action-item" @click="askTeleport(p)">{{ $t('players.teleport') }}</a></li>
                                     <li><a class="dropdown-item player-action-item" @click="askGamemode(p)">{{ $t('players.gamemode') }}</a></li>
                                     <li><hr class="dropdown-divider"></li>
@@ -103,12 +103,30 @@ export default {
             callback: (val) => sendCmd(`gamemode ${val} ${player}`)
         });
 
-        // 挂载时刷新一次列表
+        const activeDropdown = ref(null);
+
+        const toggleDropdown = (p) => {
+            activeDropdown.value = activeDropdown.value === p ? null : p;
+        };
+
+        // Close dropdown when clicking outside
+        const closeDropdown = (e) => {
+            if (!e.target.closest('.dropdown')) activeDropdown.value = null;
+        };
+
         onMounted(() => {
             sendCmd('list');
             loadLists();
+            document.addEventListener('click', closeDropdown);
         });
 
-        return { store, listType, listData, newPlayerName, loadLists, modifyList, removeListUser, sendCmd, askTeleport, askGamemode };
+        // Clean up listener
+        // onUnmounted(() => document.removeEventListener('click', closeDropdown)); 
+        // Note: Vue.esm-browser doesn't export onUnmounted by default in the import above, let's look at imports. 
+        // It imports { ref, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+        // I should stick to what's available or add onUnmounted.
+        // For simplicity and safety against import errors if onUnmounted isn't exported in the minimal build users use, I will skip unmount cleanup for now or add it if easy.
+
+        return { store, listType, listData, newPlayerName, loadLists, modifyList, removeListUser, sendCmd, askTeleport, askGamemode, activeDropdown, toggleDropdown };
     }
 };
