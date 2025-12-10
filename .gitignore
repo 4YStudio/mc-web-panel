@@ -1,7 +1,29 @@
+# Node
 node_modules/
-mc_server/
+npm-debug.log
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build Artifacts
+dist_build/
+mc-web-panel-*
+node-*
+*.exe
+*.zip
+*.tar.gz
+*.tar.xz
+logo.ico
+
+# Runtime Data
 data/
+mc_server/
+logs/
+backups/
 runner/
-mc-web-panel-linux
-mc-web-panel-win.exe
-mc-web-panel-mac
+panel.log
+config/
+
+# OS
+.DS_Store
+Thumbs.db

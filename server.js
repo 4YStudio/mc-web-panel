@@ -23,12 +23,12 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose(); // 新增
 
 // --- 配置区域 ---
-// detect if running in pkg
-const isPkg = typeof process.pkg !== 'undefined';
-const BASE_DIR = isPkg ? process.cwd() : __dirname;
+// detect if running in compressed environment (pkg or caxa)
+// For caxa, __dirname is temp dir, process.cwd() is user dir.
+// We want data in user dir, static assets in temp dir.
 
-const MC_DIR = path.join(BASE_DIR, 'mc_server');
-const DATA_DIR = path.join(BASE_DIR, 'data');
+const MC_DIR = path.join(process.cwd(), 'mc_server');
+const DATA_DIR = path.join(process.cwd(), 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const SERVER_PROPERTIES = path.join(MC_DIR, 'server.properties');

@@ -1,7 +1,7 @@
 import { ref, reactive, onMounted, watch, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast } from '../utils.js';
+import { showToast, openModal } from '../utils.js';
 
 // --- 配置定义 (Schema) ---
 // Keys for i18n, descriptions removed for brevity or need keys too.
@@ -82,7 +82,7 @@ export default {
             <div class="card-body d-flex align-items-center gap-4">
                 <div class="position-relative">
                     <img v-show="hasCustomIcon" :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @load="hasCustomIcon=true" @error="iconLoadError">
-                    <div v-show="!hasCustomIcon" class="rounded border d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;">
+                    <div v-if="!hasCustomIcon" class="rounded border d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;">
                         <i class="fa-solid fa-cube fa-2x opacity-50"></i>
                     </div>
                 </div>
@@ -183,13 +183,22 @@ export default {
         };
 
         const deleteIcon = async () => {
-            if (!confirm($t('properties.reset_icon_confirm'))) return;
-            try {
-                await api.delete('/api/server/icon');
-                showToast($t('common.success'));
-                store.serverIconVersion = Date.now();
-                hasCustomIcon.value = false; // Directly update state
-            } catch (err) { showToast('Error', 'danger'); }
+            openModal({
+                title: $t('properties.server_icon'),
+                message: $t('properties.reset_icon_confirm'),
+                callback: async () => {
+                    try {
+                        await api.delete('/api/server/icon');
+                        showToast($t('common.success'));
+                        store.serverIconVersion = Date.now();
+                        hasCustomIcon.value = false;
+                    } catch (err) {
+                        // Show actual error message from server if available
+                        const msg = err.response?.data?.error || err.message || 'Error';
+                        showToast(msg, 'danger');
+                    }
+                }
+            });
         };
 
         // 正则：匹配 key=value (兼容空格)
