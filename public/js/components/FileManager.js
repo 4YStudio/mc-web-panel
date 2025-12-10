@@ -44,12 +44,10 @@ export default {
                         </div>
                         <div class="btn-group">
                             <button class="btn btn-sm btn-outline-primary" @click="$refs.fileUp.click()" :title="$t('files.upload_file')"><i class="fa-solid fa-file-upload"></i></button>
-                            <button class="btn btn-sm btn-outline-primary" @click="$refs.folderUp.click()" :title="$t('files.upload_folder')"><i class="fa-solid fa-upload"></i></button>
                             <button class="btn btn-sm btn-outline-success" @click="askNewFile" :title="$t('files.new_file')"><i class="fa-solid fa-file-circle-plus"></i></button>
                             <button class="btn btn-sm btn-outline-success" @click="askNewFolder" :title="$t('files.new_folder')"><i class="fa-solid fa-folder-plus"></i></button>
                         </div>
                         <input type="file" ref="fileUp" multiple class="d-none" @change="(e)=>uploadFiles(e)">
-                        <input type="file" ref="folderUp" webkitdirectory class="d-none" @change="(e)=>uploadFiles(e)">
                         <div class="ms-auto d-flex gap-2">
                         </div>
                     </div>
