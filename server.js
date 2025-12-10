@@ -727,27 +727,25 @@ if (cluster.isPrimary) {
     });
 
     // 3. 重置 2FA
-    app.post('/api/panel/reset-2fa', requireAuth, async (req, res) => {
+    app.get('/api/panel/2fa/generate', requireAuth, async (req, res) => {
         try {
-            const newSecret = authenticator.generateSecret();
-            appConfig.secret = newSecret;
-            appConfig.isSetup = false;
-
-            await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
-
-            // 生成二维码
-            QRCode.toDataURL(authenticator.keyuri('Admin', 'MC-Panel', newSecret), (err, qrUrl) => {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({
-                    success: true,
-                    secret: newSecret,
-                    qr: qrUrl,
-                    message: '2FA已重置,请重新扫描二维码设置'
-                });
+            const secret = authenticator.generateSecret();
+            const otpauth = authenticator.keyuri('Admin', 'MC-Panel', secret);
+            QRCode.toDataURL(otpauth, (err, qr) => {
+                if (err) throw err;
+                res.json({ secret, qr });
             });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/panel/2fa/verify', requireAuth, async (req, res) => {
+        const { secret, token } = req.body;
+        try {
+            if (!authenticator.check(token, secret)) return res.status(400).json({ error: 'Invalid Code' });
+            appConfig.secret = secret;
+            await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     // 4. 重启面板
@@ -884,8 +882,13 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+
+    // Helper: Fix Multer filename encoding
+    const fixFileName = (name) => Buffer.from(name, 'latin1').toString('utf8');
+
     app.post('/api/files/upload', requireAuth, upload.array('files'), async (req, res) => {
         const targetDir = req.body.path ? path.join(MC_DIR, req.body.path) : MC_DIR;
+        if (!targetDir.startsWith(MC_DIR)) return res.status(403).json({ error: 'Access Denied' });
         try {
             for (const file of req.files) await fs.move(file.path, path.join(targetDir, fixFileName(file.originalname)), { overwrite: true });
             res.json({ success: true });
@@ -895,12 +898,24 @@ if (cluster.isPrimary) {
     app.post('/api/files/operate', requireAuth, async (req, res) => {
         const { action, sources, destination, compressName } = req.body;
         const destPath = destination ? path.join(MC_DIR, destination) : MC_DIR;
+        if (!destPath.startsWith(MC_DIR)) return res.status(403).json({ error: 'Access Denied' });
+
         try {
-            if (action === 'delete') for (const src of sources) await fs.remove(path.join(MC_DIR, src));
+            if (action === 'delete') {
+                for (const src of sources) {
+                    const p = path.join(MC_DIR, src);
+                    if (!p.startsWith(MC_DIR)) throw new Error('Access Denied');
+                    await fs.remove(p);
+                }
+            }
             else if (action === 'move' || action === 'copy') {
                 for (const src of sources) {
                     const srcPath = path.join(MC_DIR, src);
+                    if (!srcPath.startsWith(MC_DIR)) throw new Error('Access Denied');
+
                     const finalDest = path.join(destPath, path.basename(src));
+                    if (!finalDest.startsWith(MC_DIR)) throw new Error('Access Denied');
+
                     if (action === 'move') await fs.move(srcPath, finalDest, { overwrite: true });
                     else await fs.copy(srcPath, finalDest, { overwrite: true });
                 }
@@ -911,15 +926,63 @@ if (cluster.isPrimary) {
                 archive.pipe(output);
                 for (const src of sources) {
                     const srcPath = path.join(MC_DIR, src);
+                    if (!srcPath.startsWith(MC_DIR)) continue;
                     if ((await fs.stat(srcPath)).isDirectory()) archive.directory(srcPath, path.basename(srcPath));
                     else archive.file(srcPath, { name: path.basename(srcPath) });
                 }
                 await archive.finalize();
             }
-            else if (action === 'disable') for (const src of sources) if (!src.endsWith('.disabled')) await fs.rename(path.join(MC_DIR, src), path.join(MC_DIR, src) + '.disabled');
-            else if (action === 'enable') for (const src of sources) if (src.endsWith('.disabled')) await fs.rename(path.join(MC_DIR, src), path.join(MC_DIR, src).replace('.disabled', ''));
+            else if (action === 'disable') {
+                for (const src of sources) {
+                    const p = path.join(MC_DIR, src);
+                    if (!p.startsWith(MC_DIR)) continue;
+                    if (!src.endsWith('.disabled')) await fs.rename(p, p + '.disabled');
+                }
+            }
+            else if (action === 'enable') {
+                for (const src of sources) {
+                    if (src.endsWith('.disabled')) {
+                        const newPath = src.slice(0, -9);
+                        const p = path.join(MC_DIR, src);
+                        const np = path.join(MC_DIR, newPath);
+                        if (!p.startsWith(MC_DIR) || !np.startsWith(MC_DIR)) continue;
+
+                        await fs.rename(p, np);
+                    }
+                }
+            }
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/files/rename', requireAuth, async (req, res) => {
+        const { oldPath, newPath } = req.body;
+        const op = path.join(MC_DIR, oldPath);
+        const np = path.join(MC_DIR, newPath);
+        if (!op.startsWith(MC_DIR) || !np.startsWith(MC_DIR)) return res.status(403).json({ error: 'Access Denied' });
+
+        try {
+            await fs.rename(op, np);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/files/mkdir', requireAuth, async (req, res) => {
+        const targetPath = path.join(MC_DIR, req.body.path);
+        if (!targetPath.startsWith(MC_DIR)) return res.status(403).json({ error: 'Denied' });
+        try { await fs.ensureDir(targetPath); res.json({ success: true }); }
+        catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/files/create', requireAuth, async (req, res) => {
+        const targetPath = path.join(MC_DIR, req.body.path);
+        if (!targetPath.startsWith(MC_DIR)) return res.status(403).json({ error: 'Denied' });
+        try {
+            if (await fs.pathExists(targetPath)) return res.status(400).json({ error: 'File exists' });
+            await fs.outputFile(targetPath, '');
+            res.json({ success: true });
+        }
+        catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.get('/api/files/download', requireAuth, async (req, res) => {
@@ -931,6 +994,14 @@ if (cluster.isPrimary) {
     app.post('/api/files/save', requireAuth, async (req, res) => { try { await fs.writeFile(path.join(MC_DIR, req.body.filepath), req.body.content); res.json({ success: true }); } catch (e) { res.status(500).send('Err'); } });
 
     app.get('/api/lists/:type', requireAuth, async (req, res) => { try { res.json(await fs.readJson(path.join(MC_DIR, `${req.params.type}.json`))); } catch (e) { res.json([]); } });
+    app.post('/api/lists/:type', requireAuth, async (req, res) => {
+        try {
+            const f = path.join(MC_DIR, `${req.params.type}.json`);
+            if (!f.startsWith(MC_DIR)) return res.status(403).json({ error: 'Denied' });
+            await fs.writeJson(f, req.body, { spaces: 2 });
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
 
     server.listen(appConfig.port, () => console.log(`MC Panel v6.0 running on http://localhost:${appConfig.port}`));
 }

@@ -59,7 +59,7 @@ export default {
                         </span>
                         <button class="btn btn-sm btn-outline-danger" @click="removeListUser(p.name||p)">{{ $t('common.remove') }}</button>
                     </li>
-                    <li v-if="listData.length===0" class="list-group-item text-muted text-center">{{ $t('mods.empty') }}</li>
+                    <li v-if="listData.length===0" class="list-group-item text-muted text-center">{{ $t('players.empty') }}</li>
                 </ul>
             </div>
         </div>
@@ -72,7 +72,14 @@ export default {
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
 
-        const sendCmd = async (c) => { await api.post('/api/server/command', { command: c }); showToast($t('common.success')); };
+        const sendCmd = async (c) => {
+            if (!store.isRunning) {
+                showToast($t('common.error') + ': Server is offline', 'warning');
+                return;
+            }
+            await api.post('/api/server/command', { command: c });
+            showToast($t('common.success'));
+        };
 
         const loadLists = async () => {
             try {

@@ -21,7 +21,7 @@ export default {
                 <button class="btn btn-primary" @click="createBackup" :disabled="!store.isRunning"><i class="fa-solid fa-plus-circle me-2"></i>{{ $t('backups.create_snap') }}</button>
             </div>
             <div v-if="currentTab === 'config'" class="btn-group">
-                <button class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{editMode==='gui'?'Text Mode':'GUI Mode'}}</button>
+                <button class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{editMode==='gui'?$t('common.text_mode'):$t('common.gui_mode')}}</button>
                 <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}</button>
             </div>
         </div>

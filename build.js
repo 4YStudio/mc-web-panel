@@ -188,6 +188,10 @@ async function main() {
     await prepareBuildDir();
     for (const target of TARGETS) await buildTarget(target);
     console.log('\nAll builds finished.');
+
+    // Clean up
+    console.log('Cleaning up temporary build files...');
+    if (fs.existsSync(BUILD_DIR)) fs.rmSync(BUILD_DIR, { recursive: true, force: true });
 }
 
 main();

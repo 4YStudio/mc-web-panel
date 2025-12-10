@@ -42,11 +42,15 @@ export default {
                             <button class="btn btn-sm btn-outline-primary" @click="copyToClipboard('move')" :disabled="!selectedFiles.length" :title="$t('files.move')"><i class="fa-solid fa-scissors"></i></button>
                             <button v-if="clipboard.files.length" class="btn btn-sm btn-warning" @click="pasteFiles"><i class="fa-solid fa-paste"></i> ({{ clipboard.files.length }})</button>
                         </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @click="$refs.fileUp.click()" :title="$t('files.upload_file')"><i class="fa-solid fa-file-upload"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" @click="$refs.folderUp.click()" :title="$t('files.upload_folder')"><i class="fa-solid fa-upload"></i></button>
+                            <button class="btn btn-sm btn-outline-success" @click="askNewFile" :title="$t('files.new_file')"><i class="fa-solid fa-file-circle-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-success" @click="askNewFolder" :title="$t('files.new_folder')"><i class="fa-solid fa-folder-plus"></i></button>
+                        </div>
+                        <input type="file" ref="fileUp" multiple class="d-none" @change="(e)=>uploadFiles(e)">
+                        <input type="file" ref="folderUp" webkitdirectory class="d-none" @change="(e)=>uploadFiles(e)">
                         <div class="ms-auto d-flex gap-2">
-                            <input type="file" ref="fileUp" multiple class="d-none" @change="(e)=>uploadFiles(e)">
-                            <button class="btn btn-sm btn-primary" @click="$refs.fileUp.click()"><i class="fa-solid fa-file-upload"></i> {{ $t('files.new_file') }}</button>
-                            <input type="file" ref="folderUp" webkitdirectory class="d-none" @change="(e)=>uploadFiles(e)">
-                            <button class="btn btn-sm btn-primary" @click="$refs.folderUp.click()"><i class="fa-solid fa-folder-plus"></i> {{ $t('files.new_folder') }}</button>
                         </div>
                     </div>
                 </div>
@@ -219,7 +223,10 @@ export default {
             if (!files.length) return;
             const fd = new FormData();
             let total = 0;
-            for (let i = 0; i < files.length; i++) { fd.append('files', files[i]); total += files[i].size; }
+            for (let i = 0; i < files.length; i++) {
+                fd.append('files', files[i], files[i].webkitRelativePath || files[i].name);
+                total += files[i].size;
+            }
             fd.append('path', currentPath.value);
 
             store.task.visible = true; store.task.title = $t('common.upload'); store.task.percent = 0;
@@ -262,7 +269,29 @@ export default {
             title: $t('files.modal_compress_title'), message: $t('files.modal_compress_name'), mode: 'input', placeholder: 'archive.zip',
             callback: (name) => operateFiles('compress', selectedFiles.value, currentPath.value, { compressName: name.endsWith('.zip') ? name : name + '.zip' })
         });
-        const askDelete = (files) => openModal({ title: $t('common.delete'), message: `Delete ${files.length} items?`, callback: () => operateFiles('delete', files) });
+        const askDelete = (files) => openModal({ title: $t('common.delete'), message: $t('common.delete_confirm', { count: files.length }), callback: () => operateFiles('delete', files) });
+
+        const askNewFolder = () => openModal({
+            title: $t('files.new_folder'), message: $t('files.modal_new_folder'), mode: 'input',
+            callback: async (name) => {
+                if (!name) return;
+                try { await api.post('/api/files/mkdir', { path: joinPath(currentPath.value, name) }); showToast($t('common.success')); loadFiles(); }
+                catch (e) { showToast($t('common.error'), 'danger'); }
+            }
+        });
+
+        const askNewFile = () => openModal({
+            title: $t('files.new_file'), message: $t('files.modal_new_file'), mode: 'input', placeholder: 'example.txt',
+            callback: async (name) => {
+                if (!name) return;
+                try {
+                    await api.post('/api/files/create', { path: joinPath(currentPath.value, name) });
+                    showToast($t('common.success')); loadFiles();
+                    editFile(name); // Auto open editor
+                }
+                catch (e) { showToast($t('common.error'), 'danger'); }
+            }
+        });
 
         const askRename = (file) => openModal({
             title: $t('common.edit'), message: $t('files.modal_new_file'), mode: 'input', inputValue: file.name,
@@ -286,7 +315,7 @@ export default {
             editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp,
             changeDir, goUp, joinPath, getIcon, formatSize,
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
-            editFile, saveFile, closeEditor, refreshFiles, askRename
+            editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder
         };
     }
 };

@@ -5,7 +5,7 @@ import { showToast, openModal } from '../utils.js';
 import Avatar from './Avatar.js'
 
 // --- 正则工具 ---
-const createRegex = (key) => new RegExp(`("^|\\n|\\s)${key}\\s*[:=]\\s*([^\\n#]+)`, 'm');
+const createRegex = (key) => new RegExp(`((?:^|\\n|\\s)${key}\\s*[:=]\\s*)([^\\n#]+)`, 'm');
 
 // --- Schema 定义 (保持不变) ---
 // Keys should remain as is, Labels could be i18n keys if we support config translation, but keeping it simple for now.
@@ -20,7 +20,13 @@ const SCHEMAS = {
         { titleKey: 'easyauth.config_groups.restrictions', items: [{ key: 'allow-chat', labelKey: 'easyauth.config_labels.allow_chat', type: 'boolean' }, { key: 'allow-commands', labelKey: 'easyauth.config_labels.allow_commands', type: 'boolean' }, { key: 'allow-movement', labelKey: 'easyauth.config_labels.allow_movement', type: 'boolean' }, { key: 'allow-block-interaction', labelKey: 'easyauth.config_labels.allow_block_interaction', type: 'boolean' }, { key: 'allow-block-breaking', labelKey: 'easyauth.config_labels.allow_block_breaking', type: 'boolean' }, { key: 'hide-inventory', labelKey: 'easyauth.config_labels.hide_inventory', type: 'boolean' }, { key: 'player-invulnerable', labelKey: 'easyauth.config_labels.player_invulnerable', type: 'boolean' }] },
         { titleKey: 'easyauth.config_groups.rules', items: [{ key: 'min-password-length', labelKey: 'easyauth.config_labels.min_password_length', type: 'number' }, { key: 'max-password-length', labelKey: 'easyauth.config_labels.max_password_length', type: 'number' }, { key: 'username-regexp', labelKey: 'easyauth.config_labels.username_regexp', type: 'text' }] }
     ],
-    'translation.conf': [{ titleKey: 'easyauth.config_groups.others', items: [{ key: 'enable-server-side-translation', labelKey: 'easyauth.config_labels.enable_server_side_translation', type: 'boolean' }] }]
+    'translation.conf': [{ titleKey: 'easyauth.config_groups.others', items: [{ key: 'enable-server-side-translation', labelKey: 'easyauth.config_labels.enable_server_side_translation', type: 'boolean' }] }],
+    'storage.conf': [
+        { titleKey: 'easyauth.config_groups.storage', items: [{ key: 'database-type', labelKey: 'easyauth.config_labels.database_type', type: 'select', options: ['sqlite', 'mysql', 'mongodb'] }, { key: 'sqlite-path', labelKey: 'easyauth.config_labels.sqlite_path', type: 'text' }, { key: 'sqlite-table', labelKey: 'easyauth.config_labels.sqlite_table', type: 'text' }, { key: 'mysql-host', labelKey: 'easyauth.config_labels.mysql_host', type: 'text' }, { key: 'mysql-user', labelKey: 'easyauth.config_labels.mysql_user', type: 'text' }, { key: 'mysql-password', labelKey: 'easyauth.config_labels.mysql_password', type: 'text' }, { key: 'mysql-database', labelKey: 'easyauth.config_labels.mysql_database', type: 'text' }, { key: 'mysql-table', labelKey: 'easyauth.config_labels.mysql_table', type: 'text' }, { key: 'mongodb-connection-string', labelKey: 'easyauth.config_labels.mongodb_connection_string', type: 'text' }, { key: 'mongodb-database', labelKey: 'easyauth.config_labels.mongodb_database', type: 'text' }, { key: 'use-simpleauth-db', labelKey: 'easyauth.config_labels.use_simpleauth_db', type: 'boolean' }] }
+    ],
+    'technical.conf': [
+        { titleKey: 'easyauth.config_groups.technical', items: [{ key: 'global-password', labelKey: 'easyauth.config_labels.global_password_hash', type: 'text' }] }
+    ]
 };
 
 export default {
@@ -30,7 +36,7 @@ export default {
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3>EasyAuth</h3>
             <div v-if="currentTab === 'config'" class="btn-group">
-                <button v-if="currentSchema" class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{ editMode==='gui' ? 'Text' : 'GUI' }}</button>
+                <button v-if="currentSchema" class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{ editMode==='gui' ? $t('common.text_mode') : $t('common.gui_mode') }}</button>
                 <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}</button>
             </div>
         </div>
@@ -178,7 +184,7 @@ export default {
         const syncToText = () => {
             let text = fileContent.value;
             currentSchema.value.forEach(g => g.items.forEach(i => {
-                if (formModel[i.key] !== undefined) text = text.replace(createRegex(i.key), (m, p) => p + String(formModel[i.key]));
+                if (formModel[i.key] !== undefined) text = text.replace(createRegex(i.key), (m, p1) => p1 + String(formModel[i.key]));
             }));
             fileContent.value = text;
         };

@@ -239,25 +239,39 @@ export default {
                 message: $t('panel_settings.reset_2fa_confirm'),
                 callback: async () => {
                     try {
-                        const res = await api.post('/api/panel/reset-2fa');
+                        const res = await api.get('/api/panel/2fa/generate');
+                        const { secret, qr } = res.data;
 
-                        if (res.data.success) {
-                            // 显示新的二维码
-                            openModal({
-                                title: $t('panel_settings.reset_2fa_success'),
-                                message: `
-                                    <div class="text-center">
-                                        <p>${$t('panel_settings.reset_2fa_instruction')}</p>
-                                        <img src="${res.data.qr}" class="img-fluid mb-3" style="max-width: 300px;">
-                                        <p class="text-muted small">Secret: ${res.data.secret}</p>
-                                    </div>
-                                `,
-                                callback: () => {
-                                    // 重新加载配置
-                                    loadConfig();
-                                }
-                            });
-                        }
+                        const verifyFlow = () => {
+                            setTimeout(() => {
+                                openModal({
+                                    title: $t('panel_settings.reset_2fa_setup'), // "Setup 2FA"
+                                    message: `
+                                        <div class="text-center">
+                                            <p>${$t('panel_settings.reset_2fa_instruction')}</p>
+                                            <img src="${qr}" class="img-fluid mb-2" style="max-width: 250px;">
+                                            <p class="text-muted small user-select-all">${secret}</p>
+                                        </div>
+                                    `,
+                                    mode: 'input',
+                                    placeholder: '6-digit Code',
+                                    callback: async (code) => {
+                                        if (!code) return;
+                                        try {
+                                            await api.post('/api/panel/2fa/verify', { secret, token: code });
+                                            showToast($t('panel_settings.reset_2fa_success'), 'success');
+                                            loadConfig();
+                                        } catch (e) {
+                                            showToast($t('common.error') + ': ' + (e.response?.data?.error || 'Invalid Code'), 'danger');
+                                            verifyFlow(); // Retry
+                                        }
+                                    }
+                                });
+                            }, 300);
+                        };
+
+                        verifyFlow();
+
                     } catch (e) {
                         showToast($t('common.error') + ': ' + (e.response?.data?.error || e.message), 'danger');
                     }

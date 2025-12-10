@@ -114,7 +114,7 @@ export default {
         const askDelete = (files) => {
             openModal({
                 title: $t('common.delete'),
-                message: `${$t('common.delete')} ${files.length} items?`,
+                message: $t('common.delete_confirm', { count: files.length }),
                 callback: () => operateFiles('delete', files)
             });
         };
