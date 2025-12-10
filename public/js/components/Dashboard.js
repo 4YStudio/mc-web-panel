@@ -45,6 +45,10 @@ export default {
                             <span>{{ $t('dashboard.target') }}: {{ store.stats.version?.mc || 'Unknown' }}</span>
                             <span>{{ $t('dashboard.loader') }}: {{ store.stats.version?.loader || 'Unknown' }}</span>
                          </div>
+                         <div class="small text-muted border-top pt-2 mt-2">
+                             <span>{{ $t('dashboard.java_version') }}: <span class="fw-bold">{{ store.stats.javaVersion || 'Checking...' }}</span></span>
+                         </div>
+
                     </div>
                 </div>
             </div>

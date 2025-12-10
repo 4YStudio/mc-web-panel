@@ -13,9 +13,8 @@ const TARGETS = [
     { name: 'linux-x64', nodeArch: 'linux-x64', ext: '', sqliteArch: 'linux-x64' },
     { name: 'linux-arm64', nodeArch: 'linux-arm64', ext: '', sqliteArch: 'linux-arm64' },
     { name: 'win-x64', nodeArch: 'win-x64', ext: '.exe', sqliteArch: 'win32-x64' },
-    { name: 'win-arm64', nodeArch: 'win-arm64', ext: '.exe', sqliteArch: 'win32-arm64' },
-    { name: 'macos-x64', nodeArch: 'darwin-x64', ext: '', sqliteArch: 'darwin-x64' },
-    { name: 'macos-arm64', nodeArch: 'darwin-arm64', ext: '', sqliteArch: 'darwin-arm64' }
+    // win-arm64 dropped: No prebuilt sqlite3 bindings available for v5.1.7. Users can run win-x64 via emulation.
+    // macos-x64 and macos-arm64 dropped: User requested removal.
 ];
 
 const downloadFile = (url, dest) => {
@@ -28,7 +27,9 @@ const downloadFile = (url, dest) => {
 };
 
 async function fetchSqliteBindings(target, buildPath) {
-    const bindingDir = path.join(buildPath, 'node_modules', 'sqlite3', 'lib', 'binding', `${NAPI_VERSION}-${target.sqliteArch}`);
+    // We use build/Release/node_sqlite3.node because the 'bindings' package (used by sqlite3)
+    // always checks this path. This avoids issues with N-API vs ABI version directory naming.
+    const bindingDir = path.join(buildPath, 'node_modules', 'sqlite3', 'build', 'Release');
     const bindingFile = path.join(bindingDir, 'node_sqlite3.node');
 
     if (fs.existsSync(bindingFile)) return;
@@ -88,10 +89,35 @@ async function prepareBuildDir() {
         execSync(`find node_modules -type f \\( -name "*.ts" -o -name "*.md" -o -name "LICENSE" -o -name "*.map" \\) -delete`, { cwd: BUILD_DIR });
         execSync(`find node_modules -type d \\( -name "test" -o -name "tests" -o -name "example" -o -name "examples" -o -name "docs" \\) -exec rm -rf {} +`, { cwd: BUILD_DIR });
     } catch (e) { }
+    // Recursively remove all .bin directories within node_modules to ensure NO symlinks remain
+    // This is critical for Windows compatibility where extracting symlinks requires admin privileges
+    console.log('Removing all .bin directories...');
+    try {
+        // Find and delete all directories named .bin inside node_modules
+        execSync(`find node_modules -type d -name ".bin" -exec rm -rf {} +`, { cwd: BUILD_DIR });
+    } catch (e) {
+        console.warn('Failed to recursively remove .bin dirs:', e);
+    }
 }
 
 async function buildTarget(target) {
     console.log(`\n=== Building for ${target.name} ===`);
+
+    // Clean up sqlite3 artifacts from previous builds or npm install (host arch)
+    // This ensures we don't accidentally bundle Linux binaries into Windows builds
+    const sqlitePath = path.join(BUILD_DIR, 'node_modules', 'sqlite3');
+    try {
+        const buildRelease = path.join(sqlitePath, 'build');
+        if (fs.existsSync(buildRelease)) fs.rmSync(buildRelease, { recursive: true, force: true });
+
+        const libBinding = path.join(sqlitePath, 'lib', 'binding');
+        if (fs.existsSync(libBinding)) fs.rmSync(libBinding, { recursive: true, force: true });
+
+        // Some sqlite3 installations put it in lib/binding/node-vXX-platform-arch
+        // We want to ensure specific target binding is the ONLY one present
+    } catch (e) {
+        console.warn('Failed to clean sqlite artifacts:', e);
+    }
 
     // Check if target already exists to skip? No, always rebuild as user might have changed code.
 
@@ -129,9 +155,28 @@ async function buildTarget(target) {
     const outputName = `mc-web-panel-${target.name}${target.ext}`;
     console.log(`Packaging to ${outputName}...`);
 
+    // Map targets to caxa stubs
+    // win-arm64 is missing in caxa, we fallback to win-x64 stub (which will run under emulation on win-arm64 to bootstrap the native node-arm64)
+    const stubMap = {
+        'linux-x64': 'stub--linux--x64',
+        'linux-arm64': 'stub--linux--arm64',
+        'win-x64': 'stub--win32--x64',
+        'win-arm64': 'stub--win32--x64',
+        'macos-x64': 'stub--darwin--x64',
+        'macos-arm64': 'stub--darwin--arm64'
+    };
+    const stubName = stubMap[target.name];
+    const stubPath = path.join(__dirname, 'node_modules', 'caxa', 'stubs', stubName);
+
+    if (!fs.existsSync(stubPath)) {
+        console.error(`Stub not found for ${target.name}: ${stubPath}`);
+        return;
+    }
+
     try {
         const caxaPath = path.join(__dirname, 'node_modules', '.bin', 'caxa');
-        execSync(`"${caxaPath}" --no-dedupe --input "${BUILD_DIR}" --output "${outputName}" -- "{{caxa}}/${nodeBinName}" "{{caxa}}/server.js"`, { stdio: 'inherit' });
+        // Add --stub argument
+        execSync(`"${caxaPath}" --no-dedupe --stub "${stubPath}" --input "${BUILD_DIR}" --output "${outputName}" -- "{{caxa}}/${nodeBinName}" "{{caxa}}/server.js"`, { stdio: 'inherit' });
 
         console.log(`Success: ${outputName}`);
     } catch (e) {

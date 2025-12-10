@@ -72,7 +72,8 @@ export const messages = {
             toast_sent: '已发送',
             system: '系统',
             target: '版本',
-            loader: '加载器'
+            loader: '加载器',
+            java_version: 'Java 版本'
         },
         files: {
             path: '路径',
@@ -378,7 +379,8 @@ export const messages = {
             toast_sent: 'Command Sent',
             system: 'System',
             target: 'Version',
-            loader: 'Loader'
+            loader: 'Loader',
+            java_version: 'Java Version'
         },
         files: {
             path: 'Path',

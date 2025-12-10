@@ -24,14 +24,39 @@ const sqlite3 = require('sqlite3').verbose(); // 新增
 
 // --- 配置区域 ---
 // detect if running in compressed environment (pkg or caxa)
-// For caxa, __dirname is temp dir, process.cwd() is user dir.
-// We want data in user dir, static assets in temp dir.
+// Caxa (v3+) extracts node to a temp dir, so process.execPath is often the internal 'node.exe'.
+// To find the actual executable path, we scan process.argv for the .exe file that launched us.
+let BASE_DIR = process.cwd();
+const isNode = path.basename(process.execPath).toLowerCase().startsWith('node');
 
-const MC_DIR = path.join(process.cwd(), 'mc_server');
-const DATA_DIR = path.join(process.cwd(), 'data');
+if (!isNode) {
+    // If execPath is NOT node, then it's the wrapper (pkg behavior, or caxa on some platforms)
+    BASE_DIR = path.dirname(process.execPath);
+} else {
+    // If execPath IS node (caxa default), check argv for the wrapper executable
+    // Typically: [ '.../temp/node.exe', '.../temp/server.js', 'REAL_EXE_PATH', ... ]
+    // But sometimes caxa wrapper is just passed as an argument.
+    // We look for any argv ending in .exe that is NOT node.exe
+    for (const arg of process.argv) {
+        if (arg && arg.toLowerCase().endsWith('.exe') && !path.basename(arg).toLowerCase().startsWith('node')) {
+            BASE_DIR = path.dirname(arg);
+            console.log(`Detected Caxa Executable: ${arg}`);
+            break;
+        }
+    }
+}
+// Fallback: If still pointing to temp dir (unlikely for BASE_DIR unless wrapper was in temp), user might be running normally.
+
+const MC_DIR = path.join(BASE_DIR, 'mc_server');
+const DATA_DIR = path.join(BASE_DIR, 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const SERVER_PROPERTIES = path.join(MC_DIR, 'server.properties');
+
+console.log(`DEBUG PATHS:`);
+console.log(`  execPath: ${process.execPath}`);
+console.log(`  argv[0]: ${process.argv[0]}`);
+console.log(`  Determined BASE_DIR: ${BASE_DIR}`);
 const EASYAUTH_DIR = path.join(MC_DIR, 'EasyAuth');
 const EASYAUTH_DB = path.join(EASYAUTH_DIR, 'easyauth.db');
 const EASYAUTH_CONFIG_DIR = path.join(MC_DIR, 'config', 'EasyAuth');
@@ -75,6 +100,9 @@ if (cluster.isPrimary) {
     // Worker Process Logic
     const upload = multer({ dest: path.join(os.tmpdir(), 'mc-uploads') });
 
+    console.log(`Initializing Data Directories...`);
+    console.log(`  MC_DIR: ${MC_DIR}`);
+    console.log(`  DATA_DIR: ${DATA_DIR}`);
     fs.ensureDirSync(MC_DIR);
     fs.ensureDirSync(DATA_DIR);
     fs.ensureDirSync(path.join(MC_DIR, 'mods'));
@@ -111,6 +139,29 @@ if (cluster.isPrimary) {
     let onlinePlayers = new Set();
     let MAX_LOG_HISTORY = appConfig.maxLogHistory || 1000;
     let logHistory = [];
+    let globalJavaVersion = '';
+    let detectedVersion = { mc: 'Unknown', loader: 'Unknown' };
+
+    // Helper: Check Java Version
+    const checkJavaVersion = async (javaPath) => {
+        return new Promise((resolve) => {
+            const process = spawn(javaPath, ['-version']);
+            let output = '';
+            process.stderr.on('data', (d) => output += d.toString());
+            process.on('error', () => resolve('Not Installed'));
+            process.on('close', () => {
+                const match = output.match(/version "([^"]+)"/) || output.match(/version (\S+)/);
+                resolve(match ? match[1] : 'Unknown');
+            });
+        });
+    };
+
+    // Periodic Java Version Check
+    const updateJavaVersion = async () => {
+        globalJavaVersion = await checkJavaVersion(appConfig.javaPath);
+    };
+    updateJavaVersion(); // Initial check
+    setInterval(updateJavaVersion, 60000); // Check every minute
 
     if (fs.existsSync(LOG_FILE)) {
         try {
@@ -158,6 +209,8 @@ if (cluster.isPrimary) {
                     if (fs.existsSync(vFile)) {
                         const vData = await fs.readJson(vFile);
                         versionInfo = { mc: vData.gameVersion, loader: vData.loaderVersion };
+                    } else if (detectedVersion.mc !== 'Unknown') {
+                        versionInfo = detectedVersion;
                     }
                 } catch (e) { }
 
@@ -174,6 +227,14 @@ if (cluster.isPrimary) {
                         serverInfo.motd = props.get('motd') || 'Minecraft Server';
                     } catch (e) { }
                 }
+
+                // Check Java version occasionally or just check once?
+                // For simplicity, we can check it in the loop but it might spawn too many processes.
+                // Better: Cache it?
+                // Actually, let's just assume checking it every monitorInterval (2s) is okay if efficient, OR better: check routinely.
+                // But avoid spawning 'java -version' every 2s.
+                // Let's create a cached variable outside.
+
                 io.emit('system_stats', {
                     cpu: load.currentLoad.toFixed(1),
                     mem: { total: (mem.total / 1024 / 1024 / 1024).toFixed(1), used: (mem.active / 1024 / 1024 / 1024).toFixed(1), percentage: ((mem.active / mem.total) * 100).toFixed(1) },
@@ -182,7 +243,8 @@ if (cluster.isPrimary) {
                     hasBackupMod: hasBackupMod,
                     hasEasyAuth: hasEasyAuth,
                     hasVoicechat: hasVoicechat,
-                    isSetup: fs.readdirSync(MC_DIR).length > 2
+                    isSetup: fs.readdirSync(MC_DIR).length > 2,
+                    javaVersion: globalJavaVersion || 'Checking...'
                 });
             } catch (e) { }
         }
@@ -739,30 +801,68 @@ if (cluster.isPrimary) {
 
     app.post('/api/server/start', requireAuth, async (req, res) => {
         if (mcProcess) return res.json({ message: '已运行' });
+
+        const javaVer = await checkJavaVersion(appConfig.javaPath);
+        if (javaVer === 'Not Installed') {
+            appendLog(`[错误] Java 未找到: ${appConfig.javaPath}\n`);
+            return res.json({ success: false, message: 'Java 未安装或路径错误' });
+        }
+
         const eulaPath = path.join(MC_DIR, 'eula.txt');
         try { if (!await fs.pathExists(eulaPath) || !(await fs.readFile(eulaPath, 'utf8')).includes('eula=true')) await fs.writeFile(eulaPath, 'eula=true'); } catch (e) { }
+
         onlinePlayers.clear();
         appendLog('[系统] --- 正在启动服务器 ---\n');
-        appendLog(`[系统] 使用 Java: ${appConfig.javaPath}\n`);
-        mcProcess = spawn(appConfig.javaPath, [...appConfig.javaArgs, '-jar', appConfig.jarName, 'nogui'], { cwd: MC_DIR });
-        mcProcess.stdout.on('data', (data) => {
-            const line = data.toString();
-            appendLog(line);
-            const join = line.match(/:\s(\w+)\sjoined the game/);
-            if (join) { onlinePlayers.add(join[1]); io.emit('players_update', Array.from(onlinePlayers)); }
-            const leave = line.match(/:\s(\w+)\sleft the game/);
-            if (leave) { onlinePlayers.delete(leave[1]); io.emit('players_update', Array.from(onlinePlayers)); }
-        });
-        mcProcess.stderr.on('data', d => appendLog(d.toString()));
-        mcProcess.on('close', (code) => {
-            appendLog(`[系统] --- 服务器已停止 (Code ${code}) ---\n`);
-            io.emit('status', false);
-            onlinePlayers.clear();
-            io.emit('players_update', []);
-            mcProcess = null;
-        });
-        io.emit('status', true);
-        res.json({ success: true });
+        appendLog(`[系统] 使用 Java: ${appConfig.javaPath} (版本: ${javaVer})\n`);
+
+        try {
+            mcProcess = spawn(appConfig.javaPath, [...appConfig.javaArgs, '-jar', appConfig.jarName, 'nogui'], { cwd: MC_DIR });
+
+            mcProcess.stdout.on('data', (data) => {
+                const line = data.toString();
+                appendLog(line);
+                const join = line.match(/:\s(\w+)\sjoined the game/);
+                if (join) { onlinePlayers.add(join[1]); io.emit('players_update', Array.from(onlinePlayers)); }
+                const leave = line.match(/:\s(\w+)\sleft the game/);
+                if (leave) { onlinePlayers.delete(leave[1]); io.emit('players_update', Array.from(onlinePlayers)); }
+
+                // Auto-detect Version
+                if (detectedVersion.mc === 'Unknown') {
+                    // Vanilla: Starting minecraft server version 1.20.1
+                    const vanillaMatch = line.match(/Starting minecraft server version (\S+)/);
+                    if (vanillaMatch) detectedVersion.mc = vanillaMatch[1];
+
+                    // Fabric: Loading Minecraft 1.20.1 with Fabric Loader 0.14.21
+                    const fabricMatch = line.match(/Loading Minecraft (\S+) with Fabric Loader (\S+)/);
+                    if (fabricMatch) {
+                        detectedVersion.mc = fabricMatch[1];
+                        detectedVersion.loader = fabricMatch[2];
+                    }
+                }
+            });
+
+            mcProcess.stderr.on('data', d => appendLog(d.toString()));
+
+            mcProcess.on('error', (err) => {
+                appendLog(`[严重错误] 启动失败: ${err.message}\n`);
+                io.emit('status', false);
+                mcProcess = null;
+            });
+
+            mcProcess.on('close', (code) => {
+                appendLog(`[系统] --- 服务器已停止 (Code ${code}) ---\n`);
+                io.emit('status', false);
+                onlinePlayers.clear();
+                io.emit('players_update', []);
+                mcProcess = null;
+            });
+
+            io.emit('status', true);
+            res.json({ success: true });
+        } catch (e) {
+            appendLog(`[错误] 启动异常: ${e.message}\n`);
+            res.status(500).json({ error: e.message });
+        }
     });
     app.post('/api/server/stop', requireAuth, (req, res) => { if (mcProcess) mcProcess.stdin.write('stop\n'); res.json({ success: true }); });
     app.post('/api/server/command', requireAuth, (req, res) => { if (mcProcess) { mcProcess.stdin.write(req.body.command + '\n'); appendLog(`> ${req.body.command}\n`); } res.json({ success: true }); });
