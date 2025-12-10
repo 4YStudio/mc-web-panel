@@ -1,73 +1,65 @@
-# MC Web Panel v6.0
+# MC Web Panel
 
-Modern, feature-rich Minecraft server management panel built with Node.js and Vue.js 3.
+[English](#english) | [中文](#chinese)
 
-## Features
+<a name="english"></a>
+## 🇺🇸 English
 
-- **Dashboard**: Real-time server status, CPU/RAM monitoring, and console control.
-- **Server Management**:
-    - Start/Stop/Restart control.
-    - Setup Wizard for installing Minecraft (Fabric/Vanilla) servers.
-    - Server Properties editor (GUI & Text mode).
-    - Server Icon management.
-- **File Manager**: Web-based file browser with upload, delete, move, copy, and compress/decompress capabilities.
-- **Mod Management**: Upload and manage mods.
-- **Backup System**: 
-    - Full & Differential backups.
-    - One-click restore.
-    - Scheduled snapshots (snapshots not yet fully implemented).
-- **Player Management**: Manage whitelist, ops, and EasyAuth integration (change passwords, unregister).
-- **Voice Chat**: Simple configuration editor for Voice Chat mod.
-- **Multi-Platform Support**: Binaries for Linux, Windows, and macOS (x64/ARM64).
+### Introduction
+MC Web Panel is a lightweight, modern, and high-performance Minecraft server management panel built with Node.js and Vue 3. It provides a beautiful web interface to manage your Fabric server, players, files, and more.
 
-## Getting Started
+### Features
+- **Dashboard**: Real-time server status, CPU/RAM usage, and console output.
+- **File Manager**: Web-based file management with upload, download, edit, and unzip capabilities.
+- **Player Manager**: Manage whitelist, OPs, bans, and kick/ban/teleport online players.
+- **Mod Manager**: Easily upload and deleting mods.
+- **Backup Manager**: Create and restore backups (snapshots/differential).
+- **Security**: 2FA (Google Authenticator) support.
+- **Multi-Platform**: Runs on Linux (x64/ARM64) and Windows (x64).
 
-### Validating Requirements
-- Node.js v18+ (if running from source)
-- Minecraft Server (or use built-in installer)
+### Supported Mods
+This panel features dedicated GUI integration for the following mods:
+*   **Simple Voice Chat**: Configure voice chat settings (port, password, etc.) directly from the panel.
+*   **Easy Auth**: Manage registered users, change passwords, and unregister users.
+*   **Advanced Backup**: Create and restore backups (snapshots/differential).
 
-### Running from Source
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-2. Start the development server:
-   ```bash
-   pnpm start
-   ```
-3. Access: `http://localhost:3000`
+### Installation & Usage
+1.  Download the executable for your platform from the Releases page.
+2.  Place it in an empty directory (recommended).
+3.  Run the executable.
+    *   **Linux**: `./mc-web-panel-linux-x64`
+    *   **Windows**: Double-click `mc-web-panel-win-x64.exe`
+4.  Open your browser and visit `http://localhost:3000`.
+5.  Follow the setup wizard to install a Minecraft server or point it to your existing server jar.
 
-### Running from Binary
-Download the appropriate executable for your platform from the releases.
-- **Linux**: `./mc-web-panel-linux-x64`
-- **Windows**: `mc-web-panel-win-x64.exe`
-- **macOS**: `mc-web-panel-macos-x64`
+---
 
-When run, the panel will create the following directories in the same location:
-- `data/`: Contains config files and logs.
-- `mc_server/`: The directory where the Minecraft server runs.
+<a name="chinese"></a>
+## 🇨🇳 中文
 
-## Building
+### 简介
+MC Web Panel 是一个基于 Node.js 和 Vue 3 构建的轻量级、现代化且高性能的 Minecraft 服务器管理面板。它提供了一个美观的 Web 界面来管理您的 Fabric 服务器、玩家、文件等。
 
-This project uses `caxa` to bundle the Node.js runtime (v24.11.1) with the application.
+### 功能特性
+- **通过 Web 管理**: 实时查看服务器状态、CPU/内存使用率和控制台输出。
+- **文件管理**: 支持在线上传、下载、编辑和解压文件。
+- **玩家管理**: 管理白名单、管理员 (OP)、黑名单，以及踢出/封禁/传送在线玩家。
+- **模组管理**: 轻松上传和删除模组。
+- **备份管理**: 创建和还原备份（支持快照和增量备份）。
+- **安全**: 支持 2FA (Google 身份验证器) 双重验证。
+- **多平台支持**: 支持 Linux (x64/ARM64) 和 Windows (x64)。
 
-1. Ensure requirements are met:
-   ```bash
-   pnpm install
-   # On Linux/macOS, ensure tar/curl/unzip are available.
-   ```
-2. Run the build script:
-   ```bash
-   pnpm run build
-   ```
-   This will automatically:
-   - Download Node.js binaries for Linux (x64/arm64), Windows (x64/arm64), and macOS (x64/arm64).
-   - Fetch necessary `sqlite3` native bindings (N-API).
-   - Generate `logo.ico` (requires `logo.png`).
-   - Bundle self-extracting executables for all platforms.
+### 模组兼容性
+本面板为以下模组提供了专属的图形化管理界面：
+*   **Simple Voice Chat (简单语音聊天)**: 直接在面板中配置语音聊天设置（端口、密码等）。
+*   **Easy Auth (简单认证)**: 管理已注册用户、修改密码和注销用户。
+*   **Advanced Backup (高级备份)**: 创建和还原备份（支持快照和增量备份）。
 
-## Localization
-Supports English and Chinese (Simplified). Auto-detects based on browser or configurable in settings.
-
-## License
-MIT
+### 安装与使用
+1.  从 Release 页面下载对应平台的执行文件。
+2.  将其放置在一个空目录中（推荐）。
+3.  运行可执行文件。
+    *   **Linux**: `./mc-web-panel-linux-x64`
+    *   **Windows**: 双击 `mc-web-panel-win-x64.exe`
+4.  打开浏览器访问 `http://localhost:3000`。
+5.  跟随设置向导安装新的 Minecraft 服务器，或指定现有的服务端 JAR 文件。
