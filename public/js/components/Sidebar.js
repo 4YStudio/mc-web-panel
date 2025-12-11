@@ -23,6 +23,7 @@ export default {
             <a v-if="store.hasVoicechat" class="nav-link" :class="{active: store.view === 'voicechat'}" @click="selectView('voicechat')"><i class="fa-solid fa-microphone"></i> {{ $t('sidebar.voicechat') }}</a>
             <a class="nav-link" :class="{active: store.view === 'players'}" @click="selectView('players')"><i class="fa-solid fa-users"></i> {{ $t('sidebar.players') }}</a>
             <a class="nav-link" :class="{active: store.view === 'panel-settings'}" @click="selectView('panel-settings')"><i class="fa-solid fa-cog"></i> {{ $t('panel_settings.title') }}</a>
+            <a class="nav-link" :class="{active: store.view === 'about'}" @click="selectView('about')"><i class="fa-solid fa-circle-info"></i> {{ $t('about.title') }}</a>
         </nav>
 
         <div class="p-3 mt-auto d-flex gap-2">

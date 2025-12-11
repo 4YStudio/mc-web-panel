@@ -57,7 +57,25 @@ export const messages = {
             backups: '备份管理',
             auth: '认证管理',
             voicechat: '语音设置',
-            players: '玩家管理'
+            players: '玩家管理',
+            about: '关于'
+        },
+        about: {
+            title: '关于 MWP',
+            description: '一个轻量级、现代化的 Fabric 服务器管理面板。',
+            version: '版本',
+            author: '作者',
+            version: '版本',
+            author: '作者',
+            source: '源代码',
+            website: '官方网站',
+            check_update: '检查更新',
+            checking: '检查中...',
+            update_available: '发现新版本！',
+            latest_version: '已是最新版本',
+            new_version: '最新版本',
+            download: '前往下载',
+            current_is_latest: '您当前使用的是最新版本。'
         },
         dashboard: {
             console_title: '控制台',
@@ -385,7 +403,25 @@ export const messages = {
             backups: 'Backups',
             auth: 'Auth',
             voicechat: 'Voice Chat',
-            players: 'Players'
+            players: 'Players',
+            about: 'About'
+        },
+        about: {
+            title: 'About MWP',
+            description: 'A lightweight, modern Fabric server management panel.',
+            version: 'Version',
+            author: 'Author',
+            version: 'Version',
+            author: 'Author',
+            source: 'Source Code',
+            website: 'Website',
+            check_update: 'Check Update',
+            checking: 'Checking...',
+            update_available: 'Update Available!',
+            latest_version: 'Up to date',
+            new_version: 'New Version',
+            download: 'Download',
+            current_is_latest: 'You are using the latest version.'
         },
         dashboard: {
             console_title: 'Console',

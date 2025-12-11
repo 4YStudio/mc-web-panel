@@ -5,7 +5,7 @@ import { toasts, removeToast, modalData, confirmModalAction, initModal, showToas
 
 // 导入所有组件
 import Login from './components/Login.js';
-import Sidebar from './components/Sidebar.js';
+import Sidebar from './components/Sidebar.js?v=1.5.0';
 import Dashboard from './components/Dashboard.js';
 import ModsManager from './components/ModsManager.js';
 import FileManager from './components/FileManager.js';
@@ -17,7 +17,8 @@ import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
 import VoicechatManager from './components/VoicechatManager.js';
 import PanelSettings from './components/PanelSettings.js';
-import { createI18n } from './i18n.js';
+import About from './components/About.js?v=1.5.0';
+import { createI18n } from './i18n.js?v=1.5.0';
 
 const socket = io();
 
@@ -36,7 +37,9 @@ const app = createApp({
         ServerPropertiesManager,
         Avatar,
         VoicechatManager,
-        PanelSettings
+        VoicechatManager,
+        PanelSettings,
+        About
     },
     setup() {
         const sidebarOpen = ref(false);

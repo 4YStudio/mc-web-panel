@@ -55,7 +55,15 @@ async function fetchSqliteBindings(target, buildPath) {
 
             if (foundPath) {
                 fs.copyFileSync(foundPath, bindingFile);
-                console.log(`Placed sqlite3 binding for ${target.name}`);
+                console.log(`Placed sqlite3 binding for ${target.name} at ${bindingFile}`);
+
+                // Hack fix for Node 24 / sqlite3 issue identifying module path
+                if (target.name === 'linux-x64') {
+                    const hackDir = path.join(buildPath, 'node_modules', 'sqlite3', 'lib', 'binding', 'node-v137-linux-x64');
+                    fs.mkdirSync(hackDir, { recursive: true });
+                    fs.copyFileSync(foundPath, path.join(hackDir, 'node_sqlite3.node'));
+                    console.log(`Placed fallback binding for ${target.name} at ${hackDir}`);
+                }
             } else {
                 console.error(`Could not find node_sqlite3.node in ${tarName}`);
             }
@@ -190,8 +198,10 @@ async function main() {
     console.log('\nAll builds finished.');
 
     // Clean up
+    // Clean up
     console.log('Cleaning up temporary build files...');
-    if (fs.existsSync(BUILD_DIR)) fs.rmSync(BUILD_DIR, { recursive: true, force: true });
+    // if (fs.existsSync(BUILD_DIR)) fs.rmSync(BUILD_DIR, { recursive: true, force: true });
+    // Keep build dir for debugging if needed
 }
 
 main();

@@ -20,7 +20,10 @@ const PropertiesReader = require('properties-reader');
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
-const sqlite3 = require('sqlite3').verbose(); // 新增
+const sqlite3 = require('sqlite3').verbose();
+
+const APP_VERSION = '1.5.0';
+const APP_CODENAME = 'Advanced Backups Support';
 
 // --- 配置区域 ---
 // detect if running in compressed environment (pkg or caxa)
@@ -998,10 +1001,47 @@ if (cluster.isPrimary) {
         try {
             const f = path.join(MC_DIR, `${req.params.type}.json`);
             if (!f.startsWith(MC_DIR)) return res.status(403).json({ error: 'Denied' });
-            await fs.writeJson(f, req.body, { spaces: 2 });
-            res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    server.listen(appConfig.port, () => console.log(`MC Panel v6.0 running on http://localhost:${appConfig.port}`));
+    app.get('/api/system/update_check', requireAuth, async (req, res) => {
+        try {
+            const currentVersion = require('./package.json').version;
+            // Fetch GitHub Releases
+            const gh = await axios.get('https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest', {
+                headers: { 'User-Agent': 'MC-Web-Panel' },
+                timeout: 5000
+            });
+            const latestTag = gh.data.tag_name; // e.g. "v1.5.1"
+            const latestVersion = latestTag.replace(/^v/, '');
+
+            // Simple semver comparison (assuming x.y.z)
+            const isNewer = (v1, v2) => {
+                const p1 = v1.split('.').map(Number);
+                const p2 = v2.split('.').map(Number);
+                for (let i = 0; i < 3; i++) {
+                    if (p1[i] > p2[i]) return true;
+                    if (p1[i] < p2[i]) return false;
+                }
+                return false;
+            };
+
+            res.json({
+                hasUpdate: isNewer(latestVersion, currentVersion),
+                latestVersion,
+                currentVersion,
+                url: gh.data.html_url,
+                body: gh.data.body
+            });
+        } catch (e) {
+            console.error('Update check failed:', e.message);
+            res.status(500).json({ error: 'Failed to check updates' });
+        }
+    });
+
+    app.get('/api/system/version', (req, res) => {
+        res.json({ version: APP_VERSION });
+    });
+
+    server.listen(appConfig.port, () => console.log(`MC Panel v${APP_VERSION} running on http://localhost:${appConfig.port}`));
 }
