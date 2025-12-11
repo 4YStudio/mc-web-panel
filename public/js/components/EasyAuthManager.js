@@ -36,8 +36,8 @@ export default {
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3>EasyAuth</h3>
             <div v-if="currentTab === 'config'" class="btn-group">
-                <button v-if="currentSchema" class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{ editMode==='gui' ? $t('common.text_mode') : $t('common.gui_mode') }}</button>
-                <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}</button>
+                <button v-if="currentSchema" class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? $t('common.text_mode') : $t('common.gui_mode') }}</span></button>
+                <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span></button>
             </div>
         </div>
 
@@ -69,10 +69,10 @@ export default {
                             <td>
                                 <!-- 新增：修改密码按钮 -->
                                 <button class="btn btn-sm btn-outline-primary me-2" @click="askChangePass(user.username)">
-                                    <i class="fa-solid fa-key me-1"></i>{{ $t('easyauth.password') }}
+                                    <i class="fa-solid fa-key me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('easyauth.password') }}</span>
                                 </button>
                                 <button class="btn btn-sm btn-outline-danger" @click="askDeleteUser(user.username)">
-                                    <i class="fa-solid fa-trash-can me-1"></i>{{ $t('easyauth.unregister') }}
+                                    <i class="fa-solid fa-trash-can me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('easyauth.unregister') }}</span>
                                 </button>
                             </td>
                         </tr>
@@ -83,19 +83,19 @@ export default {
         </div>
 
         <!-- 2. 配置管理 -->
-        <div v-if="currentTab === 'config'" class="row g-3" style="height: 65vh;">
-            <div class="col-md-3 h-100">
-                <div class="list-group h-100 overflow-auto shadow-sm">
+        <div v-if="currentTab === 'config'" class="row g-3 config-layout">
+            <div class="col-md-3 config-sidebar">
+                <div class="list-group overflow-auto shadow-sm config-list">
                     <button v-for="file in configFiles" class="list-group-item list-group-item-action" :class="{active: currentFile===file}" @click="loadFile(file)"><i class="fa-regular fa-file-code me-2"></i>{{ file }}</button>
                 </div>
             </div>
-            <div class="col-md-9 h-100">
+            <div class="col-md-9 config-content">
                 <Transition name="fade" mode="out-in">
                     <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm border-secondary-subtle" key="text">
                         <div class="card-header bg-body-tertiary small text-muted">{{ currentFile || 'Select File' }}</div>
                         <textarea v-if="currentFile" class="form-control border-0 rounded-0 bg-body text-body h-100" style="font-family: monospace; resize: none;" v-model="fileContent" spellcheck="false"></textarea>
                     </div>
-                    <div v-else class="h-100 overflow-auto pr-2" key="gui">
+                    <div v-else class="h-100 overflow-auto pr-2 custom-scrollbar" key="gui">
                         <div class="row g-3">
                             <div class="col-md-12" v-for="(group, idx) in currentSchema" :key="idx">
                                 <div class="card border-secondary-subtle">

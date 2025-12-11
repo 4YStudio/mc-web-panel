@@ -10,10 +10,10 @@ export default {
             <div class="btn-group">
                 <button class="btn btn-outline-secondary" @click="toggleEditMode">
                     <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
-                    {{ editMode==='gui' ? $t('common.mode_text') : $t('common.mode_gui') }}
+                    <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? $t('common.mode_text') : $t('common.mode_gui') }}</span>
                 </button>
                 <button class="btn btn-success" @click="saveConfig">
-                    <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
+                    <i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
                 </button>
             </div>
         </div>

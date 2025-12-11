@@ -21,8 +21,8 @@ export default {
                 <button class="btn btn-primary" @click="createBackup" :disabled="!store.isRunning"><i class="fa-solid fa-plus-circle me-2"></i>{{ $t('backups.create_snap') }}</button>
             </div>
             <div v-if="currentTab === 'config'" class="btn-group">
-                <button class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> {{editMode==='gui'?$t('common.text_mode'):$t('common.gui_mode')}}</button>
-                <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}</button>
+                <button class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> <span class="d-none d-md-inline ms-1">{{editMode==='gui'?$t('common.text_mode'):$t('common.gui_mode')}}</span></button>
+                <button class="btn btn-success" @click="saveConfig"><i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span></button>
             </div>
         </div>
 
@@ -43,7 +43,7 @@ export default {
                                 <td><span class="badge" :class="b.type==='full'?'bg-success':'bg-info'">{{ b.type==='full' ? $t('backups.type_full') : $t('backups.type_diff') }}</span><span v-if="b.folder==='snapshots'" class="badge bg-secondary ms-1">Snap</span></td>
                                 <td class="small text-muted">{{ new Date(b.mtime).toLocaleString() }}</td>
                                 <td class="small">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
-                                <td><button class="btn btn-sm btn-outline-danger" @click="askRestore(b)">{{ $t('backups.restore') }}</button></td>
+                                <td><button class="btn btn-sm btn-outline-danger" @click="askRestore(b)"><i class="fa-solid fa-clock-rotate-left me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('backups.restore') }}</span></button></td>
                             </tr>
                             <tr v-if="!backupList.length"><td colspan="5" class="text-center text-muted py-3">Empty</td></tr>
                         </tbody>

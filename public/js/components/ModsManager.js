@@ -11,12 +11,12 @@ export default {
             <div class="card-header d-flex gap-2 p-2 align-items-center bg-body-tertiary">
                 <input type="text" class="form-control form-control-sm" style="max-width: 200px;" v-model="searchQuery" :placeholder="$t('mods.search_placeholder')">
                 <div class="vr"></div>
-                <button class="btn btn-sm btn-outline-warning" @click="operateFiles('disable', selectedFiles)" :disabled="!selectedFiles.length">{{ $t('files.disable') }}</button>
-                <button class="btn btn-sm btn-outline-success" @click="operateFiles('enable', selectedFiles)" :disabled="!selectedFiles.length">{{ $t('files.enable') }}</button>
-                <button class="btn btn-sm btn-outline-danger" @click="askDelete(selectedFiles)" :disabled="!selectedFiles.length">{{ $t('common.delete') }}</button>
+                <button class="btn btn-sm btn-outline-warning" @click="operateFiles('disable', selectedFiles)" :disabled="!selectedFiles.length"><i class="fa-solid fa-ban me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('files.disable') }}</span></button>
+                <button class="btn btn-sm btn-outline-success" @click="operateFiles('enable', selectedFiles)" :disabled="!selectedFiles.length"><i class="fa-solid fa-check me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('files.enable') }}</span></button>
+                <button class="btn btn-sm btn-outline-danger" @click="askDelete(selectedFiles)" :disabled="!selectedFiles.length"><i class="fa-solid fa-trash me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.delete') }}</span></button>
                 <div class="ms-auto">
                     <input type="file" ref="modInput" multiple class="d-none" @change="(e)=>uploadFiles(e)">
-                    <button class="btn btn-sm btn-primary" @click="$refs.modInput.click()">{{ $t('common.upload') }}</button>
+                    <button class="btn btn-sm btn-primary" @click="$refs.modInput.click()"><i class="fa-solid fa-upload me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.upload') }}</span></button>
                 </div>
             </div>
             <ul class="list-group list-group-flush">
