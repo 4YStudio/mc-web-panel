@@ -22,7 +22,7 @@ const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 const APP_CODENAME = 'Advanced Backups Support';
 
 // --- 配置区域 ---

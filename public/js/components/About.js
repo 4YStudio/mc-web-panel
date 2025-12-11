@@ -56,7 +56,7 @@ export default {
                         <hr class="my-4">
                         
                         <div class="text-muted small">
-                            <p class="mb-1">&copy; 2024 MC Web Panel. All rights reserved.</p>
+                            <p class="mb-1">&copy; 2025 MC Web Panel. All rights reserved.</p>
                         </div>
                     </div>
                 </div>
@@ -92,7 +92,7 @@ export default {
                     if (!response.ok) throw new Error('Network Error');
 
                     const data = await response.json();
-                    latestVersion = data.tag_name.replace(/^v/, '');
+                    latestVersion = data.tag_name.replace(/^v/i, '');
                     htmlUrl = data.html_url;
                 } catch (e) {
                     if (e.message === 'Rate Limited') {
