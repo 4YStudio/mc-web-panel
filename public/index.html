@@ -20,14 +20,18 @@
 
         <!-- 全局提示 Toast -->
         <div class="toast-container">
-            <div v-for="t in toasts" :key="t.id" class="toast show align-items-center text-white border-0"
-                :class="'bg-' + t.type">
-                <div class="d-flex">
-                    <div class="toast-body">{{ t.message }}</div><button class="btn-close btn-close-white me-2 m-auto"
-                        @click="removeToast(t.id)"></button>
+            <transition-group name="toast">
+                <div v-for="t in toasts" :key="t.id" class="toast show align-items-center mb-2" :data-type="t.type">
+                    <div class="d-flex w-100">
+                        <div class="toast-body">{{ t.message }}</div>
+                        <button class="btn-close ms-auto me-2 m-auto" @click="removeToast(t.id)"></button>
+                    </div>
                 </div>
-            </div>
+            </transition-group>
         </div>
+
+
+
 
         <!-- 进度条组件 (注意这里改成了小写加横线) -->
         <progress-modal></progress-modal>
@@ -83,6 +87,7 @@
                         <server-properties-manager v-else-if="store.view === 'properties'"
                             key="properties"></server-properties-manager>
                         <mods-manager v-else-if="store.view === 'mods'" key="mods"></mods-manager>
+                        <modrinth-browser v-else-if="store.view === 'modrinth'" key="modrinth"></modrinth-browser>
                         <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
                         <backup-manager v-else-if="store.view === 'backups'" key="backups"></backup-manager>
                         <easy-auth-manager v-else-if="store.view === 'easyauth'" key="easyauth"></easy-auth-manager>

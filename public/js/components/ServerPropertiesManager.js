@@ -63,91 +63,121 @@ const PROP_GROUPS = [
 export default {
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>{{ $t('properties.title') }}</h3>
-            <div class="btn-group">
-                <button class="btn btn-outline-secondary" @click="toggleEditMode">
-                    <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
-                    <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? 'Text Mode' : 'GUI Mode' }}</span>
-                </button>
-                <button class="btn btn-success" @click="saveConfig">
-                    <i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
+        <!-- 文件未找到提示 -->
+        <div v-if="notFound" class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
+            <i class="fa-solid fa-file-circle-exclamation fa-4x mb-3 opacity-25"></i>
+            <h4>{{ $t('files.file_not_found', { name: 'server.properties' }) }}</h4>
+            <div class="mt-4">
+                <button class="btn btn-outline-danger" @click="askReinstall">
+                    <i class="fa-solid fa-trash-can me-2"></i>{{ $t('panel_settings.reinstall') }}
                 </button>
             </div>
         </div>
 
-        <!-- 服务器图标管理 -->
-        <div class="card mb-4 border-secondary-subtle">
-            <div class="card-header bg-body-tertiary fw-bold">{{ $t('properties.server_icon') }}</div>
-            <div class="card-body d-flex align-items-center gap-4">
-                <div class="position-relative">
-                    <img v-show="hasCustomIcon" :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @load="hasCustomIcon=true" @error="iconLoadError">
-                    <div v-if="!hasCustomIcon" class="rounded border d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;">
-                        <i class="fa-solid fa-cube fa-2x opacity-50"></i>
-                    </div>
-                </div>
-                <div>
-                    <div class="mb-2 text-muted small">{{ $t('properties.icon_tips') }}</div>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
-                            <i class="fa-solid fa-upload me-1"></i>{{ $t('common.upload') }}
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" @click="deleteIcon" :disabled="!hasCustomIcon">
-                            <i class="fa-solid fa-trash me-1"></i>{{ $t('common.delete') }}
-                        </button>
-                    </div>
-                    <input type="file" ref="iconInput" class="d-none" accept="image/png" @change="uploadIcon">
+        <template v-else>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>{{ $t('properties.title') }}</h3>
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" @click="toggleEditMode">
+                        <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
+                        <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? 'Text Mode' : 'GUI Mode' }}</span>
+                    </button>
+                    <button class="btn btn-success" @click="saveConfig">
+                        <i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
+                    </button>
                 </div>
             </div>
-        </div>
 
-        <!-- 图形化编辑器 -->
-        <div v-if="editMode === 'gui'" class="row g-4 pb-4">
-            <div class="col-md-6" v-for="(group, idx) in PROP_GROUPS" :key="idx">
-                <div class="card h-100 border-secondary">
-                    <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
-                    <div class="card-body">
-                        <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                            <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
-                            <div class="col-sm-7">
-                                
-                                <!-- Boolean -->
-                                <div v-if="item.type === 'boolean'" class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" v-model="formModel[item.key]">
+            <!-- 服务器图标管理 -->
+            <div class="card mb-4 border-secondary-subtle">
+                <div class="card-header bg-body-tertiary fw-bold">{{ $t('properties.server_icon') }}</div>
+                <div class="card-body d-flex align-items-center gap-4">
+                    <div class="position-relative">
+                        <img v-show="hasCustomIcon" :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @load="hasCustomIcon=true" @error="iconLoadError">
+                        <div v-if="!hasCustomIcon" class="rounded border d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;">
+                            <i class="fa-solid fa-cube fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mb-2 text-muted small">{{ $t('properties.icon_tips') }}</div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
+                                <i class="fa-solid fa-upload me-1"></i>{{ $t('common.upload') }}
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @click="deleteIcon" :disabled="!hasCustomIcon">
+                                <i class="fa-solid fa-trash me-1"></i>{{ $t('common.delete') }}
+                            </button>
+                        </div>
+                        <input type="file" ref="iconInput" class="d-none" accept="image/png" @change="uploadIcon">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 编辑区域 -->
+            <div v-if="editMode === 'gui'" class="row g-4 pb-4">
+                <div class="col-md-6" v-for="(group, idx) in PROP_GROUPS" :key="idx">
+                    <div class="card h-100 border-secondary">
+                        <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
+                        <div class="card-body">
+                            <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
+                                <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
+                                <div class="col-sm-7">
+                                    
+                                    <!-- Boolean -->
+                                    <div v-if="item.type === 'boolean'" class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" v-model="formModel[item.key]">
+                                    </div>
+                                    
+                                    <!-- Select -->
+                                    <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]">
+                                        <option v-for="opt in item.options" :value="opt">{{ opt }}</option>
+                                    </select>
+
+                                    <!-- Number/Text -->
+                                    <input v-else :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]">
+                                    
+                                    <div v-if="item.desc" class="form-text text-secondary small" style="font-size: 0.75rem;">{{ item.desc }}</div>
                                 </div>
-                                
-                                <!-- Select -->
-                                <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]">
-                                    <option v-for="opt in item.options" :value="opt">{{ opt }}</option>
-                                </select>
-
-                                <!-- Number/Text -->
-                                <input v-else :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]">
-                                
-                                <div v-if="item.desc" class="form-text text-secondary small" style="font-size: 0.75rem;">{{ item.desc }}</div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- 文本编辑器 -->
-        <div v-else class="h-100">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-body-tertiary small text-muted">mc_server/server.properties</div>
-                <textarea class="form-control border-0 rounded-0 h-100" 
-                    style="font-family: monospace; resize: none; min-height: 65vh;" 
-                    v-model="fileContent" 
-                    spellcheck="false"
-                ></textarea>
+                <!-- 危险区域 (作为网格的一部分) -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-danger-subtle">
+                        <div class="card-header bg-danger-subtle text-danger fw-bold">
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ $t('common.danger_zone') }}
+                        </div>
+                        <div class="card-body d-flex flex-column justify-content-center">
+                            <h5 class="card-title text-danger mb-2">{{ $t('panel_settings.reinstall') }}</h5>
+                            <p class="card-text text-muted small mb-3">{{ $t('panel_settings.reinstall_confirm') }}</p>
+                            <button class="btn btn-outline-danger w-100 mt-auto" @click="askReinstall">
+                                <i class="fa-solid fa-trash-can me-2"></i>{{ $t('panel_settings.reinstall') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- 文本编辑器 -->
+            <div v-else class="h-100">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header bg-body-tertiary small text-muted">mc_server/server.properties</div>
+                    <textarea class="form-control border-0 rounded-0 h-100" 
+                        style="font-family: monospace; resize: none; min-height: 65vh;" 
+                        v-model="fileContent" 
+                        spellcheck="false"
+                    ></textarea>
+                </div>
+            </div>
+        </template>
     </div>
     `,
     setup() {
         const editMode = ref('gui');
         const fileContent = ref('');
+        const notFound = ref(false);
         const formModel = reactive({});
         const FILE_PATH = 'server.properties';
         const iconUrl = ref('/api/server/icon');
@@ -208,10 +238,15 @@ export default {
             try {
                 const res = await api.get(`/api/files/content?path=${FILE_PATH}`);
                 fileContent.value = res.data.content;
+                notFound.value = false;
                 parseToGui();
             } catch (e) {
-                fileContent.value = '# Error reading server.properties';
-                showToast($t('common.error'), 'danger');
+                if (e.response?.status === 404) {
+                    notFound.value = true;
+                } else {
+                    fileContent.value = '# Error reading server.properties';
+                    showToast($t('common.error'), 'danger');
+                }
             }
         };
 
@@ -276,15 +311,34 @@ export default {
             }
         };
 
+        const askReinstall = () => {
+            openModal({
+                title: $t('panel_settings.reinstall'),
+                message: $t('panel_settings.reinstall_confirm'),
+                callback: async () => {
+                    try {
+                        await api.post('/api/setup/reinstall');
+                        showToast($t('panel_settings.reinstall_success'));
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    } catch (e) {
+                        showToast((e.response?.data?.error || e.message), 'danger');
+                    }
+                }
+            });
+        };
+
         onMounted(() => {
             loadFile();
             updateIconPreview();
         });
 
         return {
-            editMode, fileContent, formModel, PROP_GROUPS,
+            editMode, fileContent, formModel, PROP_GROUPS, notFound,
             saveConfig, toggleEditMode, iconUrl, iconInput,
-            uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon
+            uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon,
+            askReinstall
         };
     }
 };

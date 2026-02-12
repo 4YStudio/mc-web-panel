@@ -17,6 +17,7 @@ export default {
             <a class="nav-link" :class="{active: store.view === 'dashboard'}" @click="selectView('dashboard')"><i class="fa-solid fa-terminal"></i> {{ $t('sidebar.dashboard') }}</a>
             <a class="nav-link" :class="{active: store.view === 'properties'}" @click="selectView('properties')"><i class="fa-solid fa-sliders"></i> {{ $t('sidebar.settings') }}</a>
             <a class="nav-link" :class="{active: store.view === 'mods'}" @click="selectView('mods')"><i class="fa-solid fa-microchip"></i> {{ $t('sidebar.mods') }}</a>
+            <a class="nav-link" :class="{active: store.view === 'modrinth'}" @click="selectView('modrinth')"><i class="fa-solid fa-cloud-arrow-down"></i> {{ $t('sidebar.modrinth') }}</a>
             <a class="nav-link" :class="{active: store.view === 'files'}" @click="selectView('files')"><i class="fa-solid fa-folder-open"></i> {{ $t('sidebar.files') }}</a>
             <a v-if="store.hasBackupMod" class="nav-link" :class="{active: store.view === 'backups'}" @click="selectView('backups')"><i class="fa-solid fa-clock-rotate-left"></i> {{ $t('sidebar.backups') }}</a>
             <a v-if="store.hasEasyAuth" class="nav-link" :class="{active: store.view === 'easyauth'}" @click="selectView('easyauth')"><i class="fa-solid fa-user-shield"></i> {{ $t('sidebar.auth') }}</a>

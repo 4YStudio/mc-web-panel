@@ -43,7 +43,10 @@ export default {
                                 <td><span class="badge" :class="b.type==='full'?'bg-success':'bg-info'">{{ b.type==='full' ? $t('backups.type_full') : $t('backups.type_diff') }}</span><span v-if="b.folder==='snapshots'" class="badge bg-secondary ms-1">Snap</span></td>
                                 <td class="small text-muted">{{ new Date(b.mtime).toLocaleString() }}</td>
                                 <td class="small">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
-                                <td><button class="btn btn-sm btn-outline-danger" @click="askRestore(b)"><i class="fa-solid fa-clock-rotate-left me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('backups.restore') }}</span></button></td>
+                                <td class="text-nowrap">
+                                    <button class="btn btn-sm btn-outline-primary me-2" @click="askRestore(b)"><i class="fa-solid fa-clock-rotate-left me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('backups.restore') }}</span></button>
+                                    <button class="btn btn-sm btn-outline-danger" @click="askDelete(b)"><i class="fa-solid fa-trash me-0 me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.delete') }}</span></button>
+                                </td>
                             </tr>
                             <tr v-if="!backupList.length"><td colspan="5" class="text-center text-muted py-3">Empty</td></tr>
                         </tbody>
@@ -147,9 +150,25 @@ export default {
             });
         };
 
+        const askDelete = (b) => {
+            openModal({
+                title: $t('backups.confirm_delete_title'),
+                message: $t('backups.confirm_delete_msg', { name: b.name }),
+                callback: async () => {
+                    try {
+                        await api.post('/api/backups/delete', { filename: b.name, folder: b.folder });
+                        showToast($t('common.success'));
+                        loadBackups();
+                    } catch (e) {
+                        showToast((e.response?.data?.error || e.message), 'danger');
+                    }
+                }
+            });
+        };
+
         watch(currentTab, (val) => { if (val === 'list') loadBackups(); if (val === 'config') loadConfig(); });
         onMounted(loadBackups);
 
-        return { store, currentTab, editMode, backupList, rawContent, formModel, CONFIG_GROUPS, loadBackups, createBackup, askRestore, saveConfig, toggleEditMode };
+        return { store, currentTab, editMode, backupList, rawContent, formModel, CONFIG_GROUPS, loadBackups, createBackup, askRestore, askDelete, saveConfig, toggleEditMode };
     }
 };

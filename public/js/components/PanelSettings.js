@@ -62,7 +62,11 @@ export default {
                     <div class="card-body">
                         <div class="mb-3">
                             <label class="form-label">{{ $t('panel_settings.jar_name') }}</label>
-                            <input type="text" class="form-control" v-model="config.jarName">
+                            <select class="form-select" v-model="config.jarName">
+                                <option v-for="jar in jars" :key="jar" :value="jar">{{ jar }}</option>
+                                <option v-if="!jars.length && config.jarName" :value="config.jarName">{{ config.jarName }}</option>
+                                <option v-if="!jars.length && !config.jarName" value="" disabled>{{ $t('setup.choose') }}</option>
+                            </select>
                             <div class="form-text">{{ $t('panel_settings.jar_name_desc') }}</div>
                         </div>
                         
@@ -101,21 +105,31 @@ export default {
                 </div>
             </div>
 
-            <!-- 高级设置 -->
+            <!-- AI 设置 -->
             <div class="col-md-6">
                 <div class="card h-100">
-                    <div class="card-header bg-warning text-dark fw-bold">
-                        <i class="fa-solid fa-gear me-2"></i>{{ $t('panel_settings.advanced') }}
+                    <div class="card-header bg-info text-white fw-bold">
+                        <i class="fa-solid fa-robot me-2"></i>{{ $t('panel_settings.ai_settings') }}
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.max_log_history') }}</label>
-                            <input type="number" class="form-control" v-model.number="config.maxLogHistory" min="100" max="10000">
+                            <label class="form-label">{{ $t('panel_settings.ai_endpoint') }}</label>
+                            <input type="text" class="form-control" v-model="config.aiEndpoint" :placeholder="$t('panel_settings.ai_endpoint_desc')">
+                            <div class="form-text small opacity-75">{{ $t('panel_settings.ai_endpoint_desc') }}</div>
                         </div>
-                        
                         <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.monitor_interval') }}</label>
-                            <input type="number" class="form-control" v-model.number="config.monitorInterval" min="1000" max="10000" step="100">
+                            <label class="form-label">{{ $t('panel_settings.ai_key') }}</label>
+                            <input type="password" class="form-control" v-model="config.aiKey" :placeholder="$t('panel_settings.ai_key_desc')">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ $t('panel_settings.ai_model') }}</label>
+                            <input type="text" class="form-control" v-model="config.aiModel" :placeholder="$t('panel_settings.ai_model_placeholder')">
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button class="btn btn-outline-info fw-bold" @click="testAI" :disabled="testingAI">
+                                <span v-if="testingAI" class="spinner-border spinner-border-sm me-2"></span>
+                                <i v-else class="fa-solid fa-vial me-2"></i>{{ $t('panel_settings.ai_test') }}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -129,6 +143,7 @@ export default {
 
         const loading = ref(true);
         const saving = ref(false);
+        const testingAI = ref(false);
         const config = reactive({
             port: 3000,
             defaultLang: 'zh',
@@ -138,17 +153,30 @@ export default {
             secret: '',
             sessionTimeout: 7,
             maxLogHistory: 1000,
-            monitorInterval: 2000
+            monitorInterval: 2000,
+            aiEndpoint: '',
+            aiKey: '',
+            aiModel: ''
         });
 
         const javaArgsText = ref('');
+        const jars = ref([]);
+
+        const loadJars = async () => {
+            try {
+                const res = await api.get('/api/panel/jars');
+                jars.value = res.data;
+            } catch (e) {
+                console.error('Failed to load jars:', e);
+            }
+        };
 
         const loadConfig = async () => {
             try {
                 loading.value = true;
                 const res = await api.get('/api/panel/config');
                 Object.assign(config, res.data);
-                javaArgsText.value = config.javaArgs.join('\\n');
+                javaArgsText.value = config.javaArgs.join('\n');
 
                 // 如果配置中的主题/语言与当前不同,使用当前的(localStorage优先)
                 const currentTheme = localStorage.getItem('theme');
@@ -173,7 +201,7 @@ export default {
                 saving.value = true;
 
                 // 解析 Java 参数
-                config.javaArgs = javaArgsText.value.split('\\n').map(s => s.trim()).filter(s => s);
+                config.javaArgs = javaArgsText.value.split('\n').map(s => s.trim()).filter(s => s);
 
                 const res = await api.post('/api/panel/config', config);
 
@@ -233,7 +261,28 @@ export default {
             }
         };
 
+        const testAI = async () => {
+            if (!config.aiEndpoint || !config.aiModel) {
+                showToast($t('panel_settings.validation_error'), 'warning');
+                return;
+            }
+            testingAI.value = true;
+            try {
+                await api.post('/api/panel/ai/test', {
+                    aiEndpoint: config.aiEndpoint,
+                    aiKey: config.aiKey,
+                    aiModel: config.aiModel
+                });
+                showToast($t('panel_settings.ai_test_success'), 'success');
+            } catch (e) {
+                showToast($t('panel_settings.ai_test_fail') + ': ' + (e.response?.data?.error || e.message), 'danger');
+            } finally {
+                testingAI.value = false;
+            }
+        };
+
         const reset2FA = () => {
+
             openModal({
                 title: $t('panel_settings.reset_2fa'),
                 message: $t('panel_settings.reset_2fa_confirm'),
@@ -279,14 +328,20 @@ export default {
             });
         };
 
-        onMounted(loadConfig);
+        onMounted(() => {
+            loadConfig();
+            loadJars();
+        });
 
         return {
             loading,
             saving,
+            testingAI,
             config,
             javaArgsText,
+            jars,
             saveConfig,
+            testAI,
             reset2FA
         };
     }

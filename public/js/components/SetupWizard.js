@@ -14,33 +14,34 @@ export default {
                 <p class="text-muted">{{ $t('setup.desc') }}</p>
             </div>
 
-            <div v-if="loading" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-3 text-muted">{{ loadingText }}</p>
-            </div>
-
-            <div v-else class="row justify-content-center">
+            <div class="row justify-content-center">
                 <div class="col-md-8 col-lg-6">
                     <!-- Step 1: MC Version -->
                     <div class="mb-4">
-                        <label class="form-label fw-bold">{{ $t('setup.select_mc') }}</label>
-                        <select class="form-select form-select-lg" v-model="selectedMc" @change="fetchLoaders">
-                            <option value="">{{ $t('setup.choose') }}</option>
+                        <label class="form-label fw-bold d-flex align-items-center">
+                            {{ $t('setup.select_mc') }}
+                            <span v-if="loadingMc" class="spinner-border spinner-border-sm text-primary ms-2" role="status"></span>
+                        </label>
+                        <select class="form-select form-select-lg" v-model="selectedMc" @change="fetchLoaders" :disabled="loadingMc">
+                            <option value="">{{ loadingMc ? $t('common.loading') : $t('setup.choose') }}</option>
                             <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
                         </select>
                     </div>
 
                      <!-- Step 2: Loader Version -->
-                    <div class="mb-4" v-if="selectedMc">
-                        <label class="form-label fw-bold">{{ $t('setup.select_loader') }}</label>
-                        <select class="form-select form-select-lg" v-model="selectedLoader">
-                            <option value="">{{ $t('setup.choose') }}</option>
+                    <div class="mb-4" v-if="selectedMc || loadingLoaders">
+                        <label class="form-label fw-bold d-flex align-items-center">
+                            {{ $t('setup.select_loader') }}
+                            <span v-if="loadingLoaders" class="spinner-border spinner-border-sm text-primary ms-2" role="status"></span>
+                        </label>
+                        <select class="form-select form-select-lg" v-model="selectedLoader" :disabled="loadingLoaders">
+                            <option value="">{{ loadingLoaders ? $t('common.loading') : $t('setup.choose') }}</option>
                             <option v-for="v in loaderVersions" :key="v" :value="v">{{ v }}</option>
                         </select>
                     </div>
 
                     <!-- Step 3: Install -->
-                    <div class="d-grid" v-if="selectedMc && selectedLoader">
+                    <div class="d-grid" v-if="selectedMc && selectedLoader && !loadingLoaders">
                         <button class="btn btn-primary btn-lg" @click="install" :disabled="installing">
                              <span v-if="installing" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                              {{ installing ? $t('setup.installing') : $t('setup.install') }}
@@ -57,17 +58,19 @@ export default {
         const loaderVersions = ref([]);
         const selectedMc = ref('');
         const selectedLoader = ref('');
-        const loading = ref(true);
-        const loadingText = computed(() => t('setup.loading_versions'));
+        const loadingMc = ref(false);
+        const loadingLoaders = ref(false);
         const installing = ref(false);
 
         const fetchMc = async () => {
+            loadingMc.value = true;
             try {
                 const res = await api.get('/api/setup/versions/mc');
                 mcVersions.value = res.data;
-                loading.value = false;
             } catch (e) {
                 showToast(t('setup.fetch_fail_mc'), 'danger');
+            } finally {
+                loadingMc.value = false;
             }
         };
 
@@ -75,12 +78,15 @@ export default {
             if (!selectedMc.value) return;
             loaderVersions.value = [];
             selectedLoader.value = '';
+            loadingLoaders.value = true;
             try {
                 const res = await api.get(`/api/setup/versions/loader/${selectedMc.value}`);
                 loaderVersions.value = res.data;
                 if (res.data.length > 0) selectedLoader.value = res.data[0];
             } catch (e) {
                 showToast(t('setup.fetch_fail_loader'), 'danger');
+            } finally {
+                loadingLoaders.value = false;
             }
         };
 
@@ -122,7 +128,7 @@ export default {
 
         return {
             mcVersions, loaderVersions, selectedMc, selectedLoader,
-            loading, loadingText, installing,
+            loadingMc, loadingLoaders, installing,
             fetchLoaders, install
         };
     }

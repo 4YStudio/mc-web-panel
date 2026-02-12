@@ -14,6 +14,7 @@ const { authenticator } = require('otplib');
 const QRCode = require('qrcode');
 const fs = require('fs-extra');
 const multer = require('multer');
+const crypto = require('crypto');
 const os = require('os');
 const si = require('systeminformation');
 const PropertiesReader = require('properties-reader');
@@ -22,28 +23,34 @@ const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 const APP_CODENAME = 'Advanced Backups Support';
+const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
 // --- 配置区域 ---
 // detect if running in compressed environment (pkg or caxa)
-// Caxa (v3+) extracts node to a temp dir, so process.execPath is often the internal 'node.exe'.
-// To find the actual executable path, we scan process.argv for the .exe file that launched us.
 let BASE_DIR = process.cwd();
 const isNode = path.basename(process.execPath).toLowerCase().startsWith('node');
 
+// In modern caxa, process.execPath might point to the temporary node binary.
+// We try to find the actual executable path that the user ran.
 if (!isNode) {
-    // If execPath is NOT node, then it's the wrapper (pkg behavior, or caxa on some platforms)
+    // Directly running the wrapper
     BASE_DIR = path.dirname(process.execPath);
 } else {
-    // If execPath IS node (caxa default), check argv for the wrapper executable
-    // Typically: [ '.../temp/node.exe', '.../temp/server.js', 'REAL_EXE_PATH', ... ]
-    // But sometimes caxa wrapper is just passed as an argument.
-    // We look for any argv ending in .exe that is NOT node.exe
+    // Scanning argv for the original executable (especially for caxa)
+    // We look for a path that is NOT node and NOT a .js file
     for (const arg of process.argv) {
-        if (arg && arg.toLowerCase().endsWith('.exe') && !path.basename(arg).toLowerCase().startsWith('node')) {
+        if (!arg) continue;
+        const base = path.basename(arg).toLowerCase();
+        const isJs = base.endsWith('.js') || base.endsWith('.cjs') || base.endsWith('.mjs');
+        const isNodeBin = base.startsWith('node');
+
+        // On Linux, binaries often have no extension. On Windows they have .exe.
+        // We look for an absolute path that is not node or a script.
+        if (path.isAbsolute(arg) && !isNodeBin && !isJs) {
             BASE_DIR = path.dirname(arg);
-            console.log(`Detected Caxa Executable: ${arg}`);
+            console.log(`Detected Standalone Executable: ${arg}`);
             break;
         }
     }
@@ -112,7 +119,7 @@ if (cluster.isPrimary) {
 
     // 默认配置
     const DEFAULT_CONFIG = {
-        secret: authenticator.generateSecret(),
+        secret: '', // Initial secret is empty
         isSetup: false,
         port: 3000,
         defaultLang: 'zh',
@@ -126,13 +133,18 @@ if (cluster.isPrimary) {
         sessionSecret: ''
     };
 
-    let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : DEFAULT_CONFIG;
-    // 如果没有 sessionSecret，生成一个新的并保存
+    let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : { ...DEFAULT_CONFIG };
+
+    // 如果没有 sessionSecret，生成并根据情况保存
     if (!appConfig.sessionSecret) {
         appConfig.sessionSecret = authenticator.generateSecret() + '_' + Date.now();
+    }
+
+    // 立即保存配置文件 (如果不存在)
+    if (!fs.existsSync(CONFIG_FILE)) {
+        fs.ensureDirSync(DATA_DIR);
         fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
     }
-    if (!fs.existsSync(CONFIG_FILE)) fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
 
     const app = express();
     const server = http.createServer(app);
@@ -588,6 +600,27 @@ if (cluster.isPrimary) {
         }
     });
 
+    // 4. 删除备份
+    app.post('/api/backups/delete', requireAuth, async (req, res) => {
+        const { filename, folder } = req.body;
+        try {
+            const targetPath = path.join(folder === 'differential' ? BACKUP_DIFF_DIR : BACKUP_SNAP_DIR, filename);
+            const resolvedPath = path.resolve(targetPath);
+            if (!resolvedPath.startsWith(path.resolve(BACKUP_DIFF_DIR)) && !resolvedPath.startsWith(path.resolve(BACKUP_SNAP_DIR))) {
+                return res.status(403).json({ error: 'Access Denied' });
+            }
+
+            if (fs.existsSync(targetPath)) {
+                await fs.remove(targetPath);
+                res.json({ success: true });
+            } else {
+                res.status(404).json({ error: '备份文件不存在' });
+            }
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // --- 面板设置 API (新增) ---
 
     // 1. 获取面板配置
@@ -608,6 +641,17 @@ if (cluster.isPrimary) {
         }
     });
 
+    // 2. 获取可用 JAR 文件列表
+    app.get('/api/panel/jars', requireAuth, (req, res) => {
+        try {
+            const files = fs.readdirSync(MC_DIR);
+            const jars = files.filter(f => f.toLowerCase().endsWith('.jar'));
+            res.json(jars);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // --- 5. Setup API ---
     app.get('/api/setup/status', requireAuth, (req, res) => {
         try {
@@ -617,6 +661,32 @@ if (cluster.isPrimary) {
             res.json({ isSetup });
         } catch (e) {
             res.json({ isSetup: false });
+        }
+    });
+
+    app.post('/api/setup/reinstall', requireAuth, async (req, res) => {
+        try {
+            // 1. 停止服务器 (如果运行中)
+            if (mcProcess) {
+                mcProcess.kill();
+                mcProcess = null;
+                io.emit('status', false);
+            }
+
+            // 2. 删除目录内容
+            const files = fs.readdirSync(MC_DIR);
+            for (const f of files) {
+                await fs.remove(path.join(MC_DIR, f));
+            }
+
+            // 3. 更新配置
+            appConfig.isSetup = false;
+            fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+
+            io.emit('system_stats', { isSetup: false });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
         }
     });
 
@@ -681,10 +751,253 @@ if (cluster.isPrimary) {
         }
     });
 
+    // Modrinth API / AI Translate
+    app.get('/api/mods/modrinth/search', requireAuth, async (req, res) => {
+        const { q, facets, offset, limit, index } = req.query;
+        console.log(`[Modrinth Search] q=${q}, facets=${facets}, index=${index}`);
+        try {
+            const params = { query: q, limit: limit || 20, offset: offset || 0 };
+            if (facets) params.facets = facets;
+            if (index) params.index = index;
+
+            const response = await axios.get('https://api.modrinth.com/v2/search', {
+                params,
+                headers: { 'User-Agent': MODRINTH_UA }
+            });
+            res.json(response.data);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/mods/modrinth/versions', requireAuth, async (req, res) => {
+        try {
+            const response = await axios.get('https://api.modrinth.com/v2/tag/game_version', {
+                headers: { 'User-Agent': MODRINTH_UA }
+            });
+            res.json(response.data);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/mods/modrinth/project/:id', requireAuth, async (req, res) => {
+        try {
+            const [project, versions] = await Promise.all([
+                axios.get(`https://api.modrinth.com/v2/project/${req.params.id}`, { headers: { 'User-Agent': MODRINTH_UA } }),
+                axios.get(`https://api.modrinth.com/v2/project/${req.params.id}/version`, { headers: { 'User-Agent': MODRINTH_UA } })
+            ]);
+            res.json({ project: project.data, versions: versions.data });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/mods/modrinth/download', requireAuth, async (req, res) => {
+        const { url, filename } = req.body;
+        if (!url || !filename) return res.status(400).json({ error: 'URL and filename required' });
+
+        const dest = path.join(MC_DIR, 'mods', filename);
+        appendLog(`Installing mod: ${filename}...`);
+
+        try {
+            const response = await axios.get(url, { responseType: 'stream' });
+            const writer = fs.createWriteStream(dest);
+            response.data.pipe(writer);
+
+            writer.on('finish', () => {
+                appendLog(`Successfully installed ${filename}`);
+                res.json({ success: true });
+            });
+
+            writer.on('error', (err) => {
+                console.error('Download failed', err);
+                appendLog('Installation failed: ' + err.message);
+                res.status(500).json({ error: err.message });
+            });
+
+        } catch (e) {
+            console.error(e);
+            appendLog('Installation error: ' + e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/ai/translate', requireAuth, async (req, res) => {
+        const { text, targetLang = 'Chinese' } = req.body;
+        if (!text) return res.status(400).json({ error: 'Text is required' });
+        if (!appConfig.aiKey || !appConfig.aiEndpoint) {
+            return res.status(400).json({ error: 'AI_NOT_CONFIGURED', message: 'AI is not configured in Panel Settings' });
+        }
+
+        try {
+            const endpoint = appConfig.aiEndpoint.endsWith('/') ? appConfig.aiEndpoint : appConfig.aiEndpoint + '/';
+            const response = await axios.post(`${endpoint}chat/completions`, {
+                model: appConfig.aiModel,
+                messages: [
+                    { role: 'system', content: `You are a professional translator specializing in Minecraft and software. Translate the following English text to ${targetLang}. Preserve Markdown if present. Only return the translated text.` },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0.3
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${appConfig.aiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const translated = response.data.choices[0]?.message?.content?.trim();
+            res.json({ translated });
+        } catch (e) {
+            console.error('AI Translate error:', e.response?.data || e.message);
+            res.status(500).json({
+                error: 'AI_TRANSLATE_FAILED',
+                message: e.response?.data?.error?.message || e.message
+            });
+        }
+    });
+
+    app.post('/api/panel/ai/test', requireAuth, async (req, res) => {
+        const { aiEndpoint, aiKey, aiModel } = req.body;
+        if (!aiEndpoint || !aiModel) return res.status(400).json({ error: 'Endpoint and Model required' });
+
+        try {
+            const endpoint = aiEndpoint.endsWith('/') ? aiEndpoint : aiEndpoint + '/';
+            const response = await axios.post(`${endpoint}chat/completions`, {
+                model: aiModel,
+                messages: [{ role: 'user', content: 'test' }],
+                max_tokens: 5
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${aiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 5000
+            });
+            if (response.data.choices) {
+                res.json({ success: true });
+            } else {
+                res.status(500).json({ error: 'Invalid response from AI provider' });
+            }
+        } catch (e) {
+            res.status(500).json({ error: e.response?.data?.error?.message || e.message });
+        }
+    });
+
+
+    // --- 本地模组增强 ---
+    const modMetadataCache = new Map();
+    const fileHashCache = new Map(); // filename:mtime:size -> hash
+
+    const getFileHash = (filePath) => {
+        return new Promise((resolve, reject) => {
+            const hash = crypto.createHash('sha1');
+            const stream = fs.createReadStream(filePath);
+            stream.on('data', (data) => hash.update(data));
+            stream.on('end', () => resolve(hash.digest('hex')));
+            stream.on('error', reject);
+        });
+    };
+
+    app.get('/api/mods/local/list', requireAuth, async (req, res) => {
+        const modsDir = path.join(MC_DIR, 'mods');
+        try {
+            if (!fs.existsSync(modsDir)) {
+                return res.json([]);
+            }
+
+            const files = await fs.readdir(modsDir);
+            const jarFiles = files.filter(f => f.endsWith('.jar') || f.endsWith('.jar.disabled'));
+
+            const results = [];
+            for (const file of jarFiles) {
+                const filePath = path.join(modsDir, file);
+                try {
+                    const stats = await fs.stat(filePath);
+                    const cacheKey = `${file}:${stats.mtime.getTime()}:${stats.size}`;
+                    const hash = fileHashCache.get(cacheKey);
+
+                    results.push({
+                        name: file,
+                        size: stats.size,
+                        mtime: stats.mtime,
+                        isDisabled: file.endsWith('.disabled'),
+                        hash: hash || null,
+                        metadata: hash ? (modMetadataCache.get(hash) || null) : null
+                    });
+                } catch (err) {
+                    console.error(`[Mods] Error stat file ${file}:`, err.message);
+                }
+            }
+
+            res.json(results);
+        } catch (e) {
+            console.error('[Mods] Local mod list error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/mods/local/metadata', requireAuth, async (req, res) => {
+        const { file } = req.query;
+        if (!file) return res.status(400).json({ error: 'File name required' });
+
+        const modsDir = path.join(MC_DIR, 'mods');
+        const filePath = path.join(modsDir, file);
+
+        try {
+            if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+            const stats = await fs.stat(filePath);
+            const cacheKey = `${file}:${stats.mtime.getTime()}:${stats.size}`;
+            let hash = fileHashCache.get(cacheKey);
+
+            if (!hash) {
+                hash = await getFileHash(filePath);
+                fileHashCache.set(cacheKey, hash);
+            }
+
+            let metadata = modMetadataCache.get(hash);
+
+            if (!metadata) {
+                try {
+                    const response = await axios.post('https://api.modrinth.com/v2/version_files', {
+                        hashes: [hash],
+                        algorithm: 'sha1'
+                    }, {
+                        headers: { 'User-Agent': MODRINTH_UA },
+                        timeout: 5000
+                    });
+
+                    const metaMap = response.data;
+                    if (metaMap[hash]) {
+                        const version = metaMap[hash];
+                        const projectRes = await axios.get(`https://api.modrinth.com/v2/project/${version.project_id}`, {
+                            headers: { 'User-Agent': MODRINTH_UA },
+                            timeout: 3000
+                        });
+                        metadata = {
+                            title: projectRes.data.title,
+                            icon_url: projectRes.data.icon_url,
+                            version: version.version_number,
+                            project_id: version.project_id
+                        };
+                        modMetadataCache.set(hash, metadata);
+                    }
+                } catch (e) {
+                    console.error(`[Mods] Modrinth lookup failed for ${file}:`, e.message);
+                }
+            }
+
+            res.json({ hash, metadata });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // 2. 保存面板配置
     app.post('/api/panel/config', requireAuth, async (req, res) => {
         try {
-            const { port, defaultLang, theme, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath } = req.body;
+            const { port, defaultLang, theme, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel } = req.body;
 
             // 验证配置
             if (port && (port < 1024 || port > 65535)) {
@@ -719,6 +1032,9 @@ if (cluster.isPrimary) {
             if (maxLogHistory !== undefined) appConfig.maxLogHistory = maxLogHistory;
             if (monitorInterval !== undefined) appConfig.monitorInterval = monitorInterval;
             if (javaPath !== undefined) appConfig.javaPath = javaPath;
+            if (aiEndpoint !== undefined) appConfig.aiEndpoint = aiEndpoint;
+            if (aiKey !== undefined) appConfig.aiKey = aiKey;
+            if (aiModel !== undefined) appConfig.aiModel = aiModel;
 
             // 保存到文件
             await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
@@ -765,15 +1081,49 @@ if (cluster.isPrimary) {
     app.get('/api/auth/check', (req, res) => {
         let isSetup = false;
         try { isSetup = fs.readdirSync(MC_DIR).length > 2; } catch (e) { }
-        res.json({ isSetup, authenticated: !!req.session.authenticated });
+        res.json({
+            isSetup,
+            authenticated: !!req.session.authenticated,
+            has2FA: !!appConfig.secret
+        });
     });
-    app.get('/api/auth/qr', (req, res) => QRCode.toDataURL(authenticator.keyuri('Admin', 'MC-Panel', appConfig.secret), (err, url) => res.json({ qr: url, secret: appConfig.secret })));
+    app.get('/api/auth/qr', (req, res) => {
+        // If no secret is set, generate a temporary one for the session
+        let secret = appConfig.secret;
+        if (!secret) {
+            if (!req.session.tempSecret) req.session.tempSecret = authenticator.generateSecret();
+            secret = req.session.tempSecret;
+        }
+        QRCode.toDataURL(authenticator.keyuri('Admin', 'MC-Panel', secret), (err, url) => {
+            res.json({ qr: url, secret: secret });
+        });
+    });
+
     app.post('/api/auth/login', (req, res) => {
-        if (authenticator.check(req.body.token, appConfig.secret)) {
+        const { token } = req.body;
+        let secret = appConfig.secret;
+        let isFirstSetup = false;
+
+        if (!secret && req.session.tempSecret) {
+            secret = req.session.tempSecret;
+            isFirstSetup = true;
+        }
+
+        if (secret && authenticator.check(token, secret)) {
             req.session.authenticated = true;
-            if (!appConfig.isSetup) { appConfig.isSetup = true; fs.writeJsonSync(CONFIG_FILE, appConfig); }
+            if (isFirstSetup) {
+                appConfig.secret = secret;
+                appConfig.isSetup = true;
+                fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+                delete req.session.tempSecret;
+            } else if (!appConfig.isSetup) {
+                appConfig.isSetup = true;
+                fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+            }
             res.json({ success: true });
-        } else res.json({ success: false });
+        } else {
+            res.json({ success: false });
+        }
     });
     app.post('/api/auth/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
@@ -873,7 +1223,7 @@ if (cluster.isPrimary) {
         const targetPath = path.join(MC_DIR, req.query.path || '');
         if (!targetPath.startsWith(MC_DIR)) return res.status(403).send('Denied');
         try {
-            if (!fs.existsSync(targetPath)) fs.ensureDirSync(targetPath);
+            if (!fs.existsSync(targetPath)) return res.status(404).json({ error: 'Folder not found' });
             const files = await fs.readdir(targetPath);
             const fileStats = await Promise.all(files.map(async f => {
                 try {
@@ -993,7 +1343,13 @@ if (cluster.isPrimary) {
         if (!filePath.startsWith(MC_DIR)) return res.status(403).send('Denied');
         if (fs.existsSync(filePath)) res.download(filePath); else res.status(404).send('Not Found');
     });
-    app.get('/api/files/content', requireAuth, async (req, res) => { try { res.json({ content: await fs.readFile(path.join(MC_DIR, req.query.path), 'utf8') }); } catch (e) { res.status(500).send('Err'); } });
+    app.get('/api/files/content', requireAuth, async (req, res) => {
+        try {
+            const filepath = path.join(MC_DIR, req.query.path);
+            if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
+            res.json({ content: await fs.readFile(filepath, 'utf8') });
+        } catch (e) { res.status(500).send('Err'); }
+    });
     app.post('/api/files/save', requireAuth, async (req, res) => { try { await fs.writeFile(path.join(MC_DIR, req.body.filepath), req.body.content); res.json({ success: true }); } catch (e) { res.status(500).send('Err'); } });
 
     app.get('/api/lists/:type', requireAuth, async (req, res) => { try { res.json(await fs.readJson(path.join(MC_DIR, `${req.params.type}.json`))); } catch (e) { res.json([]); } });

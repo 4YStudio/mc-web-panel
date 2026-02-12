@@ -1,6 +1,6 @@
 {
   "name": "mc-web-panel",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "",
   "main": "index.js",
   "bin": "server.js",

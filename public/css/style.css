@@ -275,6 +275,15 @@ body {
     }
 }
 
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2050;
+}
+
 /* --- Misc --- */
 .btn {
     border-radius: 8px;
@@ -452,6 +461,57 @@ body {
 }
 
 .config-sidebar,
+.min-w-max {
+    min-width: max-content;
+}
+
+.border-transparent {
+    border-color: transparent !important;
+}
+
+.hover-grow {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-grow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+}
+
+.mod-description-container {
+    line-height: 1.6;
+    overflow-wrap: break-word;
+}
+
+.mod-description-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.mod-description-container h1,
+.mod-description-container h2,
+.mod-description-container h3 {
+    border-bottom: 1px solid var(--bs-border-color);
+    padding-bottom: 8px;
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+.mod-description-container li {
+    margin-bottom: 4px;
+}
+
+.mod-description-container a {
+    text-decoration: none;
+}
+
+.mod-description-container a:hover {
+    text-decoration: underline;
+}
+
 .config-content {
     height: 100%;
 }
@@ -484,5 +544,157 @@ body {
     .config-content {
         height: 60vh;
         /* Give content decent height on mobile */
+    }
+}
+
+/* Modrinth Enhanced UI */
+.modrinth-result-card {
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modrinth-result-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Modal Transitions */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+.scale-enter-active,
+.scale-leave-active {
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.scale-enter-from,
+.scale-leave-to {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+}
+
+.scale-enter-to,
+.scale-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+@keyframes spin-slow {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spin-slow {
+    animation: spin-slow 2s linear infinite;
+}
+
+@keyframes animate-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Fix for position: fixed modals inside transformed containers */
+.animate-in {
+    animation: animate-in 0.4s ease-out forwards;
+}
+
+.modrinth-search-group .form-control {
+    border-color: var(--bs-border-color) !important;
+}
+
+.modrinth-search-group .btn {
+    border-color: var(--bs-border-color) !important;
+    border-left: none;
+}
+
+/* Toast Redesign & Animations */
+
+.toast-container .toast {
+    background: rgba(var(--c-surface-rgb, 255, 255, 255), 0.7) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 2px solid var(--c-border) !important;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    transition: none !important;
+    /* Managed by Vue */
+    color: var(--c-text-primary);
+    width: 350px;
+}
+
+[data-bs-theme="dark"] .toast-container .toast {
+    background: rgba(22, 27, 34, 0.7) !important;
+}
+
+.toast-container .toast[data-type="success"] {
+    border-color: #28a745 !important;
+}
+
+.toast-container .toast[data-type="danger"] {
+    border-color: #dc3545 !important;
+}
+
+.toast-container .toast[data-type="warning"] {
+    border-color: #ffc107 !important;
+}
+
+.toast-container .toast[data-type="info"] {
+    border-color: #17a2b8 !important;
+}
+
+.toast-container .toast[data-type="primary"] {
+    border-color: var(--c-primary) !important;
+}
+
+.toast-container .toast-enter-active,
+.toast-container .toast-leave-active {
+    transition: all 0.4s ease !important;
+}
+
+.toast-container .toast-move {
+    transition: transform 0.4s ease;
+}
+
+/* 进入：从正上方滑入 + 渐显 */
+.toast-container .toast-enter-from {
+    opacity: 0 !important;
+    transform: translateY(-20px);
+}
+
+/* 离开：仅渐隐 */
+.toast-container .toast-leave-to {
+    opacity: 0 !important;
+}
+
+.toast-container .toast-leave-active {
+    position: absolute !important;
+    pointer-events: none;
+    right: 0;
+}
+
+@media (max-width: 576px) {
+    .toast-container .toast-leave-active {
+        width: 100% !important;
+        right: 0;
+        left: 0;
     }
 }

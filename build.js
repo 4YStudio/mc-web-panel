@@ -12,9 +12,6 @@ const NAPI_VERSION = 'napi-v6';
 const TARGETS = [
     { name: 'linux-x64', nodeArch: 'linux-x64', ext: '', sqliteArch: 'linux-x64' },
     { name: 'linux-arm64', nodeArch: 'linux-arm64', ext: '', sqliteArch: 'linux-arm64' },
-    { name: 'win-x64', nodeArch: 'win-x64', ext: '.exe', sqliteArch: 'win32-x64' },
-    // win-arm64 dropped: No prebuilt sqlite3 bindings available for v5.1.7. Users can run win-x64 via emulation.
-    // macos-x64 and macos-arm64 dropped: User requested removal.
 ];
 
 const downloadFile = (url, dest) => {

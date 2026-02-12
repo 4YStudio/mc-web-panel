@@ -17,6 +17,7 @@ import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
 import VoicechatManager from './components/VoicechatManager.js';
 import PanelSettings from './components/PanelSettings.js';
+import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
 import { createI18n } from './i18n.js?v=1.5.0';
 
@@ -39,6 +40,7 @@ const app = createApp({
         VoicechatManager,
         VoicechatManager,
         PanelSettings,
+        ModrinthBrowser,
         About
     },
     setup() {
@@ -55,10 +57,10 @@ const app = createApp({
 
             try {
                 const { data } = await api.get('/api/auth/check');
-                store.auth.isSetup = data.isSetup;
-                store.isSetup = data.isSetup; // Update root property
+                store.auth.isSetup = data.has2FA; // 这里映射到 auth.isSetup 控制登录页面显示
+                store.isSetup = data.isSetup;     // 这是主界面的安装向导状态
                 store.auth.loggedIn = data.authenticated;
-                if (!store.auth.isSetup || !store.isSetup) {
+                if (!data.has2FA) {
                     const qr = await api.get('/api/auth/qr');
                     store.auth.qrCode = qr.data.qr;
                     store.auth.secret = qr.data.secret;
