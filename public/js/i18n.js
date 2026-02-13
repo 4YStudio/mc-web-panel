@@ -427,7 +427,11 @@ export const messages = {
             ai_model_placeholder: '例如 gpt-3.5-turbo',
             ai_test: '测试连接',
             ai_test_success: '连接成功',
-            ai_test_fail: '连接失败'
+            ai_test_fail: '连接失败',
+            console_info_position: '控制台信息展示位置',
+            pos_top: '顶部显示',
+            pos_sidebar: '侧边栏显示',
+            pos_hide: '不显示'
         },
 
         setup: {

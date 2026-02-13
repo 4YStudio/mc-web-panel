@@ -49,6 +49,15 @@ export default {
                                 <option value="auto">{{ $t('panel_settings.theme_auto') }}</option>
                             </select>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ $t('panel_settings.console_info_position') }}</label>
+                            <select class="form-select" v-model="config.consoleInfoPosition">
+                                <option value="top">{{ $t('panel_settings.pos_top') }}</option>
+                                <option value="sidebar">{{ $t('panel_settings.pos_sidebar') }}</option>
+                                <option value="hide">{{ $t('panel_settings.pos_hide') }}</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -148,6 +157,7 @@ export default {
             port: 3000,
             defaultLang: 'zh',
             theme: 'auto',
+            consoleInfoPosition: 'top',
             jarName: '',
             javaArgs: [],
             secret: '',
@@ -178,14 +188,12 @@ export default {
                 Object.assign(config, res.data);
                 javaArgsText.value = config.javaArgs.join('\n');
 
-                // 如果配置中的主题/语言与当前不同,使用当前的(localStorage优先)
                 const currentTheme = localStorage.getItem('theme');
                 const currentLang = localStorage.getItem('lang');
 
                 if (currentTheme && config.theme !== currentTheme && config.theme === 'auto') {
                     config.theme = currentTheme;
                 }
-
                 if (currentLang && config.defaultLang !== currentLang) {
                     config.defaultLang = currentLang;
                 }
@@ -199,52 +207,42 @@ export default {
         const saveConfig = async () => {
             try {
                 saving.value = true;
-
-                // 解析 Java 参数
                 config.javaArgs = javaArgsText.value.split('\n').map(s => s.trim()).filter(s => s);
-
                 const res = await api.post('/api/panel/config', config);
 
                 if (res.data.success) {
-                    // 立即同步主题和语言设置
                     if (config.theme && config.theme !== 'auto') {
                         document.documentElement.setAttribute('data-bs-theme', config.theme);
                         localStorage.setItem('theme', config.theme);
                     }
-
                     if (config.defaultLang) {
-                        // 导入 store 来更新语言
                         const { store } = await import('../store.js');
                         store.lang = config.defaultLang;
                         localStorage.setItem('lang', config.defaultLang);
                     }
 
+                    // Sync consoleInfoPosition to global store immediately
+                    const { store } = await import('../store.js');
+                    store.consoleInfoPosition = config.consoleInfoPosition;
+
                     showToast($t('panel_settings.save_success'), 'success');
 
-                    // 询问是否重启
                     openModal({
                         title: $t('panel_settings.restart_required'),
                         message: $t('panel_settings.restart_confirm'),
                         callback: async () => {
                             try {
-                                // 记录当前端口和新端口
                                 const currentPort = window.location.port || '80';
                                 const newPort = config.port.toString();
                                 const portChanged = currentPort !== newPort;
-
                                 await api.post('/api/panel/restart');
                                 showToast($t('panel_settings.restarting'), 'info');
-
-                                // 3秒后跳转或刷新
                                 setTimeout(() => {
                                     if (portChanged) {
-                                        // 端口改变,跳转到新端口
                                         const protocol = window.location.protocol;
                                         const hostname = window.location.hostname;
-                                        const newUrl = `${protocol}//${hostname}:${newPort}`;
-                                        window.location.href = newUrl;
+                                        window.location.href = `${protocol}//${hostname}:${newPort}`;
                                     } else {
-                                        // 端口未改变,直接刷新
                                         window.location.reload();
                                     }
                                 }, 3000);
@@ -282,7 +280,6 @@ export default {
         };
 
         const reset2FA = () => {
-
             openModal({
                 title: $t('panel_settings.reset_2fa'),
                 message: $t('panel_settings.reset_2fa_confirm'),
@@ -290,11 +287,10 @@ export default {
                     try {
                         const res = await api.get('/api/panel/2fa/generate');
                         const { secret, qr } = res.data;
-
                         const verifyFlow = () => {
                             setTimeout(() => {
                                 openModal({
-                                    title: $t('panel_settings.reset_2fa_setup'), // "Setup 2FA"
+                                    title: $t('panel_settings.reset_2fa_setup'),
                                     message: `
                                         <div class="text-center">
                                             <p>${$t('panel_settings.reset_2fa_instruction')}</p>
@@ -312,15 +308,13 @@ export default {
                                             loadConfig();
                                         } catch (e) {
                                             showToast($t('common.error') + ': ' + (e.response?.data?.error || 'Invalid Code'), 'danger');
-                                            verifyFlow(); // Retry
+                                            verifyFlow();
                                         }
                                     }
                                 });
                             }, 300);
                         };
-
                         verifyFlow();
-
                     } catch (e) {
                         showToast($t('common.error') + ': ' + (e.response?.data?.error || e.message), 'danger');
                     }
@@ -334,15 +328,8 @@ export default {
         });
 
         return {
-            loading,
-            saving,
-            testingAI,
-            config,
-            javaArgsText,
-            jars,
-            saveConfig,
-            testAI,
-            reset2FA
+            loading, saving, testingAI, config, javaArgsText, jars,
+            saveConfig, testAI, reset2FA
         };
     }
 };

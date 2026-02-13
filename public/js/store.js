@@ -12,6 +12,7 @@ export const store = reactive({
     hasBackupMod: false,
     logs: [],
     view: 'dashboard',
+    consoleInfoPosition: 'top', // 'top', 'sidebar', 'hide'
     isRunning: false,
     hasBackupMod: false,
     hasEasyAuth: false, // 新增：是否显示 EasyAuth 菜单

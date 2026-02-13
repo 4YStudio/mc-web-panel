@@ -124,6 +124,7 @@ if (cluster.isPrimary) {
         port: 3000,
         defaultLang: 'zh',
         theme: 'auto',
+        consoleInfoPosition: 'top',
         jarName: 'fabric-server-launch.jar',
         javaArgs: ['-Xms1G', '-Xmx4G'],
         sessionTimeout: 7,
@@ -997,7 +998,7 @@ if (cluster.isPrimary) {
     // 2. 保存面板配置
     app.post('/api/panel/config', requireAuth, async (req, res) => {
         try {
-            const { port, defaultLang, theme, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel } = req.body;
+            const { port, defaultLang, theme, consoleInfoPosition, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel } = req.body;
 
             // 验证配置
             if (port && (port < 1024 || port > 65535)) {
@@ -1021,6 +1022,9 @@ if (cluster.isPrimary) {
             if (monitorInterval && (monitorInterval < 1000 || monitorInterval > 10000)) {
                 return res.status(400).json({ error: '监控刷新间隔必须在 1000-10000ms 之间' });
             }
+            if (consoleInfoPosition && !['top', 'sidebar', 'hide'].includes(consoleInfoPosition)) {
+                return res.status(400).json({ error: '无效的控制台信息展示位置' });
+            }
 
             // 更新配置
             if (port !== undefined) appConfig.port = port;
@@ -1035,6 +1039,7 @@ if (cluster.isPrimary) {
             if (aiEndpoint !== undefined) appConfig.aiEndpoint = aiEndpoint;
             if (aiKey !== undefined) appConfig.aiKey = aiKey;
             if (aiModel !== undefined) appConfig.aiModel = aiModel;
+            if (consoleInfoPosition !== undefined) appConfig.consoleInfoPosition = consoleInfoPosition;
 
             // 保存到文件
             await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });

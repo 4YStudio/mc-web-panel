@@ -38,7 +38,6 @@ const app = createApp({
         ServerPropertiesManager,
         Avatar,
         VoicechatManager,
-        VoicechatManager,
         PanelSettings,
         ModrinthBrowser,
         About
@@ -57,18 +56,32 @@ const app = createApp({
 
             try {
                 const { data } = await api.get('/api/auth/check');
-                store.auth.isSetup = data.has2FA; // 这里映射到 auth.isSetup 控制登录页面显示
-                store.isSetup = data.isSetup;     // 这是主界面的安装向导状态
+                store.auth.isSetup = data.has2FA;
+                store.isSetup = data.isSetup;
                 store.auth.loggedIn = data.authenticated;
                 if (!data.has2FA) {
                     const qr = await api.get('/api/auth/qr');
                     store.auth.qrCode = qr.data.qr;
                     store.auth.secret = qr.data.secret;
                 }
+
+                if (store.auth.loggedIn) {
+                    syncConfig();
+                }
             } catch (e) { console.error(e); }
         };
 
+        const syncConfig = async () => {
+            try {
+                const configRes = await api.get('/api/panel/config');
+                if (configRes.data && configRes.data.consoleInfoPosition) {
+                    store.consoleInfoPosition = configRes.data.consoleInfoPosition;
+                }
+            } catch (e) { console.error('Failed to sync config:', e); }
+        };
+
         const postLogin = () => {
+            syncConfig();
             api.get('/api/server/status').then(res => store.isRunning = res.data.running);
 
             // Socket 监听
@@ -85,7 +98,7 @@ const app = createApp({
                 store.hasBackupMod = d.hasBackupMod;
                 store.hasEasyAuth = d.hasEasyAuth;
                 store.hasVoicechat = d.hasVoicechat;
-                store.isSetup = d.isSetup; // Sync dynamic setup state
+                store.isSetup = d.isSetup;
             });
 
             // 回档进度监听
