@@ -96,7 +96,7 @@ const LazyModRow = {
 export default {
     components: { LazyModRow },
     template: `
-    <div>
+    <div class="h-100 d-flex flex-column overflow-hidden">
         <div v-if="notFound" class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
             <i class="fa-solid fa-folder-open fa-4x mb-3 opacity-25"></i>
             <h4>{{ $t('files.folder_not_found', { name: 'mods' }) }}</h4>
@@ -110,7 +110,7 @@ export default {
                 </button>
             </div>
             
-            <div class="card shadow-sm">
+            <div class="card shadow-sm d-flex flex-column" style="flex: 1; min-height: 0;">
                 <div class="card-header d-flex gap-2 p-2 align-items-center bg-body-tertiary border-0 rounded-top-3">
                     <input type="text" class="form-control form-control-sm border-0 shadow-none bg-body" style="max-width: 200px;" v-model="searchQuery" :placeholder="$t('mods.search_placeholder')">
                     <div class="vr mx-2"></div>
@@ -122,8 +122,8 @@ export default {
                         <button class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" @click="$refs.modInput.click()"><i class="fa-solid fa-upload me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.upload') }}</span></button>
                     </div>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
+                <div class="card-body p-0 overflow-hidden d-flex flex-column" style="flex: 1; min-height: 0;">
+                    <div class="overflow-auto custom-scrollbar" style="flex: 1; min-height: 0;">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-body-tertiary">
                                 <tr>
