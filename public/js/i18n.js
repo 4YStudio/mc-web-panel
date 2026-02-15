@@ -78,6 +78,8 @@ export const messages = {
             latest_version: '已是最新版本',
             new_version: '最新版本',
             download: '前往下载',
+            update_now: '立即更新',
+            updating: '正在更新...',
             current_is_latest: '您当前使用的是最新版本。'
         },
         dashboard: {
@@ -528,6 +530,8 @@ export const messages = {
             latest_version: 'Up to date',
             new_version: 'New Version',
             download: 'Download',
+            update_now: 'Update Now',
+            updating: 'Updating...',
             current_is_latest: 'You are using the latest version.'
         },
         dashboard: {

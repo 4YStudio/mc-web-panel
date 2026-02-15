@@ -1,36 +1,47 @@
 import { store } from '../store.js';
+import { computed } from '/js/vue.esm-browser.js';
 
 export default {
     template: `
-    <!-- 遮罩层 -->
-    <div v-if="store.task.visible" class="modal-backdrop show" style="z-index: 3000; background-color: rgba(0,0,0,0.6);"></div>
-    
-    <!-- 模态框 -->
-    <div v-if="store.task.visible" class="modal show d-block" tabindex="-1" style="z-index: 3001; padding-top: 10vh;">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow-lg border-0">
-                <div class="modal-body p-4">
-                    <h5 class="mb-3 text-center">{{ store.task.title }}</h5>
-                    
-                    <!-- 进度条 -->
-                    <div class="progress mb-2" style="height: 25px;">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
-                             role="progressbar" 
-                             :style="{width: store.task.percent + '%'}">
-                             {{ store.task.percent.toFixed(0) }}%
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between small text-muted mt-2">
-                        <span class="text-truncate" style="max-width: 60%;">{{ store.task.message }}</span>
-                        <span>{{ store.task.subMessage }}</span>
-                    </div>
+    <!-- 遮罩层：毛玻璃背景 -->
+    <Transition name="scale">
+    <div v-if="store.task.visible" 
+         style="position:fixed; inset:0; z-index:3000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);">
+
+        <div class="progress-card">
+            <!-- 标题 -->
+            <div class="progress-card-title">
+                <div class="progress-icon-ring">
+                    <i class="fa-solid" :class="iconClass"></i>
                 </div>
+                <h5 class="mb-0 fw-bold">{{ store.task.title }}</h5>
+            </div>
+
+            <!-- 自定义进度条 -->
+            <div class="progress-track">
+                <div class="progress-fill" :style="{ width: clampedPercent + '%' }"></div>
+            </div>
+
+            <!-- 信息行 -->
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <span class="progress-msg text-truncate">{{ store.task.message }}</span>
+                <span class="progress-pct" v-if="store.task.percent > 0">{{ store.task.percent.toFixed(0) }}%</span>
             </div>
         </div>
+
     </div>
+    </Transition>
     `,
     setup() {
-        return { store };
+        const clampedPercent = computed(() => Math.min(100, Math.max(0, store.task.percent)));
+        const iconClass = computed(() => {
+            const title = (store.task.title || '').toLowerCase();
+            if (title.includes('更新') || title.includes('update')) return 'fa-arrow-up-from-bracket';
+            if (title.includes('回档') || title.includes('restore')) return 'fa-clock-rotate-left';
+            if (title.includes('上传') || title.includes('upload')) return 'fa-cloud-arrow-up';
+            if (title.includes('下载') || title.includes('download')) return 'fa-cloud-arrow-down';
+            return 'fa-spinner fa-spin';
+        });
+        return { store, clampedPercent, iconClass };
     }
 };

@@ -23,7 +23,7 @@ const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.2';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -32,30 +32,64 @@ const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`
 let BASE_DIR = process.cwd();
 const isNode = path.basename(process.execPath).toLowerCase().startsWith('node');
 
-// In modern caxa, process.execPath might point to the temporary node binary.
-// We try to find the actual executable path that the user ran.
-if (!isNode) {
-    // Directly running the wrapper
-    BASE_DIR = path.dirname(process.execPath);
-} else {
-    // Scanning argv for the original executable (especially for caxa)
-    // We look for a path that is NOT node and NOT a .js file
+// In modern caxa, process.execPath points to the EXTRACTED node binary inside /tmp/caxa/.
+// argv also only contains extracted paths. The original wrapper path is lost.
+// Strategy:
+//   1. Detect caxa by checking if execPath contains '/caxa/applications/'
+//   2. Extract the executable name from the extraction path pattern:
+//      /tmp/caxa/applications/<executable-name>/<hash>/<version>/node
+//   3. Resolve it against process.cwd() (the directory where user ran the command)
+let APP_EXECUTABLE = null;
+
+const _isDaemon = process.argv.includes('--daemon');
+if (_isDaemon || !isNode) {
+    console.log(`DEBUG PATHS:`);
+    console.log(`  execPath: ${process.execPath}`);
+    console.log(`  argv: ${JSON.stringify(process.argv)}`);
+    console.log(`  cwd: ${process.cwd()}`);
+}
+
+// --- Method 1: Detect caxa environment from extraction path ---
+const caxaMatch = process.execPath.match(/[\/\\]caxa[\/\\]applications[\/\\]([^\/\\]+)[\/\\]/);
+if (caxaMatch) {
+    const exeName = caxaMatch[1]; // e.g. "mc-web-panel-linux-x64"
+    const candidate = path.join(process.cwd(), exeName);
+    console.log(`  Detected caxa environment, executable name: ${exeName}`);
+    console.log(`  Looking for wrapper at: ${candidate}`);
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        APP_EXECUTABLE = candidate;
+        if (_isDaemon || !isNode) console.log(`  Found caxa wrapper: ${APP_EXECUTABLE}`);
+    }
+}
+
+// --- Method 2: Non-caxa standalone (e.g. pkg) ---
+if (!APP_EXECUTABLE && !isNode) {
+    APP_EXECUTABLE = process.execPath;
+}
+
+// --- Method 3: Scan argv as fallback ---
+if (!APP_EXECUTABLE) {
     for (const arg of process.argv) {
         if (!arg) continue;
         const base = path.basename(arg).toLowerCase();
         const isJs = base.endsWith('.js') || base.endsWith('.cjs') || base.endsWith('.mjs');
         const isNodeBin = base.startsWith('node');
-
-        // On Linux, binaries often have no extension. On Windows they have .exe.
-        // We look for an absolute path that is not node or a script.
-        if (path.isAbsolute(arg) && !isNodeBin && !isJs) {
-            BASE_DIR = path.dirname(arg);
-            console.log(`Detected Standalone Executable: ${arg}`);
-            break;
+        if (!isNodeBin && !isJs) {
+            try {
+                const fullPath = path.resolve(arg);
+                if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                    APP_EXECUTABLE = fullPath;
+                    console.log(`  Detected Standalone Executable via argv: ${fullPath}`);
+                    break;
+                }
+            } catch (e) { }
         }
     }
 }
-// Fallback: If still pointing to temp dir (unlikely for BASE_DIR unless wrapper was in temp), user might be running normally.
+
+if (APP_EXECUTABLE) {
+    BASE_DIR = path.dirname(APP_EXECUTABLE);
+}
 
 const MC_DIR = path.join(BASE_DIR, 'mc_server');
 const DATA_DIR = path.join(BASE_DIR, 'data');
@@ -63,10 +97,11 @@ const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const SERVER_PROPERTIES = path.join(MC_DIR, 'server.properties');
 
-console.log(`DEBUG PATHS:`);
-console.log(`  execPath: ${process.execPath}`);
-console.log(`  argv[0]: ${process.argv[0]}`);
-console.log(`  Determined BASE_DIR: ${BASE_DIR}`);
+if (_isDaemon || !isNode) {
+    console.log(`DEBUG PATHS:`);
+    console.log(`  Determined APP_EXECUTABLE: ${APP_EXECUTABLE}`);
+    console.log(`  Determined BASE_DIR: ${BASE_DIR}`);
+}
 const EASYAUTH_DIR = path.join(MC_DIR, 'EasyAuth');
 const EASYAUTH_DB = path.join(EASYAUTH_DIR, 'easyauth.db');
 const EASYAUTH_CONFIG_DIR = path.join(MC_DIR, 'config', 'EasyAuth');
@@ -78,18 +113,255 @@ const BACKUP_DIFF_DIR = path.join(BACKUP_ROOT, 'world', 'differential');
 const BACKUP_SNAP_DIR = path.join(BACKUP_ROOT, 'world', 'snapshots');
 const WORLD_DIR = path.join(MC_DIR, 'world');
 
+// --- PID 文件 ---
+const PID_FILE = path.join(DATA_DIR, 'panel.pid');
+
+// Helper: 从 argv 中过滤出用户传入的命令（排除 node / .js / caxa 路径）
+const getUserArgs = () => {
+    return process.argv.filter(arg => {
+        if (!arg) return false;
+        const b = path.basename(arg).toLowerCase();
+        if (b.startsWith('node')) return false;
+        if (b.endsWith('.js') || b.endsWith('.cjs') || b.endsWith('.mjs')) return false;
+        // Skip the executable itself
+        if (APP_EXECUTABLE && path.resolve(arg) === APP_EXECUTABLE) return false;
+        // Skip caxa temp paths
+        if (arg.includes('/caxa/') || arg.includes('\\caxa\\')) return false;
+        return true;
+    });
+};
+
+// Helper: 检查 PID 是否存活
+const isPidAlive = (pid) => {
+    try { process.kill(pid, 0); return true; } catch (e) { return false; }
+};
+
+// Helper: 读取 PID
+const readPid = () => {
+    try {
+        if (fs.existsSync(PID_FILE)) {
+            const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+            if (pid && !isNaN(pid)) return pid;
+        }
+    } catch (e) { }
+    return null;
+};
+
+// Helper: 写入 PID
+const writePid = () => {
+    fs.ensureDirSync(DATA_DIR);
+    fs.writeFileSync(PID_FILE, String(process.pid));
+};
+
+// Helper: 清理 PID
+const cleanPid = () => {
+    try { if (fs.existsSync(PID_FILE)) fs.removeSync(PID_FILE); } catch (e) { }
+};
+
+// --- CLI 命令解析 ---
+const userArgs = getUserArgs();
+const command = (userArgs[0] || '').toLowerCase();
+
+// 不需要启动面板的命令：host / reset / stop / restart / help
+if (command === 'host') {
+    const newPort = parseInt(userArgs[1], 10);
+    if (!newPort || newPort < 1024 || newPort > 65535) {
+        console.log('用法: ./mc-web-panel host <端口号>');
+        console.log('端口范围: 1024 - 65535');
+        process.exit(1);
+    }
+    fs.ensureDirSync(DATA_DIR);
+    let config = fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE) : {};
+    config.port = newPort;
+    fs.writeJsonSync(CONFIG_FILE, config, { spaces: 2 });
+    console.log(`✅ 面板端口已更改为 ${newPort}`);
+    console.log('如果面板正在运行，请执行 restart 使其生效。');
+    process.exit(0);
+}
+
+if (command === 'reset') {
+    fs.ensureDirSync(DATA_DIR);
+    let config = fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE) : {};
+    const newSecret = authenticator.generateSecret();
+    config.secret = newSecret;
+    fs.writeJsonSync(CONFIG_FILE, config, { spaces: 2 });
+    const otpauth = authenticator.keyuri('Admin', 'MC-Panel', newSecret);
+    console.log('✅ 2FA 密钥已重置！');
+    console.log('');
+    console.log(`  新密钥: ${newSecret}`);
+    console.log(`  OTPAuth URI: ${otpauth}`);
+    console.log('');
+    console.log('请使用 Google Authenticator 或其他 TOTP 应用扫描以上信息。');
+    process.exit(0);
+}
+
+if (command === 'stop') {
+    const pid = readPid();
+    if (!pid) {
+        console.log('面板未在运行（未找到 PID 文件）。');
+        process.exit(0);
+    }
+    if (!isPidAlive(pid)) {
+        console.log(`PID ${pid} 已不存在，清理残留文件...`);
+        cleanPid();
+        process.exit(0);
+    }
+    console.log(`正在停止面板 (PID: ${pid})...`);
+    try {
+        process.kill(pid, 'SIGTERM');
+        let waited = 0;
+        const check = () => {
+            if (!isPidAlive(pid)) {
+                cleanPid();
+                console.log('✅ 面板已停止。');
+                process.exit(0);
+            }
+            waited += 500;
+            if (waited > 10000) {
+                console.log('⚠️ 进程未响应，强制终止...');
+                try { process.kill(pid, 'SIGKILL'); } catch (e) { }
+                cleanPid();
+                process.exit(0);
+            }
+            setTimeout(check, 500);
+        };
+        setTimeout(check, 500);
+    } catch (e) {
+        console.error('停止失败:', e.message);
+        cleanPid();
+        process.exit(1);
+    }
+    return;
+}
+
+if (command === 'restart') {
+    const pid = readPid();
+    if (pid && isPidAlive(pid)) {
+        console.log(`正在停止面板 (PID: ${pid})...`);
+        try { process.kill(pid, 'SIGTERM'); } catch (e) { }
+        // Wait for it to die then start
+        let waited = 0;
+        const check = () => {
+            if (!isPidAlive(pid) || waited > 10000) {
+                if (waited > 10000) {
+                    try { process.kill(pid, 'SIGKILL'); } catch (e) { }
+                }
+                cleanPid();
+                console.log('旧进程已停止，正在启动...');
+                doStart();
+            } else {
+                waited += 500;
+                setTimeout(check, 500);
+            }
+        };
+        setTimeout(check, 500);
+    } else {
+        console.log('面板未在运行，直接启动...');
+        doStart();
+    }
+    return;
+}
+
+// start 命令（默认行为）
+function doStart() {
+    if (!APP_EXECUTABLE) {
+        // 开发环境，直接前台运行
+        console.log('开发环境，前台启动面板...');
+        return; // 继续执行后续 cluster 逻辑
+    }
+    const existingPid = readPid();
+    if (existingPid && isPidAlive(existingPid)) {
+        console.log(`面板已在运行 (PID: ${existingPid})。如需重启请使用 restart 命令。`);
+        process.exit(0);
+    }
+    if (existingPid) cleanPid(); // stale PID file
+    // 以 daemon 模式后台启动
+    const child = spawn(APP_EXECUTABLE, ['--daemon'], {
+        detached: true,
+        stdio: 'ignore',
+        cwd: path.dirname(APP_EXECUTABLE)
+    });
+    child.on('error', (err) => {
+        console.error('启动失败:', err.message);
+        process.exit(1);
+    });
+    child.unref();
+    console.log(`✅ 面板已在后台启动 (PID: ${child.pid})`);
+    console.log(`   访问地址: http://localhost:${(fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE).port : null) || 3000}`);
+    console.log('   停止: ./mc-web-panel stop');
+    process.exit(0);
+}
+
+if (command === 'help' || command === '--help' || command === '-h') {
+    const name = APP_EXECUTABLE ? path.basename(APP_EXECUTABLE) : 'mc-web-panel';
+    console.log(`MC Web Panel v${APP_VERSION}`);
+    console.log('');
+    console.log('用法:');
+    console.log(`  ./${name} [命令]`);
+    console.log('');
+    console.log('命令:');
+    console.log('  start          启动面板（后台运行，默认）');
+    console.log('  stop           停止面板');
+    console.log('  restart        重启面板');
+    console.log('  host <端口>    修改面板端口');
+    console.log('  reset          重置 2FA 密钥');
+    console.log('  help           显示帮助');
+    process.exit(0);
+}
+
+// 如果是 start 命令或无参数，决定是否后台启动
+if (command === 'start' || command === '') {
+    if (command === 'start' || (APP_EXECUTABLE && !userArgs.includes('--daemon'))) {
+        // 非 daemon 模式 → 后台启动
+        doStart();
+        // doStart() 会 process.exit(0) 除非是开发环境
+    }
+    // --daemon 或开发环境 → 继续执行 cluster 逻辑
+}
+
+// --- 以下为面板实际运行逻辑 ---
 if (cluster.isPrimary) {
+    writePid();
     console.log(`Master ${process.pid} is running`);
+
+    let restartingMaster = false;
 
     const forkWorker = () => {
         const worker = cluster.fork();
         worker.on('exit', (code, signal) => {
+            if (restartingMaster) return; // Don't fork during restart_master
             if (code === 100) {
                 console.log('Worker requested restart. Restarting...');
                 forkWorker();
             } else {
                 console.log(`Worker stopped with code ${code || signal}`);
+                cleanPid();
                 process.exit(code || 0);
+            }
+        });
+
+        worker.on('message', (msg) => {
+            if (msg.type === 'restart_master') {
+                restartingMaster = true;
+                console.log('Received restart_master signal. Restarting entire panel...');
+                if (APP_EXECUTABLE) {
+                    const { spawn } = require('child_process');
+                    const spawnCwd = path.dirname(APP_EXECUTABLE);
+                    console.log(`Spawning new process: ${APP_EXECUTABLE} in ${spawnCwd}`);
+                    cleanPid();
+                    const child = spawn(APP_EXECUTABLE, ['--daemon'], {
+                        detached: true,
+                        stdio: 'ignore',
+                        cwd: spawnCwd
+                    });
+                    child.on('error', (err) => {
+                        console.error('Failed to spawn new process:', err);
+                    });
+                    child.unref();
+                    setTimeout(() => process.exit(0), 500);
+                } else {
+                    process.exit(0);
+                }
             }
         });
     };
@@ -101,6 +373,7 @@ if (cluster.isPrimary) {
         for (const id in cluster.workers) {
             cluster.workers[id].kill();
         }
+        cleanPid();
         process.exit();
     };
     process.on('SIGINT', cleanup);
@@ -231,9 +504,13 @@ if (cluster.isPrimary) {
                 } catch (e) { }
 
                 let serverInfo = { port: '25565', maxPlayers: '20', motd: 'Loading...' };
-                const hasBackupMod = fs.existsSync(BACKUP_ROOT);
-                const hasEasyAuth = fs.existsSync(EASYAUTH_DIR) && fs.existsSync(EASYAUTH_DB);
-                const hasVoicechat = fs.existsSync(VOICECHAT_CONFIG_DIR);
+                // 通过检查 mods 目录下的 JAR 文件名判断模组是否安装
+                const MODS_DIR = path.join(MC_DIR, 'mods');
+                let modFiles = [];
+                try { modFiles = fs.readdirSync(MODS_DIR).map(f => f.toLowerCase()); } catch (e) { }
+                const hasBackupMod = modFiles.some(f => f.includes('advancedbackups') || f.includes('advanced-backups') || f.includes('advanced_backups'));
+                const hasEasyAuth = modFiles.some(f => f.includes('easyauth') || f.includes('easy-auth') || f.includes('easy_auth'));
+                const hasVoicechat = modFiles.some(f => f.includes('voicechat') || f.includes('voice-chat') || f.includes('voice_chat'));
 
                 if (fs.existsSync(SERVER_PROPERTIES)) {
                     try {
@@ -1397,6 +1674,103 @@ if (cluster.isPrimary) {
         } catch (e) {
             console.error('Update check failed:', e.message);
             res.status(500).json({ error: 'Failed to check updates' });
+        }
+    });
+
+    app.post('/api/system/update', requireAuth, async (req, res) => {
+        try {
+            if (!APP_EXECUTABLE) {
+                return res.status(400).json({ error: '未检测到独立运行环境，无法自动更新' });
+            }
+
+            // 1. 获取最新版本信息
+            const gh = await axios.get('https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest', {
+                headers: { 'User-Agent': 'MC-Web-Panel' },
+                timeout: 5000
+            });
+
+            const arch = process.arch === 'x64' ? 'linux-x64' : 'linux-arm64';
+            const assetName = `mc-web-panel-${arch}`;
+            const asset = gh.data.assets.find(a => a.name === assetName);
+
+            if (!asset) {
+                return res.status(404).json({ error: `未找到对应架构 ( ${arch} ) 的发布文件` });
+            }
+
+            const downloadUrl = asset.browser_download_url;
+            const newExePath = APP_EXECUTABLE + '.new';
+            const oldExePath = APP_EXECUTABLE + '.old';
+
+            console.log(`[Update] Downloading ${assetName} from ${downloadUrl}...`);
+            io.emit('update_status', { step: 'downloading', message: '正在下载新版本...' });
+
+            const writer = fs.createWriteStream(newExePath);
+            const response = await axios({
+                url: downloadUrl,
+                method: 'GET',
+                responseType: 'stream'
+            });
+
+            // 追踪进度
+            const totalLength = parseInt(response.headers['content-length'], 10);
+            let downloadedLength = 0;
+
+            response.data.on('data', (chunk) => {
+                downloadedLength += chunk.length;
+                const progress = Math.round((downloadedLength / totalLength) * 100);
+                io.emit('update_progress', { progress });
+            });
+
+            response.data.pipe(writer);
+
+            writer.on('finish', async () => {
+                try {
+                    console.log('[Update] Download complete. Applying update...');
+                    io.emit('update_status', { step: 'applying', message: '正在应用更新...' });
+
+                    // 给予执行权限
+                    await fs.chmod(newExePath, '755');
+
+                    // 备份旧版本
+                    if (await fs.pathExists(oldExePath)) await fs.remove(oldExePath);
+                    await fs.move(APP_EXECUTABLE, oldExePath);
+
+                    // 替换为新版本
+                    await fs.move(newExePath, APP_EXECUTABLE);
+
+                    console.log('[Update] Update applied. Restarting...');
+                    io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
+
+                    setTimeout(() => {
+                        // 重启逻辑：Master 会捕捉 100 信号并重启 Worker
+                        // 但是为了完全应用新版本（如果是 caxa 打包），建议整个流程由外部（如 systemd）重启
+                        // 这里的 process.exit(100) 只会让 Master 重启 Worker。
+                        // 如果是 caxa，Master 进程的代码是固定的。
+                        // 这里我们选择直接退出 Master，让外部重启（如果支持）。
+                        // 或者触发 Master 重启。
+                        process.send({ type: 'restart_master' }); // 我们需要在主进程处理这个
+                        process.exit(100);
+                    }, 2000);
+
+                    res.json({ success: true, message: '更新已下载并应用，正在重启...' });
+                } catch (err) {
+                    console.error('[Update] Error applying update:', err);
+                    io.emit('update_status', { step: 'error', message: '应用更新失败: ' + err.message });
+                    // 尝试恢复
+                    if (await fs.pathExists(oldExePath) && !await fs.pathExists(APP_EXECUTABLE)) {
+                        await fs.move(oldExePath, APP_EXECUTABLE);
+                    }
+                }
+            });
+
+            writer.on('error', (err) => {
+                console.error('[Update] Download error:', err);
+                io.emit('update_status', { step: 'error', message: '下载失败: ' + err.message });
+            });
+
+        } catch (e) {
+            console.error('[Update] Error:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 

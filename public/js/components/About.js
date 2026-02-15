@@ -42,11 +42,15 @@ export default {
                                 <i class="fa-solid" :class="updateInfo.hasUpdate ? 'fa-gift' : 'fa-check-circle'"></i>
                                 {{ updateInfo.hasUpdate ? $t('about.update_available') : $t('about.latest_version') }}
                             </h5>
-                            <p class="mb-0" v-if="updateInfo.hasUpdate">
-                                {{ $t('about.new_version') }}: <strong>{{ updateInfo.latestVersion }}</strong>
-                                <br>
-                                <a :href="updateInfo.url" target="_blank" class="btn btn-sm btn-success mt-2">{{ $t('about.download') }}</a>
-                            </p>
+                            <div class="mb-0" v-if="updateInfo.hasUpdate">
+                                <p>{{ $t('about.new_version') }}: <strong>{{ updateInfo.latestVersion }}</strong></p>
+                                <div class="d-flex justify-content-center gap-2 mt-2">
+                                    <button @click="startUpdate" class="btn btn-success" :disabled="store.task.visible">
+                                        <i class="fa-solid fa-download me-1"></i> {{ $t('about.update_now') }}
+                                    </button>
+                                    <a :href="updateInfo.url" target="_blank" class="btn btn-outline-success">{{ $t('about.download') }}</a>
+                                </div>
+                            </div>
                             <p class="mb-0" v-else>
                                 {{ $t('about.current_is_latest') }} 
                                 <span class="badge bg-success">v{{ updateInfo.latestVersion }}</span>
@@ -82,66 +86,35 @@ export default {
             checking.value = true;
             updateInfo.value = null;
             try {
-                let latestVersion;
-                let htmlUrl = 'https://github.com/4YStudio/mc-web-panel/releases';
-
-                try {
-                    // Try GitHub API first
-                    const response = await fetch('https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest');
-                    if (response.status === 403) throw new Error('Rate Limited');
-                    if (!response.ok) throw new Error('Network Error');
-
-                    const data = await response.json();
-                    latestVersion = data.tag_name.replace(/^v/i, '');
-                    htmlUrl = data.html_url;
-                } catch (e) {
-                    if (e.message === 'Rate Limited') {
-                        // Fallback to raw package.json from main branch
-                        console.log('GitHub API Limited, trying raw content...');
-                        const rawRes = await fetch('https://raw.githubusercontent.com/4YStudio/mc-web-panel/main/package.json');
-                        if (!rawRes.ok) throw e; // Propagate original error if fallback fails
-                        const rawData = await rawRes.json();
-                        latestVersion = rawData.version;
-                    } else {
-                        throw e;
-                    }
-                }
-
-                const currentVersion = appVersion.value;
-
-                const isNewer = (v1, v2) => {
-                    if (!v1 || !v2) return false;
-                    const p1 = v1.split('.').map(Number);
-                    const p2 = v2.split('.').map(Number);
-                    for (let i = 0; i < 3; i++) {
-                        if (p1[i] > p2[i]) return true;
-                        if (p1[i] < p2[i]) return false;
-                    }
-                    return false;
-                };
-
-                updateInfo.value = {
-                    hasUpdate: isNewer(latestVersion, currentVersion),
-                    latestVersion,
-                    currentVersion,
-                    url: htmlUrl
-                };
-
+                const { data } = await api.get('/api/system/update_check');
+                updateInfo.value = data;
             } catch (e) {
                 console.error(e);
-                if (e.message === 'Rate Limited') {
-                    showToast('GitHub API 速率限制，请稍后再试或直接访问 GitHub 查看。', 'warning');
-                } else {
-                    showToast('检查更新失败: ' + e.message, 'danger');
-                }
+                showToast('检查更新失败: ' + (e.response?.data?.error || e.message), 'danger');
             } finally {
                 checking.value = false;
+            }
+        };
+
+        const startUpdate = async () => {
+            // Show the progress modal BEFORE starting the request
+            // Socket handlers in app.js will update progress during download
+            store.task.visible = true;
+            store.task.title = '系统更新';
+            store.task.message = '正在请求更新...';
+            store.task.percent = 0;
+            try {
+                await api.post('/api/system/update');
+                // Don't set state here — socket events have already updated it
+            } catch (e) {
+                store.task.visible = false;
+                showToast('启动更新失败: ' + (e.response?.data?.error || e.message), 'danger');
             }
         };
 
         // Initial fetch
         getVersion();
 
-        return { store, checkUpdate, checking, updateInfo, appVersion, ref };
+        return { store, checkUpdate, checking, updateInfo, appVersion, ref, startUpdate };
     }
 };

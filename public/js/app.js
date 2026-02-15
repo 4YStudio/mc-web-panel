@@ -121,6 +121,47 @@ const app = createApp({
                 store.task.visible = false;
                 showToast('回档出错: ' + msg, 'danger');
             });
+
+            // 更新进度监听
+            let autoRefreshPoll = null;
+            const startAutoRefreshPoll = () => {
+                if (autoRefreshPoll) return; // already polling
+                store.task.percent = 100;
+                store.task.message = '更新完成，等待面板重启...';
+                autoRefreshPoll = setInterval(async () => {
+                    try {
+                        const resp = await fetch('/', { method: 'HEAD', cache: 'no-store' });
+                        if (resp.ok) {
+                            clearInterval(autoRefreshPoll);
+                            autoRefreshPoll = null;
+                            location.reload();
+                        }
+                    } catch (e) { /* server still down */ }
+                }, 2000);
+            };
+
+            socket.on('update_status', (data) => {
+                store.task.visible = true;
+                store.task.title = '系统更新';
+                store.task.message = data.message;
+                if (data.step === 'error') {
+                    setTimeout(() => store.task.visible = false, 3000);
+                }
+                if (data.step === 'restarting') {
+                    startAutoRefreshPoll();
+                }
+            });
+            socket.on('update_progress', (data) => {
+                store.task.percent = data.progress;
+                store.task.subMessage = data.progress + '%';
+            });
+
+            // Fallback: if socket disconnects during an update, start auto-refresh poll
+            socket.on('disconnect', () => {
+                if (store.task.visible && store.task.title === '系统更新') {
+                    startAutoRefreshPoll();
+                }
+            });
         };
 
         watch(() => store.auth.loggedIn, (val) => {
