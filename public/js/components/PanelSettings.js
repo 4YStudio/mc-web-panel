@@ -1,48 +1,54 @@
 import { ref, reactive, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
+import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
 
 export default {
     template: `
-    <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>{{ $t('panel_settings.title') }}</h3>
+    <div class="h-100 d-flex flex-column overflow-hidden">
+        <div class="d-flex justify-content-between align-items-center mb-5 flex-shrink-0">
+            <div class="d-flex align-items-center">
+                <button @click="store.view = 'instance-manager'" class="btn-back me-3">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <h2 class="fw-black m-0 tracking-tight" style="font-size: 2.2rem;">{{ $t('panel_settings.title') }}</h2>
+            </div>
             <div class="btn-group">
-                <button class="btn btn-success" @click="saveConfig" :disabled="saving">
+                <button class="btn btn-success px-4 py-2 fw-bold shadow-sm" @click="saveConfig" :disabled="saving" style="border-radius: 12px;">
                     <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
                 </button>
             </div>
         </div>
 
         <div v-if="loading" class="text-center py-5">
-            <div class="spinner-border" role="status"></div>
-            <p class="mt-2">{{ $t('common.loading') }}</p>
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted fw-medium">{{ $t('common.loading') }}</p>
         </div>
 
-        <div v-else class="row g-4">
+        <div v-else class="row g-4 overflow-auto custom-scrollbar pb-5">
             <!-- 基础设置 -->
             <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-primary text-white fw-bold">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
+                    <div class="card-header bg-primary-subtle text-primary border-0 fw-bold py-3 px-4" style="border-radius: 16px 16px 0 0;">
                         <i class="fa-solid fa-sliders me-2"></i>{{ $t('panel_settings.basic') }}
                     </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.port') }}</label>
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.port') }}</label>
                             <input type="number" class="form-control" v-model.number="config.port" min="1024" max="65535">
-                            <div class="form-text">{{ $t('panel_settings.port_desc') }}</div>
+                            <div class="form-text small opacity-75">{{ $t('panel_settings.port_desc') }}</div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.default_lang') }}</label>
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.default_lang') }}</label>
                             <select class="form-select" v-model="config.defaultLang">
                                 <option value="zh">中文</option>
                                 <option value="en">English</option>
                             </select>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.theme') }}</label>
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.theme') }}</label>
                             <select class="form-select" v-model="config.theme">
                                 <option value="light">{{ $t('panel_settings.theme_light') }}</option>
                                 <option value="dark">{{ $t('panel_settings.theme_dark') }}</option>
@@ -50,8 +56,8 @@ export default {
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.console_info_position') }}</label>
+                        <div class="mb-0">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.console_info_position') }}</label>
                             <select class="form-select" v-model="config.consoleInfoPosition">
                                 <option value="top">{{ $t('panel_settings.pos_top') }}</option>
                                 <option value="sidebar">{{ $t('panel_settings.pos_sidebar') }}</option>
@@ -62,52 +68,26 @@ export default {
                 </div>
             </div>
 
-            <!-- 服务器配置 -->
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-success text-white fw-bold">
-                        <i class="fa-solid fa-server me-2"></i>{{ $t('panel_settings.server') }}
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.jar_name') }}</label>
-                            <select class="form-select" v-model="config.jarName">
-                                <option v-for="jar in jars" :key="jar" :value="jar">{{ jar }}</option>
-                                <option v-if="!jars.length && config.jarName" :value="config.jarName">{{ config.jarName }}</option>
-                                <option v-if="!jars.length && !config.jarName" value="" disabled>{{ $t('setup.choose') }}</option>
-                            </select>
-                            <div class="form-text">{{ $t('panel_settings.jar_name_desc') }}</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.java_args') }}</label>
-                            <textarea class="form-control" rows="4" v-model="javaArgsText" style="font-family: monospace;"></textarea>
-                            <div class="form-text">{{ $t('panel_settings.java_args_desc') }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- 安全设置 -->
             <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-danger text-white fw-bold">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
+                    <div class="card-header bg-danger-subtle text-danger border-0 fw-bold py-3 px-4" style="border-radius: 16px 16px 0 0;">
                         <i class="fa-solid fa-shield-halved me-2"></i>{{ $t('panel_settings.security') }}
                     </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.secret') }}</label>
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.secret') }}</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" :value="config.secret" readonly>
                                 <button class="btn btn-outline-danger" @click="reset2FA">
                                     <i class="fa-solid fa-rotate me-1"></i>{{ $t('panel_settings.reset_2fa') }}
                                 </button>
                             </div>
-                            <div class="form-text">{{ $t('panel_settings.secret_masked') }}</div>
+                            <div class="form-text small">{{ $t('panel_settings.secret_masked') }}</div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.session_timeout') }}</label>
+                        <div class="mb-0">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.session_timeout') }}</label>
                             <input type="number" class="form-control" v-model.number="config.sessionTimeout" min="1" max="365">
                         </div>
                     </div>
@@ -116,26 +96,26 @@ export default {
 
             <!-- AI 设置 -->
             <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-info text-white fw-bold">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
+                    <div class="card-header bg-info-subtle text-info border-0 fw-bold py-3 px-4" style="border-radius: 16px 16px 0 0;">
                         <i class="fa-solid fa-robot me-2"></i>{{ $t('panel_settings.ai_settings') }}
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-4">
                         <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.ai_endpoint') }}</label>
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_endpoint') }}</label>
                             <input type="text" class="form-control" v-model="config.aiEndpoint" :placeholder="$t('panel_settings.ai_endpoint_desc')">
                             <div class="form-text small opacity-75">{{ $t('panel_settings.ai_endpoint_desc') }}</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.ai_key') }}</label>
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_key') }}</label>
                             <input type="password" class="form-control" v-model="config.aiKey" :placeholder="$t('panel_settings.ai_key_desc')">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">{{ $t('panel_settings.ai_model') }}</label>
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_model') }}</label>
                             <input type="text" class="form-control" v-model="config.aiModel" :placeholder="$t('panel_settings.ai_model_placeholder')">
                         </div>
                         <div class="d-grid mt-4">
-                            <button class="btn btn-outline-info fw-bold" @click="testAI" :disabled="testingAI">
+                            <button class="btn btn-outline-info fw-bold" @click="testAI" :disabled="testingAI" style="border-radius: 12px;">
                                 <span v-if="testingAI" class="spinner-border spinner-border-sm me-2"></span>
                                 <i v-else class="fa-solid fa-vial me-2"></i>{{ $t('panel_settings.ai_test') }}
                             </button>
@@ -328,7 +308,7 @@ export default {
         });
 
         return {
-            loading, saving, testingAI, config, javaArgsText, jars,
+            store, loading, saving, testingAI, config, javaArgsText, jars,
             saveConfig, testAI, reset2FA
         };
     }

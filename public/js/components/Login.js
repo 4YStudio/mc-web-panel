@@ -9,7 +9,7 @@ export default {
         <div class="glass-card p-4 p-md-5 text-center" style="width: 100%; max-width: 400px;">
             <div class="mb-4">
                  <img v-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="rounded-circle shadow-lg" width="80" height="80" style="object-fit: cover;">
-                 <i v-else class="fa-solid fa-cube text-primary" style="font-size: 4rem;"></i>
+                 <img v-else src="/logo.png" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
             </div>
             <h4 class="mb-4 fw-bold">{{ $t('login.title') }}</h4>
             
@@ -59,9 +59,9 @@ export default {
                 if (res.data.success) {
                     store.auth.loggedIn = true;
                 } else {
-                    showToast(messages[store.lang].login.toast_fail, 'danger');
+                    showToast('login.toast_fail', 'danger');
                 }
-            } catch (e) { showToast(messages[store.lang].login.toast_error, 'danger'); }
+            } catch (e) { showToast('login.toast_error', 'danger'); }
         };
 
         const toggleTheme = () => {

@@ -33,6 +33,23 @@ This panel features dedicated GUI integration for the following mods:
 4.  Open your browser and visit `http://localhost:3000`.
 5.  Follow the setup wizard to install a Minecraft server or point it to your existing server jar.
 
+### Run from Source
+If you prefer to run the panel from source code (requires Node.js 18+):
+
+1.  Clone the repository and navigate to the project directory.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Start the server:
+    ```bash
+    npm run start
+    ```
+4.  (Optional) Build the executable:
+    ```bash
+    npm run build
+    ```
+
 ### CLI Commands
 
 | Command | Description |
@@ -85,6 +102,23 @@ MC Web Panel 是一个基于 Node.js 和 Vue 3 构建的轻量级、现代化且
     *   **Windows**: 双击 `mc-web-panel-win-x64.exe`
 4.  打开浏览器访问 `http://localhost:3000`。
 5.  跟随设置向导安装新的 Minecraft 服务器，或指定现有的服务端 JAR 文件。
+
+### 从源码运行
+如果您希望从源码运行面板（需要 Node.js 18+）：
+
+1.  克隆仓库并进入项目目录。
+2.  安装依赖：
+    ```bash
+    npm install
+    ```
+3.  启动服务器：
+    ```bash
+    npm run start
+    ```
+4.  (可选) 构建可执行文件：
+    ```bash
+    npm run build
+    ```
 
 ### 命令行管理
 

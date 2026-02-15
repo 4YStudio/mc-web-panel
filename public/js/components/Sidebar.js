@@ -1,19 +1,19 @@
-import { ref, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, watch, onMounted, computed } from '/js/vue.esm-browser.js';
 import { store } from '../store.js';
 import { api } from '../api.js';
 
 export default {
     template: `
     <div class="sidebar d-flex flex-column h-100 overflow-hidden">
-        <div class="p-4 flex-shrink-0">
+        <div class="p-4 pb-2 flex-shrink-0">
             <h5 class="fw-bold d-flex align-items-center m-0">
-                <img v-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="me-3 rounded-circle shadow-sm" width="36" height="36" style="object-fit: cover;">
-                <i v-else class="fa-solid fa-cube me-3 text-primary" style="font-size: 1.5rem;"></i>
+                <img v-if="hasIcon" :src="'/api/server/icon?instanceId=' + store.currentInstanceId + '&t=' + store.serverIconVersion" class="me-3 rounded-circle shadow-sm" width="36" height="36" style="object-fit: cover;">
+                <img v-else src="/logo.png" alt="Logo" class="me-3" style="width: 36px; height: 36px; object-fit: contain;">
                 <span style="letter-spacing: -0.5px;">MC Panel</span>
             </h5>
         </div>
-        
-        <div class="flex-grow-1 overflow-auto custom-scrollbar px-3">
+
+        <div class="flex-grow-1 overflow-auto custom-scrollbar px-3 pt-3">
             <nav class="nav flex-column mb-4">
                 <a class="nav-link" :class="{active: store.view === 'dashboard'}" @click="selectView('dashboard')"><i class="fa-solid fa-terminal"></i> {{ $t('sidebar.dashboard') }}</a>
                 <a class="nav-link" :class="{active: store.view === 'properties'}" @click="selectView('properties')"><i class="fa-solid fa-sliders"></i> {{ $t('sidebar.settings') }}</a>
@@ -24,8 +24,6 @@ export default {
                 <a v-if="store.hasEasyAuth" class="nav-link" :class="{active: store.view === 'easyauth'}" @click="selectView('easyauth')"><i class="fa-solid fa-user-shield"></i> {{ $t('sidebar.auth') }}</a>
                 <a v-if="store.hasVoicechat" class="nav-link" :class="{active: store.view === 'voicechat'}" @click="selectView('voicechat')"><i class="fa-solid fa-microphone"></i> {{ $t('sidebar.voicechat') }}</a>
                 <a class="nav-link" :class="{active: store.view === 'players'}" @click="selectView('players')"><i class="fa-solid fa-users"></i> {{ $t('sidebar.players') }}</a>
-                <a class="nav-link" :class="{active: store.view === 'panel-settings'}" @click="selectView('panel-settings')"><i class="fa-solid fa-cog"></i> {{ $t('panel_settings.title') }}</a>
-                <a class="nav-link" :class="{active: store.view === 'about'}" @click="selectView('about')"><i class="fa-solid fa-circle-info"></i> {{ $t('about.title') }}</a>
             </nav>
 
             <!-- Sidebar Stats (Conditionally shown) -->
@@ -71,25 +69,43 @@ export default {
             </div>
         </div>
 
-        <div class="p-3 flex-shrink-0 d-flex gap-2 border-top">
-            <button class="btn btn-sm btn-light flex-fill border" @click="toggleLang" :title="$t('common.switchLang')">
-                <i class="fa-solid fa-language"></i> {{ store.lang === 'zh' ? 'EN' : '中' }}
-            </button>
-            <button class="btn btn-sm btn-light flex-fill border" @click="toggleTheme" :title="$t('common.switchTheme')"><i class="fa-solid fa-circle-half-stroke"></i></button>
-            <button class="btn btn-sm btn-light flex-fill border text-danger" @click="logout" :title="$t('common.logout')"><i class="fa-solid fa-right-from-bracket"></i></button>
+        <!-- Instance Switcher Info (Moved to bottom) -->
+        <div class="p-3 border-top flex-shrink-0">
+            <div v-if="currentInstance" class="bg-body-tertiary rounded-3 p-3 border border-dashed text-center animate-in">
+                <div class="small text-muted mb-1 text-uppercase fw-bold letter-spacing-1" style="font-size: 10px;">{{ $t('common.status') }}</div>
+                <div class="fw-bold text-truncate mb-2">{{ currentInstance.name }}</div>
+                <button @click="backToInstances" class="btn btn-xs btn-outline-primary w-100 py-1" style="font-size: 11px; border-radius: 8px;">
+                    <i class="fa-solid fa-chevron-left me-1"></i>{{ $t('instance_manager.back_to_list') }}
+                </button>
+            </div>
+            <!-- Back to Hub (shown in global views like Panel Settings/Java when no instance picked) -->
+            <div v-else class="px-1 animate-in">
+                <a class="nav-link p-3 rounded-4 d-flex align-items-center justify-content-center text-primary bg-primary-subtle border border-primary-subtle transition-all hover-shadow-sm" @click="backToInstances" style="cursor: pointer; font-weight: 600;">
+                    <i class="fa-solid fa-chevron-left me-2"></i>{{ $t('instance_manager.back_to_list') }}
+                </a>
+            </div>
         </div>
     </div>
     `,
     setup(props, { emit }) {
         const hasIcon = ref(false);
 
+        const currentInstance = computed(() => {
+            return store.instanceList.find(i => i.id === store.currentInstanceId);
+        });
+
         const checkIcon = async () => {
+            if (!store.currentInstanceId) {
+                hasIcon.value = false;
+                return;
+            }
             const img = new Image();
             img.onload = () => hasIcon.value = true;
             img.onerror = () => hasIcon.value = false;
-            img.src = '/api/server/icon?t=' + Date.now();
+            img.src = `/api/server/icon?instanceId=${store.currentInstanceId}&t=${Date.now()}`;
         };
 
+        watch(() => store.currentInstanceId, checkIcon);
         watch(() => store.serverIconVersion, checkIcon);
         onMounted(checkIcon);
 
@@ -111,6 +127,12 @@ export default {
             emit('close-sidebar');
         };
 
-        return { store, toggleTheme, toggleLang, logout, selectView, hasIcon };
+        const backToInstances = () => {
+            store.view = 'instance-manager';
+            store.currentInstanceId = null;
+            emit('close-sidebar');
+        };
+
+        return { store, toggleTheme, toggleLang, logout, selectView, hasIcon, currentInstance, backToInstances };
     }
 };

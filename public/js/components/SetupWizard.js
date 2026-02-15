@@ -9,7 +9,7 @@ export default {
     <div class="card border-0 shadow-sm animate-in">
         <div class="card-body p-5">
             <div class="text-center mb-5">
-                <div class="display-1 text-primary mb-3"><i class="fa-solid fa-cube"></i></div>
+                <div class="mb-3"><img src="/logo.png" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;"></div>
                 <h2 class="fw-bold">{{ $t('setup.welcome') }}</h2>
                 <p class="text-muted">{{ $t('setup.desc') }}</p>
             </div>

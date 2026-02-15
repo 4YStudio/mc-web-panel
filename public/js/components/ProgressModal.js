@@ -22,10 +22,14 @@ export default {
                 <div class="progress-fill" :style="{ width: clampedPercent + '%' }"></div>
             </div>
 
-            <!-- 信息行 -->
             <div class="d-flex justify-content-between align-items-center mt-2">
                 <span class="progress-msg text-truncate">{{ store.task.message }}</span>
-                <span class="progress-pct" v-if="store.task.percent > 0">{{ store.task.percent.toFixed(0) }}%</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="progress-pct" v-if="store.task.percent > 0">{{ store.task.percent.toFixed(0) }}%</span>
+                    <button v-if="store.task.canCancel" class="btn btn-sm btn-outline-danger py-0 px-2" @click="handleCancel" style="height: 24px; line-height: 1;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -42,6 +46,11 @@ export default {
             if (title.includes('下载') || title.includes('download')) return 'fa-cloud-arrow-down';
             return 'fa-spinner fa-spin';
         });
-        return { store, clampedPercent, iconClass };
+
+        const handleCancel = () => {
+            if (store.task.onCancel) store.task.onCancel();
+        };
+
+        return { store, clampedPercent, iconClass, handleCancel };
     }
 };

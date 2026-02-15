@@ -1,7 +1,7 @@
 import { ref, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal } from '../utils.js';
+import { showToast, openModal, t } from '../utils.js';
 
 export default {
     template: `
@@ -180,7 +180,7 @@ export default {
                     fileContent.value = res.data.content;
                     originalContent.value = res.data.content;
                     editingFile.value = fullPath;
-                } catch (e) { showToast('Error reading file', 'danger'); }
+                } catch (e) { showToast(t('files.error_read'), 'danger'); }
             };
 
             if (!EDITABLE_EXTS.includes(ext) && name.includes('.')) {
@@ -209,7 +209,7 @@ export default {
 
         const closeEditor = () => {
             if (hasUnsavedChanges.value) {
-                if (!confirm('Unsaved changes. Close?')) return;
+                if (!confirm(t('common.unsaved_changes'))) return;
             }
             editingFile.value = null;
             fileContent.value = '';
@@ -250,7 +250,7 @@ export default {
 
         const copyToClipboard = (action) => {
             clipboard.value = { action, files: [...selectedFiles.value], sourcePath: currentPath.value };
-            showToast(`${action} ${selectedFiles.value.length}`);
+            showToast(t('files.clipboard_msg', { action: action === 'copy' ? t('files.copy') : t('files.move'), count: selectedFiles.value.length }));
             selectedFiles.value = [];
         };
 

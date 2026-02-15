@@ -10,13 +10,15 @@ export const store = reactive({
     stats: { cpu: 0, mem: { total: 0, used: 0, percentage: 0 }, mc: { online: 0, maxPlayers: 20, port: '-', motd: '-' } },
     isRunning: false,
     hasBackupMod: false,
+    hasEasyAuth: false,
+    hasVoicechat: false,
     logs: [],
-    view: 'dashboard',
+    view: 'instance-manager', // Default view to instance manager
     consoleInfoPosition: 'top', // 'top', 'sidebar', 'hide'
-    isRunning: false,
-    hasBackupMod: false,
-    hasEasyAuth: false, // 新增：是否显示 EasyAuth 菜单
-    hasVoicechat: false, // 新增：是否显示 Voicechat 菜单
+
+    currentInstanceId: null, // ID of the currently managed instance
+    instanceList: [],       // List of all instances
+    javaInstallations: [],  // List of installed Java versions
 
     // --- 新增：全局任务进度状态 ---
     task: {

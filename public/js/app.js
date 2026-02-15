@@ -19,9 +19,10 @@ import VoicechatManager from './components/VoicechatManager.js';
 import PanelSettings from './components/PanelSettings.js';
 import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
+import JavaManager from './components/JavaManager.js';
+import InstanceManager from './components/InstanceManager.js';
 import { createI18n } from './i18n.js?v=1.5.0';
-
-const socket = io();
+import { socket } from './socket.js';
 
 const app = createApp({
     // 注册组件 (Vue 会自动处理 ProgressModal -> <progress-modal> 的映射)
@@ -40,7 +41,9 @@ const app = createApp({
         VoicechatManager,
         PanelSettings,
         ModrinthBrowser,
-        About
+        About,
+        JavaManager,
+        InstanceManager
     },
     setup() {
         const sidebarOpen = ref(false);
@@ -145,9 +148,15 @@ const app = createApp({
                 store.task.title = '系统更新';
                 store.task.message = data.message;
                 if (data.step === 'error') {
+                    showToast(data.message, 'danger');
+                    // Reset cancellation
+                    store.task.canCancel = false;
+                    store.task.onCancel = null;
                     setTimeout(() => store.task.visible = false, 3000);
                 }
                 if (data.step === 'restarting') {
+                    store.task.canCancel = false;
+                    store.task.onCancel = null;
                     startAutoRefreshPoll();
                 }
             });
@@ -162,6 +171,39 @@ const app = createApp({
                     startAutoRefreshPoll();
                 }
             });
+
+            // Instance-specific Socket Switching
+            watch(() => store.currentInstanceId, (newId, oldId) => {
+                if (oldId) {
+                    socket.off(`console:${oldId}`);
+                    socket.off(`status:${oldId}`);
+                    socket.off(`players_update:${oldId}`);
+                }
+                if (newId) {
+                    store.logs = [];
+                    socket.emit('req_history', { instanceId: newId });
+                    socket.on(`console:${newId}`, l => {
+                        store.logs.push(l);
+                        if (store.logs.length > 1000) store.logs.shift();
+                    });
+                    socket.on(`status:${newId}`, s => {
+                        store.isRunning = s.isRunning;
+                        // Update other properties from s
+                        store.hasBackupMod = s.hasBackupMod;
+                        store.hasEasyAuth = s.hasEasyAuth;
+                        store.hasVoicechat = s.hasVoicechat;
+                        store.stats.mc.port = s.port;
+                        store.stats.mc.maxPlayers = s.maxPlayers;
+                        store.stats.mc.motd = s.motd;
+                        store.stats.version = s.version;
+                    });
+                    socket.on(`players_update:${newId}`, p => store.onlinePlayers = p);
+                }
+            });
+
+            // Initial fetch
+            api.get('/api/instances/list').then(res => store.instanceList = res.data);
+            socket.on('instances_update', list => store.instanceList = list);
         };
 
         watch(() => store.auth.loggedIn, (val) => {

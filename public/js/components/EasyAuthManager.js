@@ -1,7 +1,7 @@
 import { ref, reactive, onMounted, watch, computed, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal } from '../utils.js';
+import { showToast, openModal, t } from '../utils.js';
 import Avatar from './Avatar.js'
 
 // --- 正则工具 ---
@@ -148,7 +148,7 @@ export default {
                         const res = await api.post('/api/easyauth/password', { username, password: newPass });
                         if (res.data.success) showToast($t('common.success'));
                         else showToast(res.data.message, 'warning');
-                    } catch (e) { showToast('Error: ' + (e.response?.data?.error || e.message), 'danger'); }
+                    } catch (e) { showToast(t('common.error') + ': ' + (e.response?.data?.error || e.message), 'danger'); }
                 }
             });
         };
@@ -160,8 +160,8 @@ export default {
                 callback: async () => {
                     try {
                         const res = await api.post('/api/easyauth/delete', { username });
-                        if (res.data.success) { showToast($t('common.success')); loadUsers(); } else showToast('Failed', 'warning');
-                    } catch (e) { showToast('Failed', 'danger'); }
+                        if (res.data.success) { showToast($t('common.success')); loadUsers(); } else showToast(t('easyauth.failed'), 'warning');
+                    } catch (e) { showToast(t('easyauth.failed'), 'danger'); }
                 }
             });
         };

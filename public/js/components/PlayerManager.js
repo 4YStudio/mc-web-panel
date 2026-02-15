@@ -74,7 +74,7 @@ export default {
 
         const sendCmd = async (c) => {
             if (!store.isRunning) {
-                showToast($t('common.error') + ': Server is offline', 'warning');
+                showToast('common.server_offline', 'warning');
                 return;
             }
             await api.post('/api/server/command', { command: c });

@@ -3,12 +3,15 @@ import { store } from './store.js';
 import { messages } from './i18n.js';
 
 // Simple translation helper for non-component files
-const t = (key) => {
+export const t = (key, params = {}) => {
     const keys = key.split('.');
     let value = messages[store.lang];
     for (const k of keys) {
         value = value?.[k];
         if (!value) return key;
+    }
+    if (typeof value === 'string') {
+        return value.replace(/{(\w+)}/g, (_, k) => params[k] !== undefined ? params[k] : `{${k}}`);
     }
     return value;
 };
@@ -19,9 +22,19 @@ export const removeToast = (id) => {
     toasts.value = toasts.value.filter(t => t.id !== id);
 };
 
-export const showToast = (msg, type = 'success') => {
+export const showToast = (msg, type = 'success', params = {}) => {
     const id = Date.now();
-    toasts.value.push({ id, message: msg, type });
+    // Try to translate if it's a key, otherwise keep as is
+    const translatedMsg = t(msg, params);
+    // If t() returns the key itself (meaning no translation found) and msg has spaces, 
+    // it's likely a hardcoded string, so just show it. 
+    // But t() returns key if not found, so this logic is built-in to t() kind of, 
+    // except t() splits by dot.
+    // Let's just blindly try t(). If msg is "Error fetching", t("Error fetching") 
+    // might look for messages["Error fetching"], which won't exist, so it returns "Error fetching".
+    // This enables backward compatibility for hardcoded strings.
+
+    toasts.value.push({ id, message: translatedMsg, type });
     setTimeout(() => removeToast(id), 3000);
 };
 

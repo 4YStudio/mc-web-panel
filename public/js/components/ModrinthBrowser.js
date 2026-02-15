@@ -1,7 +1,7 @@
 import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast } from '../utils.js';
+import { showToast, t } from '../utils.js';
 
 export default {
     template: `
@@ -487,7 +487,7 @@ export default {
                 hasMore.value = res.data.hits.length === 20;
             } catch (e) {
                 console.error('[Modrinth Search Error]', e);
-                showToast('Search Failed', 'danger');
+                showToast('mods.modrinth.search_fail', 'danger');
             }
             finally { loadingModrinth.value = false; }
         };
@@ -508,7 +508,7 @@ export default {
                 translations[mod.project_id] = res.data.translated;
             } catch (e) {
                 const errKey = e.response?.data?.error === 'AI_NOT_CONFIGURED' ? 'mods.translate_fail_config' : 'mods.translate_fail';
-                showToast($t(errKey), 'warning');
+                showToast(errKey, 'warning');
             }
 
             finally { translatingModIds.delete(mod.project_id); }
@@ -534,7 +534,7 @@ export default {
                 bodyTranslations[id + '_desc'] = resDesc.data.translated;
             } catch (e) {
                 const errKey = e.response?.data?.error === 'AI_NOT_CONFIGURED' ? 'mods.translate_fail_config' : 'mods.translate_fail';
-                showToast($t(errKey), 'warning');
+                showToast(errKey, 'warning');
             }
 
             finally { translatingBody.value = false; }
@@ -551,9 +551,9 @@ export default {
                     url: primaryFile.url,
                     filename: primaryFile.filename
                 });
-                showToast($t('mods.download_success', { name: selectedMod.value.project.title }));
+                showToast('mods.download_success', 'success', { name: selectedMod.value.project.title });
                 selectedMod.value = null;
-            } catch (e) { showToast($t('mods.download_fail', { error: e.message }), 'danger'); }
+            } catch (e) { showToast('mods.download_fail', 'danger', { error: e.message }); }
             finally { downloadingId.value = null; }
         };
 
@@ -583,7 +583,7 @@ export default {
                 } else {
                     selectedVersionIdx.value = 0;
                 }
-            } catch (e) { showToast('Fetch Details Failed', 'danger'); }
+            } catch (e) { showToast('mods.modrinth.fetch_detail_fail', 'danger'); }
             finally { loadingDetails.value = false; }
         };
 

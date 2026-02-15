@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+instances/
+temp*/
 
 # Logs
 logs/
@@ -11,7 +13,7 @@ pnpm-debug.log*
 
 # Build Artifacts & Binaries
 dist_build/
-mc-web-panel-*
+MWP-*
 node-*
 *.exe
 *.zip

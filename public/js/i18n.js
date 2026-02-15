@@ -40,7 +40,11 @@ export const messages = {
             gui_mode: '图形模式',
             text_mode: '文本模式',
             player: '玩家',
-            player_name: '玩家名称'
+            player_name: '玩家名称',
+            action_sent: '操作已发送',
+            select_fail: '选择失败',
+            save_fail: '保存失败',
+            server_offline: '服务器已离线'
         },
         login: {
             title: 'MC 面板',
@@ -61,6 +65,7 @@ export const messages = {
             voicechat: '语音设置',
             players: '玩家管理',
             modrinth: '模组下载',
+            java: 'Java 管理',
             about: '关于'
         },
         about: {
@@ -451,6 +456,53 @@ export const messages = {
             fetch_fail_mc: '获取游戏版本失败',
             fetch_fail_loader: '获取加载器版本失败',
             loading_versions: '正在获取版本列表...'
+        },
+        java: {
+            title: 'Java 管理',
+            installed: '已安装',
+            online_install: '在线安装',
+            detect_system: '检测系统 Java',
+            add_local: '添加本地 Java',
+            local_path_placeholder: '输入 Java 可执行文件路径，如 /usr/bin/java',
+            local_path_desc: '指定本地已安装的 Java 可执行文件路径',
+            no_installed: '暂无已安装的 Java 版本',
+            no_available: '无法获取可用版本，请检查网络连接',
+            fetching: '正在获取可用版本...',
+            fetch_fail: '获取可用版本失败',
+            install: '安装',
+            already_installed: '已安装',
+            confirm_remove: '确定要删除 {name} 吗？此操作不可撤销。',
+            system_not_found: '未检测到系统 Java',
+            system_found: '检测到系统 Java',
+            add_to_list: '是否添加到管理列表？'
+        },
+        instance_manager: {
+            title: '实例管理',
+            create_btn: '创建新实例',
+            manage_java: '管理 Java',
+            search_placeholder: '搜索实例...',
+            state_running: '运行中',
+            state_stopped: '已停止',
+            online_players: '人在线',
+            select_btn: '进入面板',
+            settings_btn: '实例设置',
+            delete_btn: '删除实例',
+            create_modal_title: '创建新实例',
+            edit_modal_title: '修改实例设置',
+            name_label: '实例名称',
+            name_placeholder: '例如：红石生存',
+            jar_placeholder: 'server.jar (可选)',
+            java_path_label: 'Java 路径',
+            java_args_label: 'JVM 参数',
+            java_args_placeholder: '-Xms1G -Xmx4G',
+            delete_confirm: '确定要删除实例 "{name}" 吗？此操作将永久删除该实例的所有数据且不可撤销！',
+            create_success: '实例创建成功',
+            update_success: '设置已更新',
+            delete_success: '实例已删除',
+            back_to_list: '返回实例列表',
+            no_instances: '暂无实例，点击右上角创建',
+            action_sent: '实例 {name}: {action} 指令已发送',
+            select_fail: '选择实例失败'
         }
     },
     en: {
@@ -492,7 +544,11 @@ export const messages = {
             gui_mode: 'GUI Mode',
             text_mode: 'Text Mode',
             player: 'Player',
-            player_name: 'Player Name'
+            player_name: 'Player Name',
+            action_sent: 'Action Sent',
+            select_fail: 'Selection Failed',
+            save_fail: 'Save Failed',
+            server_offline: 'Server is offline'
         },
         login: {
             title: 'MC Panel',
@@ -513,6 +569,7 @@ export const messages = {
             voicechat: 'Voice Chat',
             players: 'Players',
             modrinth: 'Mod Download',
+            java: 'Java',
             about: 'About'
         },
         about: {
@@ -899,6 +956,53 @@ export const messages = {
             fetch_fail_mc: 'Failed to fetch MC versions',
             fetch_fail_loader: 'Failed to fetch Loader versions',
             loading_versions: 'Loading versions...'
+        },
+        java: {
+            title: 'Java Management',
+            installed: 'Installed',
+            online_install: 'Online Install',
+            detect_system: 'Detect System Java',
+            add_local: 'Add Local Java',
+            local_path_placeholder: 'Enter Java executable path, e.g. /usr/bin/java',
+            local_path_desc: 'Specify the path to a locally installed Java executable',
+            no_installed: 'No Java versions installed',
+            no_available: 'Unable to fetch available versions, check network',
+            fetching: 'Fetching available versions...',
+            fetch_fail: 'Failed to fetch available versions',
+            install: 'Install',
+            already_installed: 'Installed',
+            confirm_remove: 'Are you sure you want to remove {name}? This cannot be undone.',
+            system_not_found: 'System Java not detected',
+            system_found: 'System Java detected',
+            add_to_list: 'Add to managed list?'
+        },
+        instance_manager: {
+            title: 'Instance Manager',
+            create_btn: 'Create New Instance',
+            manage_java: 'Manage Java',
+            search_placeholder: 'Search instances...',
+            state_running: 'Running',
+            state_stopped: 'Stopped',
+            online_players: ' players online',
+            select_btn: 'Enter Panel',
+            settings_btn: 'Instance Settings',
+            delete_btn: 'Delete Instance',
+            create_modal_title: 'Create New Instance',
+            edit_modal_title: 'Edit Instance Settings',
+            name_label: 'Instance Name',
+            name_placeholder: 'e.g. Redstone Survival',
+            jar_placeholder: 'server.jar (Optional)',
+            java_path_label: 'Java Path',
+            java_args_label: 'JVM Arguments',
+            java_args_placeholder: '-Xms1G -Xmx4G',
+            delete_confirm: 'Are you sure you want to delete instance "{name}"? This will permanently delete all data for this instance and cannot be undone!',
+            create_success: 'Instance created successfully',
+            update_success: 'Settings Updated',
+            delete_success: 'Instance Deleted',
+            back_to_list: 'Back to List',
+            no_instances: 'No instances, click top right to create',
+            action_sent: 'Instance {name}: {action} command sent',
+            select_fail: 'Failed to select instance'
         }
     }
 };

@@ -95,7 +95,7 @@ export default {
                     <div class="position-relative">
                         <img v-show="hasCustomIcon" :src="iconUrl" class="rounded border" width="64" height="64" style="object-fit: cover;" @load="hasCustomIcon=true" @error="iconLoadError">
                         <div v-if="!hasCustomIcon" class="rounded border d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;">
-                            <i class="fa-solid fa-cube fa-2x opacity-50"></i>
+                            <img src="/logo.png" alt="Default" style="width: 32px; height: 32px; object-fit: contain; opacity: 0.5;">
                         </div>
                     </div>
                     <div>
@@ -209,7 +209,7 @@ export default {
                 showToast($t('common.success'));
                 store.serverIconVersion = Date.now();
                 e.target.value = '';
-            } catch (err) { showToast('Error', 'danger'); }
+            } catch (err) { showToast('common.error', 'danger'); }
         };
 
         const deleteIcon = async () => {
@@ -224,7 +224,7 @@ export default {
                         hasCustomIcon.value = false;
                     } catch (err) {
                         // Show actual error message from server if available
-                        const msg = err.response?.data?.error || err.message || 'Error';
+                        const msg = err.response?.data?.error || err.message || 'common.error';
                         showToast(msg, 'danger');
                     }
                 }

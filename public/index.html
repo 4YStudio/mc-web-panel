@@ -60,58 +60,83 @@
             </div>
         </div>
 
-        <!-- 登录视图 -->
-        <login v-if="!store.auth.loggedIn"></login>
+        <!-- 视图切换过渡 -->
+        <Transition name="page-fade" mode="out-in">
+            <!-- 登录视图 -->
+            <login v-if="!store.auth.loggedIn" key="login"></login>
 
-        <!-- 主视图 -->
-        <template v-else>
-            <!-- 移动端遮罩 -->
-            <div class="mobile-overlay" :class="{show: sidebarOpen}" @click="sidebarOpen = false"></div>
+            <!-- 实例管理视图 (独立主界面) -->
+            <instance-manager v-else-if="store.view === 'instance-manager'" class="w-100" key="hub"></instance-manager>
 
-            <!-- 侧栏：添加 show 类控制显示 -->
-            <sidebar class="sidebar" :class="{show: sidebarOpen}" @close-sidebar="sidebarOpen = false"></sidebar>
-
-            <div class="d-flex flex-column w-100 overflow-hidden">
-                <!-- 移动端顶部栏 -->
-                <div class="mobile-header">
-                    <button class="btn btn-link text-body p-0 me-3" @click="sidebarOpen = true">
-                        <i class="fa-solid fa-bars fa-lg"></i>
-                    </button>
-                    <h5 class="m-0 fw-bold">MC Panel</h5>
-                </div>
-
-                <div class="content bg-body">
-                    <!-- 动态组件切换：使用 Transition 包裹 -->
-                    <Transition name="fade" mode="out-in">
-                        <dashboard v-if="store.view === 'dashboard'" key="dashboard"></dashboard>
-                        <server-properties-manager v-else-if="store.view === 'properties'"
-                            key="properties"></server-properties-manager>
-                        <mods-manager v-else-if="store.view === 'mods'" key="mods"></mods-manager>
-                        <modrinth-browser v-else-if="store.view === 'modrinth'" key="modrinth"></modrinth-browser>
-                        <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
-                        <backup-manager v-else-if="store.view === 'backups'" key="backups"></backup-manager>
-                        <easy-auth-manager v-else-if="store.view === 'easyauth'" key="easyauth"></easy-auth-manager>
-                        <voicechat-manager v-else-if="store.view === 'voicechat'" key="voicechat"></voicechat-manager>
-                        <panel-settings v-else-if="store.view === 'panel-settings'"
-                            key="panel-settings"></panel-settings>
-                        <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
-                        <about v-else-if="store.view === 'about'" key="about"></about>
-                    </Transition>
+            <!-- Java 管理视图 (顶级独立界面) -->
+            <div v-else-if="store.view === 'java'" class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto"
+                key="java">
+                <div class="container-xxl p-0">
+                    <java-manager></java-manager>
                 </div>
             </div>
-        </template>
+
+            <!-- 面板设置视图 (顶级独立界面) -->
+            <div v-else-if="store.view === 'panel-settings'"
+                class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto" key="settings">
+                <div class="container-xxl p-0">
+                    <panel-settings></panel-settings>
+                </div>
+            </div>
+
+            <!-- 关于页面 (顶级独立界面) -->
+            <div v-else-if="store.view === 'about'" class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto"
+                key="about">
+                <div class="container-xxl p-0">
+                    <about></about>
+                </div>
+            </div>
+
+            <!-- 主视图 (带侧边栏的控制面板) -->
+            <div v-else class="d-flex h-100 w-100" key="main">
+                <!-- 移动端遮罩 -->
+                <div class="mobile-overlay" :class="{show: sidebarOpen}" @click="sidebarOpen = false"></div>
+
+                <!-- 侧栏：添加 show 类控制显示 -->
+                <sidebar class="sidebar" :class="{show: sidebarOpen}" @close-sidebar="sidebarOpen = false"></sidebar>
+
+                <div class="d-flex flex-column w-100 overflow-hidden">
+                    <!-- 移动端顶部栏 -->
+                    <div class="mobile-header">
+                        <button class="btn btn-link text-body p-0 me-3" @click="sidebarOpen = true">
+                            <i class="fa-solid fa-bars fa-lg"></i>
+                        </button>
+                        <h5 class="m-0 fw-bold">MC Panel</h5>
+                    </div>
+
+                    <div class="content bg-body">
+                        <!-- 动态组件切换：使用 Transition 包裹 -->
+                        <Transition name="fade" mode="out-in">
+                            <dashboard v-if="store.view === 'dashboard'" key="dashboard"></dashboard>
+                            <server-properties-manager v-else-if="store.view === 'properties'"
+                                key="properties"></server-properties-manager>
+                            <mods-manager v-else-if="store.view === 'mods'" key="mods"></mods-manager>
+                            <modrinth-browser v-else-if="store.view === 'modrinth'" key="modrinth"></modrinth-browser>
+                            <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
+                            <backup-manager v-else-if="store.view === 'backups'" key="backups"></backup-manager>
+                            <easy-auth-manager v-else-if="store.view === 'easyauth'" key="easyauth"></easy-auth-manager>
+                            <voicechat-manager v-else-if="store.view === 'voicechat'"
+                                key="voicechat"></voicechat-manager>
+                            <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
+                            <about v-else-if="store.view === 'about'" key="about"></about>
+                        </Transition>
+                    </div>
+                </div>
+            </div>
+        </Transition>
 
     </div>
 
     <script src="/js/axios.min.js"></script>
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script src="/js/socket.io.js"></script>
-    <!-- Vue.js (Dev / Prod) -->
-    <script src="/js/bootstrap.bundle.min.js"></script>
-
     <!-- 主入口 -->
     <script type="module" src="js/app.js?v=1.5.0"></script>
-
 </body>
 
 </html>
