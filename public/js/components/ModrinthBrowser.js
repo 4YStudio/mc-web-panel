@@ -115,12 +115,6 @@ export default {
                                 <div class="flex-shrink-0 d-flex justify-content-center">
                                     <div class="position-relative">
                                         <img :src="mod.icon_url || 'https://modrinth.com/img/brand/icon_dark.svg'" class="rounded-4 border shadow-sm bg-white" width="64" height="64" style="object-fit:cover; width: 64px; height: 64px;">
-                                        <div v-if="mod.client_side === 'required' || mod.client_side === 'optional'" 
-                                             class="position-absolute bottom-0 end-0 bg-info text-white rounded-circle d-flex align-items-center justify-content-center border border-white" 
-                                             style="width:22px; height:22px; font-size:11px;" 
-                                             :title="mod.client_side">
-                                            <i class="fa-solid fa-display"></i>
-                                        </div>
                                     </div>
                                 </div>
                                 <div class="flex-grow-1 min-width-0 d-flex flex-column text-center text-md-start">
