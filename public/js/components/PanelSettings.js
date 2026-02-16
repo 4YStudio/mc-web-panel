@@ -5,17 +5,21 @@ import { showToast, openModal } from '../utils.js';
 
 export default {
     template: `
-    <div class="h-100 d-flex flex-column overflow-hidden">
-        <div class="d-flex justify-content-between align-items-center mb-5 flex-shrink-0">
-            <div class="d-flex align-items-center">
+    <div class="h-100 d-flex flex-column animate-in overflow-hidden">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 px-1 flex-shrink-0">
+            <div class="d-flex align-items-center overflow-hidden">
                 <button @click="store.view = 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
-                <h2 class="fw-black m-0 tracking-tight" style="font-size: 2.2rem;">{{ $t('panel_settings.title') }}</h2>
+                <h3 class="m-0 fw-bold d-flex align-items-center text-truncate">
+                    <i class="fa-solid fa-sliders me-2 me-md-3 text-primary d-none d-md-inline"></i>
+                    <span>{{ $t('panel_settings.title') }}</span>
+                </h3>
             </div>
-            <div class="btn-group">
-                <button class="btn btn-success px-4 py-2 fw-bold shadow-sm" @click="saveConfig" :disabled="saving" style="border-radius: 12px;">
-                    <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
+            <div class="d-flex gap-2">
+                <button class="btn btn-success btn-sm px-3 px-md-4 py-2 fw-bold shadow-sm" @click="saveConfig" :disabled="saving" style="border-radius: 12px;">
+                    <i class="fa-solid fa-save me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
                 </button>
             </div>
         </div>
@@ -25,21 +29,21 @@ export default {
             <p class="mt-2 text-muted fw-medium">{{ $t('common.loading') }}</p>
         </div>
 
-        <div v-else class="row g-4 overflow-auto custom-scrollbar pb-5">
+        <div v-else class="row g-3 g-md-4 overflow-auto custom-scrollbar pb-5">
             <!-- 基础设置 -->
             <div class="col-md-6">
                 <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-primary-subtle text-primary border-0 fw-bold py-3 px-4" style="border-radius: 16px 16px 0 0;">
+                    <div class="card-header bg-primary-subtle text-primary border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
                         <i class="fa-solid fa-sliders me-2"></i>{{ $t('panel_settings.basic') }}
                     </div>
-                    <div class="card-body p-4">
-                        <div class="mb-4">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.port') }}</label>
                             <input type="number" class="form-control" v-model.number="config.port" min="1024" max="65535">
-                            <div class="form-text small opacity-75">{{ $t('panel_settings.port_desc') }}</div>
+                            <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.port_desc') }}</div>
                         </div>
                         
-                        <div class="mb-4">
+                        <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.default_lang') }}</label>
                             <select class="form-select" v-model="config.defaultLang">
                                 <option value="zh">中文</option>
@@ -47,7 +51,7 @@ export default {
                             </select>
                         </div>
                         
-                        <div class="mb-4">
+                        <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.theme') }}</label>
                             <select class="form-select" v-model="config.theme">
                                 <option value="light">{{ $t('panel_settings.theme_light') }}</option>
@@ -71,19 +75,20 @@ export default {
             <!-- 安全设置 -->
             <div class="col-md-6">
                 <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-danger-subtle text-danger border-0 fw-bold py-3 px-4" style="border-radius: 16px 16px 0 0;">
+                    <div class="card-header bg-danger-subtle text-danger border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
                         <i class="fa-solid fa-shield-halved me-2"></i>{{ $t('panel_settings.security') }}
                     </div>
-                    <div class="card-body p-4">
-                        <div class="mb-4">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.secret') }}</label>
-                            <div class="input-group">
+                            <div class="input-group input-group-sm">
                                 <input type="text" class="form-control" :value="config.secret" readonly>
                                 <button class="btn btn-outline-danger" @click="reset2FA">
-                                    <i class="fa-solid fa-rotate me-1"></i>{{ $t('panel_settings.reset_2fa') }}
+                                    <i class="fa-solid fa-rotate d-md-none"></i>
+                                    <span class="d-none d-md-inline"><i class="fa-solid fa-rotate me-1"></i>{{ $t('panel_settings.reset_2fa') }}</span>
                                 </button>
                             </div>
-                            <div class="form-text small">{{ $t('panel_settings.secret_masked') }}</div>
+                            <div class="form-text small" style="font-size: 0.7rem;">{{ $t('panel_settings.secret_masked') }}</div>
                         </div>
                         
                         <div class="mb-0">
@@ -97,14 +102,14 @@ export default {
             <!-- AI 设置 -->
             <div class="col-md-6">
                 <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-info-subtle text-info border-0 fw-bold py-3 px-4" style="border-radius: 16px 16px 0 0;">
+                    <div class="card-header bg-info-subtle text-info border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
                         <i class="fa-solid fa-robot me-2"></i>{{ $t('panel_settings.ai_settings') }}
                     </div>
-                    <div class="card-body p-4">
+                    <div class="card-body p-3 p-md-4">
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_endpoint') }}</label>
                             <input type="text" class="form-control" v-model="config.aiEndpoint" :placeholder="$t('panel_settings.ai_endpoint_desc')">
-                            <div class="form-text small opacity-75">{{ $t('panel_settings.ai_endpoint_desc') }}</div>
+                            <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.ai_endpoint_desc') }}</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_key') }}</label>
@@ -166,7 +171,7 @@ export default {
                 loading.value = true;
                 const res = await api.get('/api/panel/config');
                 Object.assign(config, res.data);
-                javaArgsText.value = config.javaArgs.join('\n');
+                javaArgsText.value = (config.javaArgs || []).join('\n');
 
                 const currentTheme = localStorage.getItem('theme');
                 const currentLang = localStorage.getItem('lang');

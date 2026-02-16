@@ -6,10 +6,10 @@ export default {
     template: `
     <div class="sidebar d-flex flex-column h-100 overflow-hidden">
         <div class="p-4 pb-2 flex-shrink-0">
-            <h5 class="fw-bold d-flex align-items-center m-0">
+            <h5 class="fw-bold d-flex align-items-center m-0 text-truncate">
                 <img v-if="hasIcon" :src="'/api/server/icon?instanceId=' + store.currentInstanceId + '&t=' + store.serverIconVersion" class="me-3 rounded-circle shadow-sm" width="36" height="36" style="object-fit: cover;">
                 <img v-else src="/logo.png" alt="Logo" class="me-3" style="width: 36px; height: 36px; object-fit: contain;">
-                <span style="letter-spacing: -0.5px;">MC Panel</span>
+                <span style="letter-spacing: -0.5px;">{{ currentInstance ? currentInstance.name : 'MC Panel' }}</span>
             </h5>
         </div>
 
@@ -34,11 +34,11 @@ export default {
                              <span class="small fw-bold text-muted text-uppercase letter-spacing-1">{{ $t('dashboard.server_info') }}</span>
                              <span class="badge rounded-pill" style="font-size: 10px;" :class="store.isRunning?'bg-success':'bg-danger'">{{ store.isRunning ? 'ON' : 'OFF' }}</span>
                         </div>
-                        <div class="d-flex align-items-center mb-1">
+                        <div v-if="store.stats && store.stats.mc" class="d-flex align-items-center mb-1">
                              <h4 class="m-0 fw-bold me-2">{{ store.stats.mc.online }}</h4>
                              <span class="text-muted small">/ {{ store.stats.mc.maxPlayers }}</span>
                         </div>
-                        <div class="progress" style="height: 4px; border-radius: 2px;">
+                        <div v-if="store.stats && store.stats.mc" class="progress" style="height: 4px; border-radius: 2px;">
                             <div class="progress-bar bg-success" :style="{width: (store.stats.mc.maxPlayers > 0 ? (store.stats.mc.online/store.stats.mc.maxPlayers*100) : 0) + '%'}"></div>
                         </div>
                     </div>
@@ -69,18 +69,10 @@ export default {
             </div>
         </div>
 
-        <!-- Instance Switcher Info (Moved to bottom) -->
+        <!-- Instance Switcher Info (Simplified for consistency) -->
         <div class="p-3 border-top flex-shrink-0">
-            <div v-if="currentInstance" class="bg-body-tertiary rounded-3 p-3 border border-dashed text-center animate-in">
-                <div class="small text-muted mb-1 text-uppercase fw-bold letter-spacing-1" style="font-size: 10px;">{{ $t('common.status') }}</div>
-                <div class="fw-bold text-truncate mb-2">{{ currentInstance.name }}</div>
-                <button @click="backToInstances" class="btn btn-xs btn-outline-primary w-100 py-1" style="font-size: 11px; border-radius: 8px;">
-                    <i class="fa-solid fa-chevron-left me-1"></i>{{ $t('instance_manager.back_to_list') }}
-                </button>
-            </div>
-            <!-- Back to Hub (shown in global views like Panel Settings/Java when no instance picked) -->
-            <div v-else class="px-1 animate-in">
-                <a class="nav-link p-3 rounded-4 d-flex align-items-center justify-content-center text-primary bg-primary-subtle border border-primary-subtle transition-all hover-shadow-sm" @click="backToInstances" style="cursor: pointer; font-weight: 600;">
+             <div class="px-1 animate-in">
+                <a class="nav-link p-2 rounded-3 d-flex align-items-center justify-content-center text-primary bg-primary-subtle border border-primary-subtle transition-all hover-shadow-sm small" @click="backToInstances" style="cursor: pointer; font-weight: 600;">
                     <i class="fa-solid fa-chevron-left me-2"></i>{{ $t('instance_manager.back_to_list') }}
                 </a>
             </div>

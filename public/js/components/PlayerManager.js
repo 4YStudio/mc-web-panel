@@ -39,8 +39,8 @@ export default {
         </div>
 
         <div class="card">
-            <div class="card-header">
-                <ul class="nav nav-tabs card-header-tabs">
+            <div class="card-header overflow-auto no-scrollbar">
+                <ul class="nav nav-tabs card-header-tabs flex-nowrap" style="min-width: max-content;">
                     <li class="nav-item"><a class="nav-link" :class="{active: listType==='whitelist'}" @click="listType='whitelist'; loadLists()">{{ $t('players.whitelist') }}</a></li>
                     <li class="nav-item"><a class="nav-link" :class="{active: listType==='ops'}" @click="listType='ops'; loadLists()">{{ $t('players.ops') }}</a></li>
                     <li class="nav-item"><a class="nav-link" :class="{active: listType==='banned-players'}" @click="listType='banned-players'; loadLists()">{{ $t('players.bans') }}</a></li>

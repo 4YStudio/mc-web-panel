@@ -8,29 +8,29 @@ export default {
     template: `
     <div class="animate-in vh-100 w-100 d-flex flex-column bg-body-tertiary overflow-hidden">
         <!-- Top Navigation (Global) -->
-        <nav class="navbar navbar-expand-lg border-bottom bg-body sticky-top shadow-sm px-4 py-2 z-index-dropdown">
-            <div class="container-fluid p-0">
-                <span class="navbar-brand fw-bold d-flex align-items-center m-0 py-0" style="font-size: 1.1rem;">
-                    <img src="/logo.png" alt="Logo" class="me-2" style="width: 1.4rem; height: 1.4rem; object-fit: contain;">
-                    <span>MC Panel Hub</span>
+        <nav class="navbar border-bottom bg-body sticky-top shadow-sm px-3 px-md-4 py-2 z-index-dropdown">
+            <div class="container-fluid p-0 d-flex align-items-center">
+                <span class="navbar-brand fw-bold d-flex align-items-center m-0 py-0 me-3" style="font-size: 1rem;">
+                    <img src="/logo.png" alt="Logo" class="me-2" style="width: 1.2rem; height: 1.2rem; object-fit: contain;">
+                    <span>{{ $t('sidebar.title') }}</span>
                 </span>
-                <div class="d-flex gap-2 align-items-center">
-                    <div class="d-flex gap-2 me-3">
-                        <button @click="toggleLang" class="btn btn-outline-secondary border shadow-sm btn-sm px-3 fw-bold" style="border-radius: 8px;">
-                            <i class="fa-solid fa-language me-1"></i> {{ store.lang === 'zh' ? 'EN' : '中' }}
-                        </button>
-                        <button @click="toggleTheme" class="btn btn-outline-secondary border shadow-sm btn-sm px-3" style="border-radius: 8px;">
-                            <i class="fa-solid fa-circle-half-stroke"></i>
-                        </button>
-                    </div>
-                    
-                    <button @click="store.view = 'panel-settings'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm me-1" style="border-radius: 10px;">
+                
+                <!-- Desktop Buttons: right aligned on PC -->
+                <div class="d-none d-md-flex gap-2 align-items-center justify-content-end flex-grow-1">
+                    <button @click="toggleLang" class="btn btn-outline-secondary border shadow-sm btn-sm px-3 fw-bold text-nowrap" style="border-radius: 8px;">
+                        <i class="fa-solid fa-language me-1"></i> {{ store.lang === 'zh' ? 'EN' : '中' }}
+                    </button>
+                    <button @click="toggleTheme" class="btn btn-outline-secondary border shadow-sm btn-sm px-3" style="border-radius: 8px;">
+                        <i class="fa-solid fa-circle-half-stroke"></i>
+                    </button>
+                    <div class="vr mx-2 opacity-10"></div>
+                    <button @click="store.view = 'panel-settings'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
                         <i class="fa-solid fa-gear text-white me-2"></i>{{ $t('panel_settings.title') }}
                     </button>
                     <button @click="store.view = 'java'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
                          <i class="fa-brands fa-java text-white me-2"></i>{{ $t('instance_manager.manage_java') }}
                     </button>
-                    <button @click="store.view = 'about'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm ms-1" style="border-radius: 10px;">
+                    <button @click="store.view = 'about'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
                         <i class="fa-solid fa-circle-info text-white me-2"></i>{{ $t('about.title') }}
                     </button>
                     <div class="vr mx-2 opacity-10"></div>
@@ -38,24 +38,51 @@ export default {
                         <i class="fa-solid fa-right-from-bracket me-2"></i>{{ $t('common.logout') }}
                     </button>
                 </div>
+
+                <!-- Mobile Menu: Dropdown with animation -->
+                <div class="d-flex d-md-none gap-2 ms-auto align-items-center">
+                    <button @click="toggleTheme" class="btn btn-link text-body p-1">
+                        <i class="fa-solid fa-circle-half-stroke"></i>
+                    </button>
+                    <div class="dropdown" ref="mobileDropdown">
+                        <button class="btn btn-link text-body p-1" type="button" @click.stop="showMobileMenu = !showMobileMenu">
+                            <i class="fa-solid fa-ellipsis-vertical fa-lg"></i>
+                        </button>
+                        <Teleport to="body">
+                            <Transition name="scale">
+                                <ul v-if="showMobileMenu" class="dropdown-menu border-0 shadow-lg p-2 d-block show" 
+                                    style="border-radius: 12px; min-width: 180px; position: fixed; right: 10px; top: 50px; z-index: 1070;">
+                                    <li><button class="dropdown-item rounded-3 py-2" @click="toggleLang(); showMobileMenu = false"><i class="fa-solid fa-language me-2 w-20 text-primary"></i>{{ store.lang === 'zh' ? 'English' : '中文' }}</button></li>
+                                    <li><hr class="dropdown-divider opacity-10"></li>
+                                    <li><button class="dropdown-item rounded-3 py-2 font-weight-bold" @click="store.view = 'panel-settings'; showMobileMenu = false"><i class="fa-solid fa-gear me-2 w-20 text-primary"></i>{{ $t('panel_settings.title') }}</button></li>
+                                    <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'java'; showMobileMenu = false"><i class="fa-brands fa-java me-2 w-20 text-primary"></i>{{ $t('instance_manager.manage_java') }}</button></li>
+                                    <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'about'; showMobileMenu = false"><i class="fa-solid fa-circle-info me-2 w-20 text-primary"></i>{{ $t('about.title') }}</button></li>
+                                    <li><hr class="dropdown-divider opacity-10"></li>
+                                    <li><button class="dropdown-item rounded-3 py-2 text-danger fw-bold" @click="logout(); showMobileMenu = false"><i class="fa-solid fa-right-from-bracket me-2 w-20"></i>{{ $t('common.logout') }}</button></li>
+                                </ul>
+                            </Transition>
+                        </Teleport>
+                    </div>
+                </div>
             </div>
         </nav>
 
-        <div class="flex-grow-1 overflow-auto custom-scrollbar p-4 p-md-5">
+        <div class="flex-grow-1 overflow-auto custom-scrollbar p-3 p-md-5">
             <div class="container-xxl p-0">
-                <div class="d-flex justify-content-between align-items-center mb-5">
+                <div class="d-flex justify-content-between align-items-center mb-4 mb-md-5">
                     <div>
-                        <h2 class="fw-black m-0 tracking-tight" style="font-size: 2.2rem;">{{ $t('instance_manager.title') }}</h2>
-                        <p class="text-muted fw-medium m-0 opacity-75">{{ store.instanceList.length }} {{ $t('instance_manager.title') }}</p>
+                        <h2 class="fw-black m-0 tracking-tight" style="font-size: 1.75rem;">{{ $t('instance_manager.title') }}</h2>
+                        <p class="text-muted fw-medium m-0 opacity-75 small">{{ store.instanceList.length }} {{ $t('instance_manager.title') }}</p>
                     </div>
                     <div>
-                        <button @click="showCreateModal" class="btn btn-primary px-4 py-2 fw-bold shadow-sm" style="border-radius: 12px;">
-                            <i class="fa-solid fa-plus me-2"></i>{{ $t('instance_manager.create_btn') }}
+                        <button @click="showCreateModal" class="btn btn-primary px-3 px-md-4 py-2 fw-bold shadow-sm" style="border-radius: 12px;">
+                            <i class="fa-solid fa-plus d-md-none"></i>
+                            <span class="d-none d-md-inline"><i class="fa-solid fa-plus me-2"></i>{{ $t('instance_manager.create_btn') }}</span>
                         </button>
                     </div>
                 </div>
 
-        <div class="row g-4 transition-container">
+        <div class="row g-3 g-md-4 transition-container">
             <div v-for="(inst, idx) in filteredInstances" :key="inst.id" class="col-md-6 col-lg-4 col-xl-3 animate-in" :style="{'animation-delay': (idx * 0.05) + 's'}">
                 <div class="card h-100 border-0 shadow-sm hover-shadow transition-all" :class="{'border-primary border-2': store.currentInstanceId === inst.id}">
                     <div class="card-body p-4">
@@ -173,6 +200,7 @@ export default {
         const isEditing = ref(false);
         const modal = ref(null);
         const searchTerm = ref('');
+        const showMobileMenu = ref(false);
         const iconErrors = reactive({});
 
         const filteredInstances = computed(() => {
@@ -275,10 +303,17 @@ export default {
             location.reload();
         };
 
+        let clickHandler = (e) => {
+            if (showMobileMenu.value) showMobileMenu.value = false;
+        };
+
         onMounted(() => {
             modal.value = new bootstrap.Modal(document.getElementById('instanceModal'));
             fetchInstances();
             fetchJava();
+
+            // Close mobile menu on click outside
+            window.addEventListener('click', clickHandler);
 
             // User requested polling every 10s
             // Real-time updates are handled by socket, but we ensure connection here
@@ -289,7 +324,10 @@ export default {
                 // console.log('Polling instance status...');
             }, 10000);
 
-            onUnmounted(() => clearInterval(pollTimer));
+            onUnmounted(() => {
+                clearInterval(pollTimer);
+                window.removeEventListener('click', clickHandler);
+            });
         });
 
         const quickAction = async (inst, act) => {
@@ -306,8 +344,9 @@ export default {
         return {
             store, form, isEditing, searchTerm, iconErrors,
             saveInstance, showCreateModal, openSettings, enterInstance,
-            deleteInstance, quickAction,
-            filteredInstances, toggleTheme, toggleLang, logout
+            deleteInstance, quickAction, modal,
+            filteredInstances, toggleTheme, toggleLang, logout,
+            showMobileMenu
         };
     }
 };

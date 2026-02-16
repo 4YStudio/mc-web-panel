@@ -76,7 +76,7 @@ export default {
 
         <template v-else>
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3>{{ $t('properties.title') }}</h3>
+                <h3 class="m-0 fw-bold">{{ $t('properties.title').split(' (')[0] }}</h3>
                 <div class="btn-group">
                     <button class="btn btn-outline-secondary" @click="toggleEditMode">
                         <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
@@ -102,10 +102,10 @@ export default {
                         <div class="mb-2 text-muted small">{{ $t('properties.icon_tips') }}</div>
                         <div class="btn-group">
                             <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
-                                <i class="fa-solid fa-upload me-1"></i>{{ $t('common.upload') }}
+                                <i class="fa-solid fa-upload me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.upload') }}</span>
                             </button>
                             <button class="btn btn-sm btn-outline-danger" @click="deleteIcon" :disabled="!hasCustomIcon">
-                                <i class="fa-solid fa-trash me-1"></i>{{ $t('common.delete') }}
+                                <i class="fa-solid fa-trash me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.delete') }}</span>
                             </button>
                         </div>
                         <input type="file" ref="iconInput" class="d-none" accept="image/png" @change="uploadIcon">

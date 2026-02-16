@@ -275,7 +275,25 @@ body {
     }
 
     .content {
+        padding: 1.25rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .content {
         padding: 1rem;
+    }
+
+    h2 {
+        font-size: 1.75rem !important;
+    }
+
+    h3 {
+        font-size: 1.5rem !important;
+    }
+
+    .display-6 {
+        font-size: 2rem !important;
     }
 }
 
@@ -350,12 +368,40 @@ body {
     }
 
     .toast {
-        width: 100%;
+        width: 100% !important;
+        min-width: 0 !important;
         margin-bottom: 0.5rem;
+    }
+
+    .d-mobile-none {
+        display: none !important;
+    }
+
+    .d-mobile-block {
+        display: block !important;
+    }
+
+    .d-mobile-flex {
+        display: flex !important;
+    }
+}
+
+@media (min-width: 577px) {
+    .d-mobile-only {
+        display: none !important;
     }
 }
 
 /* Scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -457,6 +503,37 @@ body {
 
 .modal.show .modal-dialog {
     transform: scale(1);
+}
+
+/* Animations */
+.scale-enter-active,
+.scale-leave-active {
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.scale-enter-from,
+.scale-leave-to {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 /* Config Layout (EasyAuth) */
@@ -923,6 +1000,31 @@ body {
 .instance-card-btn-group .btn-success {
     color: var(--bs-success);
     border-color: var(--bs-success-border-subtle);
+}
+
+@media (max-width: 768px) {
+
+    html,
+    body {
+        overflow-x: hidden;
+        width: 100%;
+        position: relative;
+    }
+
+    .container-fluid,
+    .container-xxl {
+        padding-left: 10px;
+        padding-right: 10px;
+        overflow-x: hidden;
+    }
+
+    .table-responsive {
+        margin-right: -10px;
+        margin-left: -10px;
+        padding-right: 10px;
+        padding-left: 10px;
+        width: calc(100% + 20px);
+    }
 }
 
 .instance-card-btn-group .btn-success:hover {

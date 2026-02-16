@@ -97,7 +97,15 @@ const app = createApp({
             socket.on('status', s => store.isRunning = s);
             socket.on('players_update', p => store.onlinePlayers = p);
             socket.on('system_stats', d => {
-                store.stats = d;
+                // Partial update to preserve mc stats if missing in update
+                if (d.mc) {
+                    store.stats = d;
+                } else {
+                    // Preserve existing mc stats if backend didn't send them
+                    const oldMc = store.stats.mc;
+                    store.stats = d;
+                    store.stats.mc = oldMc;
+                }
                 store.hasBackupMod = d.hasBackupMod;
                 store.hasEasyAuth = d.hasEasyAuth;
                 store.hasVoicechat = d.hasVoicechat;

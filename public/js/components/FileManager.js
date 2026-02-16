@@ -10,22 +10,27 @@ export default {
             <!-- 1. 文件列表视图 -->
             <div v-if="!editingFile" class="d-flex flex-column h-100" key="list">
                 <!-- 顶部导航栏 -->
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb mb-0 p-2 bg-body-tertiary rounded">
-                            <li class="breadcrumb-item text-primary" @click="changeDir('')">
-                                <i class="fa-solid fa-house"></i>
-                            </li>
-                            <li v-for="(p, idx) in pathParts" :key="idx" 
-                                class="breadcrumb-item" 
-                                @click="changeDir(pathParts.slice(0, idx+1).join('/'))">
-                                {{ p }}
-                            </li>
-                        </ol>
-                    </nav>
-                    <div class="input-group" style="width: 250px;">
-                        <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-                        <input type="text" class="form-control" v-model="searchQuery" :placeholder="$t('common.search') + '...'">
+                <div class="row g-2 align-items-center mb-3">
+                    <div class="col-12 col-md-auto flex-grow-1 overflow-hidden">
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0 p-2 bg-body-tertiary rounded flex-nowrap overflow-auto no-scrollbar" style="font-size: 0.9rem;">
+                                <li class="breadcrumb-item text-primary cursor-pointer" @click="changeDir('')">
+                                    <i class="fa-solid fa-house"></i>
+                                </li>
+                                <li v-for="(p, idx) in pathParts" :key="idx" 
+                                    class="breadcrumb-item text-truncate cursor-pointer" 
+                                    style="max-width: 120px;"
+                                    @click="changeDir(pathParts.slice(0, idx+1).join('/'))">
+                                    {{ p }}
+                                </li>
+                            </ol>
+                        </nav>
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <div class="input-group input-group-sm mb-0">
+                            <span class="input-group-text border-0 bg-body-tertiary"><i class="fa-solid fa-search"></i></span>
+                            <input type="text" class="form-control border-0 bg-body-tertiary px-2" v-model="searchQuery" :placeholder="$t('common.search') + '...'">
+                        </div>
                     </div>
                 </div>
 
@@ -54,74 +59,98 @@ export default {
                 </div>
 
                 <!-- 文件列表表格 -->
-                <div class="card flex-grow-1 overflow-auto">
-                    <table class="table table-hover table-sm mb-0 align-middle">
-                        <thead style="z-index: 5;">
-                            <tr>
-                                <th style="width: 30px;"><input type="checkbox" v-model="selectAll" class="form-check-input"></th>
-                                <th>{{ $t('common.name') }}</th>
-                                <th style="width: 100px;">{{ $t('common.size') }}</th>
-                                <th style="width: 150px;">{{ $t('common.time') }}</th>
-                                <th style="width: 140px;" class="text-end">{{ $t('common.actions') }}</th>
-                            </tr>
-                        </thead>
-                        <TransitionGroup tag="tbody" name="list">
-                            <tr v-if="currentPath !== ''" class="file-row" @click="goUp()" key="..">
-                                <td></td>
-                                <td colspan="4"><i class="fa-solid fa-turn-up text-primary ms-2"></i> ..</td>
-                            </tr>
-                            <tr v-for="f in filteredFiles" :key="f.name" class="file-row" :class="{selected: selectedFiles.includes(f.name)}">
-                                <td @click.stop><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
-                                
-                                <!-- 点击名称：文件夹进入，文件尝试编辑 -->
-                                <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)">
-                                    <i class="fa-solid me-2" :class="getIcon(f)"></i>
-                                    {{ f.name }}
-                                </td>
-                                
-                                <td>{{ f.isDir ? '-' : formatSize(f.size) }}</td>
-                                <td class="small text-muted">{{ new Date(f.mtime).toLocaleString() }}</td>
-                                
-                                <td class="text-end">
-                                    <div class="btn-group">
-                                        <button v-if="!f.isDir" class="btn btn-xs btn-link text-info" @click.stop="editFile(f.name)" :title="$t('common.edit')">
-                                            <i class="fa-solid fa-file-pen"></i>
-                                        </button>
-                                        <button class="btn btn-xs btn-link text-primary" @click.stop="askRename(f)" :title="$t('common.edit')">
-                                            <i class="fa-solid fa-pen"></i>
-                                        </button>
-                                        <button v-if="!f.isDir" class="btn btn-xs btn-link text-secondary" @click.stop="downloadFile(f.name)" :title="$t('common.download')">
-                                            <i class="fa-solid fa-download"></i>
-                                        </button>
-                                        <button class="btn btn-xs btn-link text-danger" @click.stop="askDelete([f.name])" :title="$t('common.delete')">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-if="filteredFiles.length === 0" key="empty">
-                                <td colspan="5" class="text-center text-muted py-3">{{ $t('files.total', {count: 0}) }}</td>
-                            </tr>
-                        </TransitionGroup>
-                    </table>
+                <div class="card flex-grow-1 overflow-hidden border-0 shadow-sm" style="border-radius: 12px;">
+                    <div class="table-responsive h-100 custom-scrollbar">
+                        <table class="table table-hover table-sm mb-0 align-middle">
+                            <thead class="sticky-top bg-body" style="z-index: 5;">
+                                <tr class="small text-uppercase text-muted">
+                                    <th style="width: 35px;" class="px-3"><input type="checkbox" v-model="selectAll" class="form-check-input"></th>
+                                    <th>{{ $t('common.name') }}</th>
+                                    <th style="width: 80px;" class="d-none d-sm-table-cell">{{ $t('common.size') }}</th>
+                                    <th style="width: 140px;" class="d-none d-md-table-cell">{{ $t('common.time') }}</th>
+                                    <th style="width: 50px; min-width: 50px;" class="text-end px-3">
+                                        <span class="d-none d-md-inline">{{ $t('common.actions') }}</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <TransitionGroup tag="tbody" name="list">
+                                <tr v-if="currentPath !== ''" class="file-row" @click="goUp()" key="..">
+                                    <td class="px-3"></td>
+                                    <td colspan="4" class="py-2"><i class="fa-solid fa-turn-up text-primary ms-2 me-2"></i> ..</td>
+                                </tr>
+                                <tr v-for="f in filteredFiles" :key="f.name" class="file-row" :class="{selected: selectedFiles.includes(f.name)}">
+                                    <td @click.stop class="px-3"><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
+                                    
+                                    <!-- 点击名称：文件夹进入，文件尝试编辑 -->
+                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)" class="text-truncate" style="max-width: 200px;">
+                                        <i class="fa-solid me-2" :class="getIcon(f)"></i>
+                                        {{ f.name }}
+                                        <div class="d-sm-none x-small text-muted">{{ f.isDir ? '-' : formatSize(f.size) }}</div>
+                                    </td>
+                                    
+                                    <td class="d-none d-sm-table-cell small">{{ f.isDir ? '-' : formatSize(f.size) }}</td>
+                                    <td class="small text-muted d-none d-md-table-cell">{{ new Date(f.mtime).toLocaleString() }}</td>
+                                    
+                                    <td class="text-end px-3">
+                                        <!-- Desktop actions -->
+                                        <div class="d-none d-md-flex justify-content-end gap-1">
+                                            <button v-if="!f.isDir" class="btn btn-xs btn-link text-info p-1" @click.stop="editFile(f.name)" :title="$t('common.edit')">
+                                                <i class="fa-solid fa-file-pen"></i>
+                                            </button>
+                                            <button class="btn btn-xs btn-link text-primary p-1" @click.stop="askRename(f)" :title="$t('common.edit')">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+                                            <button v-if="!f.isDir" class="btn btn-xs btn-link text-secondary p-1" @click.stop="downloadFile(f.name)" :title="$t('common.download')">
+                                                <i class="fa-solid fa-download"></i>
+                                            </button>
+                                            <button class="btn btn-xs btn-link text-danger p-1" @click.stop="askDelete([f.name])" :title="$t('common.delete')">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        <!-- Mobile actions dropdown -->
+                                        <div class="d-md-none dropdown">
+                                            <button class="btn btn-link btn-xs text-secondary p-0" type="button" @click.stop="toggleActionMenu(f.name)">
+                                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                                            </button>
+                                            <Transition name="scale">
+                                                <ul v-if="activeActionMenu === f.name" class="dropdown-menu dropdown-menu-end shadow border-0 p-1 d-block" style="border-radius: 12px; z-index: 1060; min-width: 120px; position: absolute; right: 0;">
+                                                    <li v-if="!f.isDir"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="editFile(f.name); activeActionMenu=null"><i class="fa-solid fa-file-pen me-2 text-info"></i>{{ $t('common.edit') }}</button></li>
+                                                    <li><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="askRename(f); activeActionMenu=null"><i class="fa-solid fa-pen me-2 text-primary"></i>{{ $t('common.edit') }}</button></li>
+                                                    <li v-if="!f.isDir"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="downloadFile(f.name); activeActionMenu=null"><i class="fa-solid fa-download me-2 text-secondary"></i>{{ $t('common.download') }}</button></li>
+                                                    <li><hr class="dropdown-divider opacity-10 my-1"></li>
+                                                    <li><button class="dropdown-item rounded-3 py-1 text-danger fw-bold small" @click.stop="askDelete([f.name]); activeActionMenu=null"><i class="fa-solid fa-trash me-2"></i>{{ $t('common.delete') }}</button></li>
+                                                </ul>
+                                            </Transition>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredFiles.length === 0" key="empty">
+                                    <td colspan="5" class="text-center text-muted py-5">
+                                        <i class="fa-solid fa-folder-open fa-2x mb-2 opacity-25 d-block"></i>
+                                        {{ $t('files.total', {count: 0}) }}
+                                    </td>
+                                </tr>
+                            </TransitionGroup>
+                        </table>
+                    </div>
                 </div>
             </div>
             
             <!-- 2. 编辑器视图 (全屏模式) -->
             <div v-else class="d-flex flex-column h-100" key="editor">
-                <div class="card h-100 border-secondary d-flex flex-column">
-                    <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2">
-                        <div class="d-flex align-items-center">
-                            <i class="fa-solid fa-file-pen me-2 text-warning"></i>
-                            <span class="fw-bold">{{ editingFile }}</span>
-                            <span class="badge bg-secondary ms-2" v-if="hasUnsavedChanges">Unsaved</span>
+                <div class="card h-100 border-0 shadow-sm d-flex flex-column" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 px-3">
+                        <div class="d-flex align-items-center overflow-hidden">
+                            <i class="fa-solid fa-file-pen me-2 text-warning flex-shrink-0"></i>
+                            <span class="fw-bold text-truncate" style="max-width: 150px; md-width: auto;">{{ editingFile.split('/').pop() }}</span>
+                            <span class="badge bg-secondary ms-2 d-none d-sm-inline" v-if="hasUnsavedChanges">Unsaved</span>
                         </div>
-                        <div>
-                            <button class="btn btn-sm btn-success me-2" @click="saveFile">
-                                <i class="fa-solid fa-save me-1"></i>{{ $t('common.save') }} (Ctrl+S)
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-success px-2 px-md-3" @click="saveFile">
+                                <i class="fa-solid fa-save me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
                             </button>
-                            <button class="btn btn-sm btn-secondary" @click="closeEditor">
-                                <i class="fa-solid fa-xmark me-1"></i>{{ $t('common.close') }}
+                            <button class="btn btn-sm btn-secondary px-2 px-md-3" @click="closeEditor">
+                                <i class="fa-solid fa-xmark me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.close') }}</span>
                             </button>
                         </div>
                     </div>
@@ -129,8 +158,8 @@ export default {
                     <!-- 文本输入框 -->
                     <textarea 
                         ref="editorArea"
-                        class="form-control border-0 rounded-0 flex-grow-1 p-3" 
-                        style="font-family: 'Consolas', 'Monaco', monospace; resize: none; font-size: 14px; line-height: 1.5;" 
+                        class="form-control border-0 rounded-0 flex-grow-1 p-3 custom-scrollbar" 
+                        style="font-family: 'Consolas', 'Monaco', monospace; resize: none; font-size: 13px; line-height: 1.5; background: var(--c-bg-base);" 
                         v-model="fileContent"
                         @keydown.ctrl.s.prevent="saveFile"
                         spellcheck="false"
@@ -147,6 +176,7 @@ export default {
         const selectedFiles = ref([]);
         const selectAll = ref(false);
         const searchQuery = ref('');
+        const activeActionMenu = ref(null);
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
         const editingFile = ref(null);
@@ -305,6 +335,9 @@ export default {
         const downloadFile = (name) => window.open(`/api/files/download?path=${joinPath(currentPath.value, name)}`, '_blank');
 
         const refreshFiles = () => loadFiles();
+        const toggleActionMenu = (name) => {
+            activeActionMenu.value = activeActionMenu.value === name ? null : name;
+        };
 
         onMounted(() => loadFiles());
 
@@ -313,7 +346,8 @@ export default {
             editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp,
             changeDir, goUp, joinPath, getIcon, formatSize,
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
-            editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder
+            editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder,
+            toggleActionMenu, activeActionMenu
         };
     }
 };

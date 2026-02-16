@@ -23,7 +23,7 @@ const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 

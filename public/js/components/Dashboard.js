@@ -13,40 +13,43 @@ export default {
 
         <!-- Normal Dashboard -->
         <div v-else class="h-100 d-flex flex-column animate-in delay-100">
-            <div class="d-flex justify-content-between align-items-center mb-4 flex-shrink-0">
+            <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 flex-shrink-0">
                 <h3 class="fw-bold m-0 tracking-tight">{{ $t('dashboard.console_title') }}</h3>
                 <div class="d-flex gap-2">
-                    <button @click="openStartupSettings" class="btn btn-outline-secondary border shadow-sm px-3" style="border-radius: 10px;" :title="$t('instance_manager.settings_btn')">
+                    <button @click="openStartupSettings" class="btn btn-outline-secondary border shadow-sm px-2 px-md-3" style="border-radius: 10px;" :title="$t('instance_manager.settings_btn')">
                         <i class="fa-solid fa-gear"></i>
                     </button>
-                    <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-4 shadow-sm" style="border-radius: 10px;"><i class="fa-solid fa-play me-2"></i>{{ $t('dashboard.start') }}</button>
-                    <button v-else @click="serverAction('stop')" class="btn btn-danger px-4 shadow-sm" style="border-radius: 10px;"><i class="fa-solid fa-stop me-2"></i>{{ $t('dashboard.stop') }}</button>
+                    <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-3 px-md-4 shadow-sm fw-bold" style="border-radius: 10px;">
+                        <i class="fa-solid fa-play me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.start') }}</span>
+                    </button>
+                    <button v-else @click="serverAction('stop')" class="btn btn-danger px-3 px-md-4 shadow-sm fw-bold" style="border-radius: 10px;">
+                        <i class="fa-solid fa-stop me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.stop') }}</span>
+                    </button>
                 </div>
             </div>
 
             <!-- System Stats Overview (Conditionally shown) -->
-            <!-- ... existing top stats cards ... -->
-            <div v-if="store.consoleInfoPosition === 'top'" class="row g-4 mb-4 flex-shrink-0">
+            <div v-if="store.consoleInfoPosition === 'top'" class="row g-3 g-md-4 mb-3 mb-md-4 flex-shrink-0">
                 <div class="col-md-6">
-                    <div class="card h-100 border-0">
-                        <div class="card-header bg-transparent border-0 pb-0 pt-4 px-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header bg-transparent border-0 pb-0 pt-3 pt-md-4 px-3 px-md-4">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1"><i class="fa-solid fa-server me-2"></i>{{ $t('dashboard.server_info') }}</h6>
                                  <span class="badge rounded-pill font-monospace" :class="store.isRunning?'bg-success-subtle text-success':'bg-danger-subtle text-danger'">{{ store.isRunning ? $t('dashboard.state_running') : $t('dashboard.state_stopped') }}</span>
                             </div>
                         </div>
-                        <div class="card-body px-4 pb-4">
-                             <div class="d-flex align-items-end mb-3">
-                                 <div class="display-6 fw-bold me-2">{{ store.stats.mc.online }}</div>
-                                 <div class="text-muted mb-2">/ {{ store.stats.mc.maxPlayers }} {{ $t('dashboard.online_players') }}</div>
-                             </div>
+                        <div class="card-body px-3 px-md-4 pb-3 pb-md-4">
+                              <div v-if="store.stats && store.stats.mc" class="d-flex align-items-end mb-2 mb-md-3">
+                                  <div class="display-6 fw-bold me-2">{{ store.stats.mc.online }}</div>
+                                  <div class="text-muted mb-2 small">/ {{ store.stats.mc.maxPlayers }} {{ $t('dashboard.online_players') }}</div>
+                              </div>
                              
-                             <div class="progress mb-3" style="height: 8px; border-radius: 4px;">
-                                <div class="progress-bar bg-success" :style="{width: (store.stats.mc.maxPlayers > 0 ? (store.stats.mc.online/store.stats.mc.maxPlayers*100) : 0) + '%'}"></div>
-                             </div>
-                             <div class="text-truncate small text-muted font-monospace mb-2"><i class="fa-solid fa-quote-left me-2 opacity-50"></i>{{ store.stats.mc.motd }}</div>
+                              <div v-if="store.stats && store.stats.mc" class="progress mb-3" style="height: 6px; border-radius: 3px;">
+                                 <div class="progress-bar bg-success" :style="{width: (store.stats.mc.maxPlayers > 0 ? (store.stats.mc.online/store.stats.mc.maxPlayers*100) : 0) + '%'}"></div>
+                              </div>
+                              <div v-if="store.stats && store.stats.mc" class="text-truncate small text-muted font-monospace mb-2"><i class="fa-solid fa-quote-left me-2 opacity-50"></i>{{ store.stats.mc.motd }}</div>
                              
-                             <div class="d-flex justify-content-between small text-muted border-top pt-2 mt-2 flex-wrap gap-2">
+                             <div class="d-flex justify-content-between small text-muted border-top pt-2 mt-2 flex-wrap gap-2" style="font-size: 0.75rem;">
                                 <span>{{ $t('dashboard.target') }}: {{ store.stats.version?.mc || 'Unknown' }}</span>
                                 <span>{{ $t('dashboard.loader') }}: {{ store.stats.version?.loader || 'Unknown' }}</span>
                                 <span>{{ $t('dashboard.java_version') }}: <span class="fw-bold">{{ store.stats.javaVersion || 'Checking...' }}</span></span>
@@ -55,26 +58,26 @@ export default {
                     </div>
                 </div>
                 <div class="col-md-6">
-                     <div class="card h-100 border-0">
-                        <div class="card-header bg-transparent border-0 pb-0 pt-4 px-4">
+                     <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header bg-transparent border-0 pb-0 pt-3 pt-md-4 px-3 px-md-4">
                             <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
                         </div>
-                        <div class="card-body px-4 pb-4">
-                             <div class="mb-4">
+                        <div class="card-body px-3 px-md-4 pb-3 pb-md-4">
+                             <div class="mb-3 mb-md-4">
                                  <div class="d-flex justify-content-between small mb-1 fw-bold">
                                      <span>{{ $t('dashboard.cpu_usage') }}</span>
                                      <span :class="{'text-danger': store.stats.cpu > 80}">{{ store.stats.cpu }}%</span>
                                  </div>
-                                 <div class="progress" style="height: 8px; border-radius: 4px;">
+                                 <div class="progress" style="height: 6px; border-radius: 3px;">
                                     <div class="progress-bar bg-primary" :style="{width: store.stats.cpu + '%'}"></div>
                                  </div>
                              </div>
                              <div>
                                  <div class="d-flex justify-content-between small mb-1 fw-bold">
                                      <span>{{ $t('dashboard.mem_usage') }} ({{ store.stats.mem.percentage }}%)</span>
-                                     <span class="text-muted font-monospace">{{ store.stats.mem.used }}G / {{ store.stats.mem.total }}G</span>
+                                     <span class="text-muted font-monospace" style="font-size: 0.75rem;">{{ store.stats.mem.used }}G / {{ store.stats.mem.total }}G</span>
                                  </div>
-                                 <div class="progress" style="height: 8px; border-radius: 4px;">
+                                 <div class="progress" style="height: 6px; border-radius: 3px;">
                                     <div class="progress-bar bg-warning" :style="{width: store.stats.mem.percentage + '%'}"></div>
                                  </div>
                              </div>
@@ -83,13 +86,13 @@ export default {
                 </div>
             </div>
 
-            <div class="console-output flex-grow-1 mb-3 position-relative" id="consoleBox">
+            <div class="console-output flex-grow-1 mb-3 position-relative" id="consoleBox" style="font-size: 0.75rem; padding: 1rem; border-radius: 12px;">
                 <div v-for="(log,i) in store.logs" :key="i" v-html="formatLog(log)"></div>
             </div>
             
             <div class="input-group flex-shrink-0">
-                <input type="text" class="form-control border-0 bg-body-tertiary px-4 py-3" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')" style="border-radius: 12px 0 0 12px;">
-                <button class="btn btn-primary px-4 fw-bold" @click="sendCommand" style="border-radius: 0 12px 12px 0;">{{ $t('dashboard.send') }}</button>
+                <input type="text" class="form-control border-0 bg-body-tertiary px-3 px-md-4 py-2 py-md-3" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')" style="border-radius: 12px 0 0 12px;">
+                <button class="btn btn-primary px-3 px-md-4 fw-bold" @click="sendCommand" style="border-radius: 0 12px 12px 0;">{{ $t('dashboard.send') }}</button>
             </div>
         </div> <!-- End Normal Dashboard -->
 

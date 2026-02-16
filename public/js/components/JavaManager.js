@@ -5,32 +5,36 @@ import { showToast, openModal } from '../utils.js';
 
 export default {
     template: `
-    <div class="h-100 d-flex flex-column overflow-hidden">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-shrink-0">
-            <div class="d-flex align-items-center">
+    <div class="h-100 d-flex flex-column animate-in overflow-hidden">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 px-1 flex-shrink-0">
+            <div class="d-flex align-items-center overflow-hidden">
                 <button @click="store.view = 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
-                <h3 class="fw-black m-0 tracking-tight">
-                    <i class="fa-brands fa-java me-2 text-danger"></i>{{ $t('java.title') }}
+                <h3 class="m-0 fw-bold d-flex align-items-center text-truncate">
+                    <i class="fa-brands fa-java me-2 me-md-3 text-primary d-none d-md-inline"></i>
+                    <span>{{ $t('instance_manager.manage_java') }}</span>
                 </h3>
             </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary fw-bold px-3" @click="detectSystemJava" :disabled="detecting" style="border-radius: 10px;">
-                    <span v-if="detecting" class="spinner-border spinner-border-sm me-1"></span>
-                    <i v-else class="fa-solid fa-magnifying-glass me-1"></i>{{ $t('java.detect_system') }}
-                </button>
-                <button class="btn btn-primary fw-bold px-3 shadow-sm" @click="showAddLocal = !showAddLocal" style="border-radius: 10px;">
-                    <i class="fa-solid fa-folder-plus me-1"></i>{{ $t('java.add_local') }}
-                </button>
-            </div>
+        </div>
+
+        <div class="d-flex justify-content-end align-items-center mb-3 flex-shrink-0 gap-2 px-1">
+            <button @click="detectSystemJava" class="btn btn-sm btn-outline-secondary border shadow-sm px-2 px-md-3 rounded-pill fw-bold" :disabled="detecting" style="border-radius: 10px !important;">
+                <span v-if="detecting" class="spinner-border spinner-border-sm"></span>
+                <i v-else class="fa-solid fa-magnifying-glass d-md-none"></i>
+                <span class="d-none d-md-inline"><i class="fa-solid fa-magnifying-glass me-1"></i>{{ $t('java.detect_system') }}</span>
+            </button>
+             <button class="btn btn-primary btn-sm fw-bold px-3 shadow-sm" @click="showAddLocal = !showAddLocal" style="border-radius: 10px;">
+                <i class="fa-solid fa-folder-plus me-1"></i>{{ $t('java.add_local') }}
+            </button>
         </div>
 
         <!-- 添加本地 Java 面板 -->
         <Transition name="fade">
             <div v-if="showAddLocal" class="card mb-3 border-primary-subtle flex-shrink-0 animate-in">
                 <div class="card-body p-3">
-                    <div class="input-group">
+                    <div class="input-group input-group-sm">
                         <span class="input-group-text"><i class="fa-solid fa-terminal"></i></span>
                         <input type="text" class="form-control" v-model="localJavaPath" :placeholder="$t('java.local_path_placeholder')" @keydown.enter="addLocalJava">
                         <button class="btn btn-primary" @click="addLocalJava" :disabled="addingLocal || !localJavaPath">
@@ -38,13 +42,13 @@ export default {
                             <span v-else>{{ $t('common.confirm') }}</span>
                         </button>
                     </div>
-                    <div class="form-text small mt-1">{{ $t('java.local_path_desc') }}</div>
+                    <div class="form-text small mt-1" style="font-size: 0.7rem;">{{ $t('java.local_path_desc') }}</div>
                 </div>
             </div>
         </Transition>
 
         <!-- 已安装列表 -->
-        <div class="card shadow-sm mb-3 flex-shrink-0">
+        <div class="card shadow-sm mb-3 flex-shrink-0 border-0 overflow-hidden" style="border-radius: 16px;">
             <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 border-0">
                 <span class="fw-bold small text-uppercase text-muted"><i class="fa-solid fa-check-circle me-2 text-success"></i>{{ $t('java.installed') }}</span>
                 <span class="badge bg-body-secondary text-muted rounded-pill">{{ installed.length }}</span>
@@ -54,46 +58,48 @@ export default {
                     <div class="spinner-border spinner-border-sm text-primary"></div>
                 </div>
                 <div v-else-if="installed.length === 0" class="text-center text-muted py-4 small">
-                    <i class="fa-solid fa-inbox fa-2x mb-2 opacity-25 d-block"></i>
-                    {{ $t('java.no_installed') }}
+                    <i class="fa-solid fa-ghost fa-2x mb-2 opacity-25 d-block"></i>
+                    {{ $t('java.no_installed') || 'No Java installed' }}
                 </div>
-                <table v-else class="table table-hover mb-0 align-middle">
-                    <tbody>
-                        <tr v-for="j in installed" :key="j.id" class="animate-in">
-                            <td style="width: 50px;" class="text-center">
-                                <div class="rounded-circle d-inline-flex align-items-center justify-content-center" 
-                                     style="width: 36px; height: 36px;" 
-                                     :class="j.source === 'local' ? 'bg-info-subtle text-info' : 'bg-danger-subtle text-danger'">
-                                    <i :class="j.source === 'local' ? 'fa-solid fa-folder' : 'fa-brands fa-java'" class="fa-lg"></i>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="fw-bold">Java {{ j.featureVersion }}</div>
-                                <div class="small text-muted font-monospace">{{ j.version }}</div>
-                            </td>
-                            <td>
-                                <span class="badge rounded-pill px-2 py-1" :class="j.source === 'local' ? 'bg-info-subtle text-info border border-info-subtle' : 'bg-primary-subtle text-primary border border-primary-subtle'">
-                                    {{ j.vendor || j.source }}
-                                </span>
-                            </td>
-                            <td class="text-muted small d-none d-lg-table-cell font-monospace text-truncate" style="max-width: 250px;" :title="j.javaPath">{{ j.javaPath }}</td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-danger border-0" @click="removeJava(j)" :title="$t('common.delete')">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div v-else class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <tbody>
+                            <tr v-for="j in installed" :key="j.id" class="animate-in">
+                                <td style="width: 50px;" class="text-center px-1 px-md-3">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center" 
+                                         style="width: 32px; height: 32px;" 
+                                         :class="j.source === 'local' ? 'bg-info-subtle text-info' : 'bg-danger-subtle text-danger'">
+                                        <i :class="j.source === 'local' ? 'fa-solid fa-folder' : 'fa-brands fa-java'" style="font-size: 0.9rem;"></i>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold small">Java {{ j.featureVersion }}</div>
+                                    <div class="text-muted font-monospace" style="font-size: 0.75rem;">{{ j.version }}</div>
+                                </td>
+                                <td class="d-none d-sm-table-cell">
+                                    <span class="badge rounded-pill px-2 py-1" style="font-size: 0.7rem;" :class="j.source === 'local' ? 'bg-info-subtle text-info border border-info-subtle' : 'bg-primary-subtle text-primary border border-primary-subtle'">
+                                        {{ j.vendor || j.source }}
+                                    </span>
+                                </td>
+                                <td class="text-muted small d-none d-md-table-cell font-monospace text-truncate" style="max-width: 200px;" :title="j.javaPath">{{ j.javaPath }}</td>
+                                <td class="text-end px-2 px-md-3">
+                                    <button class="btn btn-sm btn-outline-danger border-0" @click="removeJava(j)" :title="$t('common.delete')">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- 在线安装 -->
-        <div class="card shadow-sm d-flex flex-column" style="flex: 1; min-height: 0;">
+        <div class="card shadow-sm d-flex flex-column border-0 overflow-hidden" style="flex: 1; min-height: 0; border-radius: 16px;">
             <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 border-0">
                 <span class="fw-bold small text-uppercase text-muted"><i class="fa-solid fa-cloud-arrow-down me-2 text-primary"></i>{{ $t('java.online_install') }}</span>
                 <div class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm border-0 bg-body" style="width: auto;" v-model="selectedSource" @change="fetchAvailable">
+                    <select class="form-select form-select-sm border-0 bg-body shadow-sm" style="width: auto; font-size: 0.75rem;" v-model="selectedSource" @change="fetchAvailable">
                         <option v-for="s in sources" :key="s.id" :value="s.id">{{ s.name }}</option>
                     </select>
                     <button class="btn btn-sm btn-link text-primary p-0" @click="fetchAvailable" :disabled="loadingAvailable" :title="$t('common.refresh')">
@@ -110,50 +116,52 @@ export default {
                     <i class="fa-solid fa-cloud-exclamation fa-2x mb-2 opacity-25 d-block"></i>
                     {{ $t('java.no_available') }}
                 </div>
-                <table v-else class="table table-hover mb-0 align-middle">
-                    <tbody>
-                        <tr v-for="j in available" :key="j.featureVersion">
-                            <td style="width: 50px;" class="text-center">
-                                <div class="rounded-circle bg-warning-subtle text-warning d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
-                                    <span class="fw-bold">{{ j.featureVersion }}</span>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="fw-bold">Java {{ j.featureVersion }}
-                                    <span v-if="[8,11,17,21].includes(j.featureVersion)" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1" style="font-size: 10px;">LTS</span>
-                                </div>
-                                <div class="small text-muted font-monospace">{{ j.version }}</div>
-                            </td>
-                            <td class="text-muted small">{{ (j.size / 1024 / 1024).toFixed(0) }} MB</td>
-                            <td class="text-end">
-                                <button v-if="isInstalled(j.featureVersion)" class="btn btn-sm btn-success" disabled>
-                                    <i class="fa-solid fa-check me-1"></i>{{ $t('java.already_installed') }}
-                                </button>
-                                <button v-else-if="installing[j.featureVersion]" class="btn btn-sm btn-primary" disabled>
-                                    <span class="spinner-border spinner-border-sm me-1"></span>
-                                    {{ installProgress[j.featureVersion]?.percent || 0 }}%
-                                </button>
-                                <button v-else class="btn btn-sm btn-outline-primary" @click="installJava(j)">
-                                    <i class="fa-solid fa-download me-1"></i>{{ $t('java.install') }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div v-else class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <tbody>
+                            <tr v-for="j in available" :key="j.featureVersion">
+                                <td style="width: 40px;" class="text-center px-2 px-md-3">
+                                    <div class="rounded-circle bg-warning-subtle text-warning d-inline-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                                        <span class="fw-bold small">{{ j.featureVersion }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold small">Java {{ j.featureVersion }}
+                                        <span v-if="[8,11,17,21].includes(j.featureVersion)" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1" style="font-size: 9px;">LTS</span>
+                                    </div>
+                                    <div class="text-muted font-monospace" style="font-size: 0.7rem;">{{ j.version }}</div>
+                                </td>
+                                <td class="text-muted small d-none d-sm-table-cell">{{ (j.size / 1024 / 1024).toFixed(0) }} MB</td>
+                                <td class="text-end px-2 px-md-3">
+                                    <button v-if="isInstalled(j.featureVersion)" class="btn btn-xs btn-success py-1 px-2 fw-bold" disabled style="font-size: 0.7rem;">
+                                        <i class="fa-solid fa-check me-1"></i><span class="d-none d-sm-inline">{{ $t('java.already_installed') }}</span>
+                                    </button>
+                                    <button v-else-if="installing[j.featureVersion]" class="btn btn-xs btn-primary py-1 px-2 fw-bold" disabled style="font-size: 0.7rem;">
+                                        <span class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"></span>
+                                        {{ installProgress[j.featureVersion]?.percent || 0 }}%
+                                    </button>
+                                    <button v-else class="btn btn-xs btn-outline-primary py-1 px-2 fw-bold" @click="installJava(j)" style="font-size: 0.7rem;">
+                                        <i class="fa-solid fa-download me-1"></i>{{ $t('java.install') }}
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- 安装进度条 -->
             <Transition name="fade">
-                <div v-if="activeInstall" class="card-footer bg-body-tertiary py-2 border-0 flex-shrink-0">
+                <div v-if="activeInstall" class="card-footer bg-body-tertiary py-2 border-0 flex-shrink-0 px-3">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="spinner-border spinner-border-sm text-primary"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 12px; height: 12px;"></span>
                         <div class="flex-grow-1">
-                            <div class="modern-progress">
+                            <div class="modern-progress" style="height: 6px;">
                                 <div class="modern-progress-bar" :style="{width: (activeInstall.percent || 0) + '%'}"></div>
                             </div>
                         </div>
-                        <span class="small text-muted text-nowrap">{{ activeInstall.message }}</span>
-                        <button class="btn btn-sm btn-link text-danger p-0 ms-2" @click="cancelInstall" :title="$t('common.cancel')" :disabled="cancelling">
+                        <span class="text-muted text-nowrap" style="font-size: 0.7rem;">{{ activeInstall.message }}</span>
+                        <button class="btn btn-sm btn-link text-danger p-0 ms-1" @click="cancelInstall" :title="$t('common.cancel')" :disabled="cancelling">
                             <i class="fa-solid fa-times-circle"></i>
                         </button>
                     </div>

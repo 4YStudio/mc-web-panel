@@ -6,14 +6,18 @@ import { showToast, t } from '../utils.js';
 export default {
     template: `
     <div class="h-100 d-flex flex-column">
-        <div class="d-flex justify-content-between align-items-center mb-3 px-1 animate-in">
+        <div class="d-flex justify-content-between align-items-center mb-3 px-1 animate-in flex-wrap gap-2">
             <h3 class="m-0 d-flex align-items-center">
-                <i class="fa-solid fa-cloud-arrow-down me-3 text-primary"></i>
-                {{ $t('sidebar.modrinth') }}
+                <i class="fa-solid fa-cloud-arrow-down me-2 me-md-3 text-primary"></i>
+                <span class="d-none d-sm-inline">{{ $t('sidebar.modrinth') }}</span>
+                <span class="d-inline d-sm-none">Modrinth</span>
             </h3>
             
-            <div class="d-flex gap-2 text-primary">
-                <select class="form-select form-select-sm border-0 bg-body shadow-sm fw-bold" style="width: 140px; color: inherit;" v-model="sortBy" @change="searchModrinth(true)">
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-sm btn-outline-primary d-md-none fw-bold" @click="showMobileFilters = true">
+                    <i class="fa-solid fa-filter"></i><span class="d-none d-sm-inline ms-1">{{ $t('common.filter') }}</span>
+                </button>
+                <select class="form-select form-select-sm border-0 bg-body shadow-sm fw-bold" style="width: 120px; md-width: 140px; color: inherit;" v-model="sortBy" @change="searchModrinth(true)">
                     <option v-for="(v, k) in SORT_OPTIONS" :key="k" :value="k">{{ $t('mods.modrinth.sorting.'+k) }}</option>
                 </select>
             </div>
@@ -104,13 +108,13 @@ export default {
                     <button class="btn btn-sm btn-outline-primary mx-auto mt-3 rounded-pill" @click="clearFilters">{{ $t('mods.modrinth.reset_filters') }}</button>
                 </div>
 
-                <div v-else class="row g-4">
+                <div v-else class="row g-3 g-md-4">
                     <div v-for="mod in modrinthResults" :key="mod.project_id" class="col-12 col-xl-6">
                         <div class="card border-0 shadow-sm modrinth-result-card h-100 bg-body-tertiary hover-grow transition-all cursor-pointer" @click="fetchModDetails(mod.project_id)">
-                            <div class="card-body d-flex gap-4 p-4">
-                                <div class="flex-shrink-0">
+                            <div class="card-body d-flex flex-column flex-md-row gap-3 gap-md-4 p-3 p-md-4">
+                                <div class="flex-shrink-0 d-flex justify-content-center">
                                     <div class="position-relative">
-                                        <img :src="mod.icon_url || 'https://modrinth.com/img/brand/icon_dark.svg'" class="rounded-4 border shadow-sm bg-white" width="80" height="80" style="object-fit:cover;">
+                                        <img :src="mod.icon_url || 'https://modrinth.com/img/brand/icon_dark.svg'" class="rounded-4 border shadow-sm bg-white" width="64" height="64" style="object-fit:cover; width: 64px; height: 64px;">
                                         <div v-if="mod.client_side === 'required' || mod.client_side === 'optional'" 
                                              class="position-absolute bottom-0 end-0 bg-info text-white rounded-circle d-flex align-items-center justify-content-center border border-white" 
                                              style="width:22px; height:22px; font-size:11px;" 
@@ -119,10 +123,10 @@ export default {
                                         </div>
                                     </div>
                                 </div>
-                                <div class="flex-grow-1 min-width-0 d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <h6 class="mb-0 fw-bold text-truncate text-primary">{{ mod.title }}</h6>
-                                        <div class="text-end text-muted small ms-2 flex-shrink-0 fw-bold">
+                                <div class="flex-grow-1 min-width-0 d-flex flex-column text-center text-md-start">
+                                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center align-items-md-start mb-1">
+                                        <h6 class="mb-0 fw-bold text-truncate text-primary w-100">{{ mod.title }}</h6>
+                                        <div class="text-md-end text-muted small mt-1 mt-md-0 flex-shrink-0 fw-bold">
                                             <i class="fa-solid fa-download me-1 opacity-50"></i>{{ formatDownloads(mod.downloads) }}
                                         </div>
                                     </div>
@@ -132,11 +136,11 @@ export default {
                                     <p class="text-muted small mb-3 text-truncate-2 lh-sm flex-grow-1" style="font-size: 0.82rem;">
                                         {{ translations[mod.project_id] || mod.description }}
                                     </p>
-                                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                                    <div class="d-flex flex-wrap gap-1 align-items-center justify-content-center justify-content-md-start">
                                         <span v-for="cat in mod.categories.slice(0, 3)" :key="cat" class="badge bg-primary-subtle text-primary small fw-semibold rounded-pill px-2 py-1">
                                             {{ $t('mods.categories.'+cat).startsWith('mods.categories.') ? cat : $t('mods.categories.'+cat) }}
                                         </span>
-                                        <button class="btn btn-link btn-xs p-0 ms-auto text-decoration-none small opacity-75 fw-bold d-flex align-items-center" @click.stop="translateMod(mod)" :disabled="translatingModIds.has(mod.project_id)">
+                                        <button class="btn btn-link btn-xs p-0 ms-md-auto text-decoration-none small opacity-75 fw-bold d-flex align-items-center" @click.stop="translateMod(mod)" :disabled="translatingModIds.has(mod.project_id)">
                                             <span v-if="translatingModIds.has(mod.project_id)" class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"></span>
                                             <i v-else class="fa-solid fa-language me-1"></i>
                                             {{ translatingModIds.has(mod.project_id) ? $t('mods.translating') : (translations[mod.project_id] ? $t('common.close') : $t('mods.translate')) }}
@@ -156,6 +160,82 @@ export default {
                 </div>
             </div>
         </div>
+
+        <!-- Mobile Filter Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showMobileFilters" class="modal-backdrop fade show" style="z-index: 2070; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);"></div>
+            </Transition>
+            
+            <Transition name="scale">
+                <div class="modal show d-block" v-if="showMobileFilters" tabindex="-1" @click.self="showMobileFilters = false" style="z-index: 2080;">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content border-0 shadow-lg rounded-4">
+                            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                                <h5 class="modal-title fw-bold"><i class="fa-solid fa-filter me-2 text-primary"></i>{{ $t('common.filter') }}</h5>
+                                <button type="button" class="btn-close" @click="showMobileFilters = false"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <!-- Duplicate filter logic here or refactor into component. 
+                                     For simplicity in this single-file component, we duplicate the inner filters. -->
+                                <!-- Search -->
+                                <div class="mb-4">
+                                    <label class="fw-bold small text-uppercase text-muted mb-3 d-flex align-items-center">
+                                        <i class="fa-solid fa-search me-2"></i>{{ $t('common.search') }}
+                                    </label>
+                                    <div class="input-group input-group-sm modrinth-search-group">
+                                        <input type="text" class="form-control" v-model="modrinthSearch" @keyup.enter="searchModrinth(true); showMobileFilters = false" :placeholder="$t('mods.search_modrinth')">
+                                        <button class="btn btn-primary" @click="searchModrinth(true); showMobileFilters = false"><i class="fa-solid fa-search"></i></button>
+                                    </div>
+                                </div>
+                                <!-- Loaders -->
+                                <div class="mb-4">
+                                    <label class="fw-bold small text-uppercase text-muted mb-3 d-flex align-items-center">
+                                        <i class="fa-solid fa-microchip me-2"></i>{{ $t('mods.loader') }}
+                                    </label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <div v-for="l in LOADERS" :key="l" class="form-check small mb-0 p-0">
+                                            <input type="checkbox" class="btn-check" :value="l" v-model="filters.loaders" :id="'ml-'+l" autocomplete="off">
+                                            <label class="btn btn-sm btn-outline-primary border rounded-pill px-3 py-1 text-capitalize" :for="'ml-'+l">{{ l }}</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Versions -->
+                                <div class="mb-4">
+                                    <label class="fw-bold small text-uppercase text-muted mb-3 d-flex align-items-center">
+                                        <i class="fa-solid fa-code-branch me-2"></i>{{ $t('dashboard.target') }}
+                                    </label>
+                                    <div class="d-flex flex-wrap gap-2 overflow-auto no-scrollbar pb-2" style="max-height: 150px;">
+                                        <div v-for="v in ALL_VERSIONS.slice(0, 15)" :key="v" class="form-check small p-0">
+                                            <input type="checkbox" class="btn-check" :value="v" v-model="filters.versions" :id="'mv-'+v" autocomplete="off">
+                                            <label class="btn btn-sm btn-outline-secondary border rounded-pill px-3 py-1" :for="'mv-'+v">{{ v }}</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Categories -->
+                                <div class="mb-0">
+                                    <label class="fw-bold small text-uppercase text-muted mb-3 d-flex align-items-center">
+                                        <i class="fa-solid fa-tags me-2"></i>{{ $t('mods.categories_title') }}
+                                    </label>
+                                    <div class="d-flex flex-wrap gap-2 overflow-auto no-scrollbar" style="max-height: 200px;">
+                                        <div v-for="cat in CATEGORIES" :key="cat.id" class="form-check small p-0">
+                                            <input type="checkbox" class="btn-check" :value="cat.id" v-model="filters.categories" :id="'mc-'+cat.id" autocomplete="off">
+                                            <label class="btn btn-sm btn-outline-info border rounded-pill px-3 py-1" :for="'mc-'+cat.id">
+                                                {{ $t('mods.categories.'+cat.id).startsWith('mods.categories.') ? cat.id : $t('mods.categories.'+cat.id) }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 p-4 pt-0">
+                                <button class="btn btn-light w-100 fw-bold border" @click="clearFilters(); showMobileFilters = false">{{ $t('mods.modrinth.reset_filters') }}</button>
+                                <button class="btn btn-primary w-100 fw-bold shadow-sm" @click="showMobileFilters = false">{{ $t('common.confirm') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
 
         <!-- Mod Details Modal & Loading -->
         <Teleport to="body">
@@ -184,42 +264,42 @@ export default {
                         </div>
                         
                         <!-- Sticky Filter Header -->
-                        <div class="bg-body-tertiary border-bottom px-4 py-2 d-flex gap-3 align-items-center flex-shrink-0">
+                        <div class="bg-body-tertiary border-bottom px-3 px-md-4 py-2 d-flex gap-2 gap-md-3 align-items-center flex-shrink-0 overflow-auto no-scrollbar">
                             <div class="d-flex align-items-center gap-2">
-                                <label class="small fw-bold text-muted text-uppercase mb-0 min-w-max"><i class="fa-solid fa-gamepad me-1"></i>{{ $t('mods.game_version') }}</label>
-                                <select class="form-select form-select-sm border-2 fw-bold" style="width: 120px;" v-model="filterGameVersion">
+                                <label class="small fw-bold text-muted text-uppercase mb-0 text-nowrap"><i class="fa-solid fa-gamepad me-1"></i>{{ $t('mods.game_version') }}</label>
+                                <select class="form-select form-select-sm border-2 fw-bold" style="width: 100px; md-width: 120px;" v-model="filterGameVersion">
                                     <option v-for="v in availableGameVersions" :key="v" :value="v">{{ v }}</option>
                                 </select>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <label class="small fw-bold text-muted text-uppercase mb-0 min-w-max"><i class="fa-solid fa-microchip me-1"></i>{{ $t('mods.loader') }}</label>
-                                <select class="form-select form-select-sm border-2 fw-bold" style="width: 120px;" v-model="filterLoader">
+                                <label class="small fw-bold text-muted text-uppercase mb-0 text-nowrap"><i class="fa-solid fa-microchip me-1"></i>{{ $t('mods.loader') }}</label>
+                                <select class="form-select form-select-sm border-2 fw-bold" style="width: 100px; md-width: 120px;" v-model="filterLoader">
                                     <option v-for="l in availableLoaders" :key="l" :value="l">{{ l }}</option>
                                 </select>
                             </div>
-                            <div class="ms-auto small text-muted fw-bold">
+                            <div class="ms-auto small text-muted fw-bold d-none d-sm-block text-nowrap">
                                 {{ $t('mods.modrinth.found_versions', { count: filteredVersions.length }) }}
                             </div>
                         </div>
 
                         <div class="modal-body p-0 overflow-hidden d-flex flex-column flex-md-row">
                             <!-- Left: Mod Info & Introduction -->
-                            <div class="col-md-7 border-end overflow-auto p-4 custom-scrollbar bg-body">
-                                <div class="d-flex gap-4 mb-4">
-                                    <img :src="selectedMod.project.icon_url" class="rounded-4 border shadow-sm bg-white" width="100" height="100" style="object-fit: contain;">
+                            <div class="col-12 col-md-7 border-end overflow-auto p-3 p-md-4 custom-scrollbar bg-body">
+                                <div class="d-flex gap-3 gap-md-4 mb-3 mb-md-4">
+                                    <img :src="selectedMod.project.icon_url" class="rounded-4 border shadow-sm bg-white" width="64" height="64" style="object-fit: contain; width: 64px; height: 64px; md-width: 100px; md-height: 100px;">
                                     <div class="flex-grow-1 min-width-0">
-                                        <h4 class="fw-bold mb-1">{{ selectedMod.project.title }}</h4>
-                                        <div class="text-muted small mb-3 text-truncate-3">
+                                        <h5 class="fw-bold mb-1 text-truncate">{{ selectedMod.project.title }}</h5>
+                                        <div class="text-muted small mb-2 mb-md-3 text-truncate-2">
                                             {{ bodyTranslations[selectedMod.project.id + '_desc'] || selectedMod.project.description }}
                                         </div>
-                                        <div class="d-flex flex-wrap gap-2">
-                                            <div class="badge rounded-pill px-2 py-1 small fw-bold border"
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <div class="badge rounded-pill px-2 py-1 small fw-bold border" style="font-size: 0.7rem;"
                                                  :class="selectedMod.project.server_side === 'required' ? 'bg-success-subtle text-success border-success-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
-                                                <i class="fa-solid fa-server me-1"></i>{{ $t('mods.modrinth.env_server') }}: {{ $t('mods.modrinth.env_' + selectedMod.project.server_side) }}
+                                                {{ $t('mods.modrinth.env_server') }}: {{ $t('mods.modrinth.env_' + selectedMod.project.server_side) }}
                                             </div>
-                                            <div class="badge rounded-pill px-2 py-1 small fw-bold border"
+                                            <div class="badge rounded-pill px-2 py-1 small fw-bold border" style="font-size: 0.7rem;"
                                                  :class="selectedMod.project.client_side === 'required' ? 'bg-info-subtle text-info border-info-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
-                                                <i class="fa-solid fa-display me-1"></i>{{ $t('mods.modrinth.env_client') }}: {{ $t('mods.modrinth.env_' + selectedMod.project.client_side) }}
+                                                {{ $t('mods.modrinth.env_client') }}: {{ $t('mods.modrinth.env_' + selectedMod.project.client_side) }}
                                             </div>
                                         </div>
                                     </div>
@@ -242,7 +322,7 @@ export default {
                             </div>
 
                             <!-- Right: File List -->
-                            <div class="col-md-5 bg-body-tertiary overflow-auto p-4 custom-scrollbar">
+                            <div class="col-12 col-md-5 bg-body-tertiary overflow-auto p-3 p-md-4 custom-scrollbar">
                                 <label class="form-label fw-bold text-uppercase text-muted mb-3 d-flex align-items-center">
                                     <i class="fa-solid fa-download me-2 text-primary"></i>{{ $t('mods.select_version') }}
                                 </label>
@@ -293,6 +373,7 @@ export default {
         const selectedMod = ref(null);
         const selectedVersionIdx = ref(0);
         const downloadingId = ref(null);
+        const showMobileFilters = ref(false);
         const filterGameVersion = ref('');
         const filterLoader = ref('fabric');
         const offset = ref(0);
@@ -609,7 +690,7 @@ export default {
 
         return {
             modrinthSearch, modrinthResults, loadingModrinth, loadingDetails,
-            selectedMod, selectedVersionIdx, downloadingId,
+            selectedMod, selectedVersionIdx, downloadingId, showMobileFilters,
             filterGameVersion, filterLoader, availableGameVersions, availableLoaders, filteredVersions,
             renderMarkdown, translatingBody, bodyTranslations, translatingModIds, translateBody,
             filters, ALL_VERSIONS, CATEGORIES, LOADERS, SORT_OPTIONS, sortBy,
