@@ -158,8 +158,7 @@ async function buildTarget(target) {
     await fetchSqliteBindings(target, BUILD_DIR);
 
     const pkg = require('./package.json');
-    const versionNoDots = pkg.version.replace(/\./g, '');
-    const outputName = `MWP-${target.name}-${versionNoDots}${target.ext}`;
+    const outputName = `MWP-${pkg.version}-${target.name}${target.ext}`;
     console.log(`Packaging to ${outputName}...`);
 
     // Map targets to caxa stubs

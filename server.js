@@ -2581,7 +2581,8 @@ if (cluster.isPrimary) {
             });
 
             const arch = process.arch === 'x64' ? 'linux-x64' : 'linux-arm64';
-            const assetName = `mc-web-panel-${arch}`;
+            const version = gh.data.tag_name.replace(/^v/, '');
+            const assetName = `MWP-${version}-${arch}`;
             const asset = gh.data.assets.find(a => a.name === assetName);
 
             if (!asset) {
