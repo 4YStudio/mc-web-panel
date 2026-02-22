@@ -111,7 +111,7 @@ export default {
                                     </td>
                                 </tr>
                                 <tr v-if="!backupList.length">
-                                    <td colspan="5" class="text-center text-muted py-5">
+                                    <td colspan="6" class="text-center text-muted py-5">
                                         <i class="fa-solid fa-box-open fa-2x mb-2 opacity-25 d-block"></i>
                                         Empty
                                     </td>
