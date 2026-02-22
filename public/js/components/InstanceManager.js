@@ -173,7 +173,7 @@ export default {
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.jar_name') }}</label>
                             <input type="text" class="form-control" v-model="form.jarName" :placeholder="$t('instance_manager.jar_placeholder')">
                         </div>
-                        <div class="mb-0 animate-in">
+                        <div class="mb-3 animate-in">
                             <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.java_path_label') }}</label>
                             <select class="form-select" v-model="form.javaPath">
                                 <option value="">{{ $t('common.unknown') }} (Default)</option>
@@ -196,7 +196,9 @@ export default {
     setup() {
         // const { t } = VueI18n.useI18n(); // global mixin used in template, maybe not needed here if not used in script? 
         // usage in script: t is used in showToast. imported from utils.
-        const form = ref({ id: '', name: '', jarName: '', javaArgs: '', javaPath: '' });
+        const form = ref({
+            id: '', name: '', jarName: '', javaArgs: '', javaPath: ''
+        });
         const isEditing = ref(false);
         const modal = ref(null);
         const searchTerm = ref('');
@@ -211,7 +213,9 @@ export default {
 
         const showCreateModal = () => {
             isEditing.value = false;
-            form.value = { id: '', name: '', jarName: '', javaArgs: '', javaPath: '' };
+            form.value = {
+                id: '', name: '', jarName: '', javaArgs: '', javaPath: ''
+            };
             modal.value.show();
         };
 

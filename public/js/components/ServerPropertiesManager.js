@@ -63,31 +63,34 @@ const PROP_GROUPS = [
 export default {
     template: `
     <div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="m-0 fw-bold">{{ $t('properties.title').split(' (')[0] }}</h3>
+            <div class="btn-group" v-if="!notFound">
+                <button class="btn btn-outline-secondary" @click="toggleEditMode">
+                    <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
+                    <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? 'Text Mode' : 'GUI Mode' }}</span>
+                </button>
+                <button class="btn btn-success" @click="saveConfig">
+                    <i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Backup Strategy Management -->
+        <!-- Backup Strategy Management [MOVED TO GRID BOTTOM] -->
+
         <!-- 文件未找到提示 -->
         <div v-if="notFound" class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
             <i class="fa-solid fa-file-circle-exclamation fa-4x mb-3 opacity-25"></i>
             <h4>{{ $t('files.file_not_found', { name: 'server.properties' }) }}</h4>
             <div class="mt-4">
-                <button class="btn btn-outline-danger" @click="askReinstall">
+                <button class="btn btn-outline-danger px-4 rounded-pill fw-bold" @click="askReinstall">
                     <i class="fa-solid fa-trash-can me-2"></i>{{ $t('panel_settings.reinstall') }}
                 </button>
             </div>
         </div>
 
         <template v-else>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="m-0 fw-bold">{{ $t('properties.title').split(' (')[0] }}</h3>
-                <div class="btn-group">
-                    <button class="btn btn-outline-secondary" @click="toggleEditMode">
-                        <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
-                        <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? 'Text Mode' : 'GUI Mode' }}</span>
-                    </button>
-                    <button class="btn btn-success" @click="saveConfig">
-                        <i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
-                    </button>
-                </div>
-            </div>
-
             <!-- 服务器图标管理 -->
             <div class="card mb-4 border-secondary-subtle">
                 <div class="card-header bg-body-tertiary fw-bold">{{ $t('properties.server_icon') }}</div>
@@ -142,6 +145,31 @@ export default {
                         </div>
                     </div>
                 </div>
+                
+                <!-- 备份策略 (作为网格的一部分) -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-primary-subtle shadow-sm overflow-hidden" style="border-radius: 12px;">
+                        <div class="card-header bg-primary-subtle text-primary fw-bold border-0 py-2 px-3 small text-uppercase">
+                            <i class="fa-solid fa-clock-rotate-left me-2"></i>{{ $t('map_backup.strategy') }}
+                        </div>
+                        <div class="card-body p-3 d-flex flex-column">
+                            <div class="mb-3 flex-grow-1">
+                                <label class="form-label small fw-bold text-muted mb-1">{{ $t('map_backup.strategy') }}</label>
+                                <select class="form-select border-0 bg-body-tertiary fw-bold" v-model="backupStrategy">
+                                    <option value="panel">{{ $t('map_backup.strategy_panel') }}</option>
+                                    <option value="mod">{{ $t('map_backup.strategy_mod') }}</option>
+                                </select>
+                                <div class="form-text small mt-2 opacity-75" style="font-size: 0.75rem;">
+                                    <i class="fa-solid fa-circle-info me-1"></i>
+                                    {{ backupStrategy === 'mod' ? $t('backups.tips') : $t('map_backup.panel_tips') }}
+                                </div>
+                            </div>
+                            <button class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm mt-auto" @click="saveBackupStrategy">
+                                <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- 危险区域 (作为网格的一部分) -->
                 <div class="col-md-6">
@@ -183,6 +211,7 @@ export default {
         const iconUrl = ref('/api/server/icon');
         const iconInput = ref(null);
         const hasCustomIcon = ref(false);
+        const backupStrategy = ref(store.stats?.backupStrategy || 'panel');
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
 
@@ -198,6 +227,9 @@ export default {
 
         // Watch global version
         watch(() => store.serverIconVersion, updateIconPreview);
+        watch(() => store.stats?.backupStrategy, (val) => {
+            if (val) backupStrategy.value = val;
+        });
 
         const uploadIcon = async (e) => {
             const file = e.target.files[0];
@@ -223,7 +255,6 @@ export default {
                         store.serverIconVersion = Date.now();
                         hasCustomIcon.value = false;
                     } catch (err) {
-                        // Show actual error message from server if available
                         const msg = err.response?.data?.error || err.message || 'common.error';
                         showToast(msg, 'danger');
                     }
@@ -334,11 +365,23 @@ export default {
             updateIconPreview();
         });
 
+        const saveBackupStrategy = async () => {
+            try {
+                await api.post('/api/instances/update', {
+                    id: store.currentInstanceId,
+                    backupStrategy: backupStrategy.value
+                });
+                showToast($t('common.success'));
+            } catch (err) {
+                showToast($t('common.error'), 'danger');
+            }
+        };
+
         return {
             editMode, fileContent, formModel, PROP_GROUPS, notFound,
             saveConfig, toggleEditMode, iconUrl, iconInput,
             uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon,
-            askReinstall
+            askReinstall, backupStrategy, saveBackupStrategy
         };
     }
 };

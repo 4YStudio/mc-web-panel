@@ -46,7 +46,12 @@ export const messages = {
             action_sent: '操作已发送',
             select_fail: '选择失败',
             save_fail: '保存失败',
-            server_offline: '服务器已离线'
+            server_offline: '服务器已离线',
+            note: '备注',
+            lock: '锁定',
+            unlock: '解锁',
+            locked: '已锁定',
+            edit_note: '编辑备注'
         },
         login: {
             title: 'MC 面板',
@@ -244,6 +249,13 @@ export const messages = {
             config: '配置',
             type_full: '全量',
             type_diff: '增量',
+            type_auto: '自动',
+            type_manual: '手动',
+            clone: '克隆为新实例',
+            clone_success: '克隆成功',
+            import: '导入备份',
+            import_success: '导入成功',
+            prompt_clone_name: '新实例名称',
             confirm_restore_title: '确认回档',
             confirm_restore_msg: '确定要回档到 {name} 吗？服务器将先停止，当前存档会自动备份。',
             progress_restoring: '正在回档...',
@@ -273,7 +285,30 @@ export const messages = {
                 buffer: 'Buffer',
                 path: '备份路径',
                 blacklist: '黑名单'
-            }
+            },
+            prompt_note: '备份备注（可选）'
+        },
+        map_backup: {
+            title: '地图备份',
+            strategy: '备份策略',
+            strategy_mod: '高级备份模组 (Mod)',
+            strategy_panel: '面板自带备份 (推荐)',
+            auto_enabled: '启用自动地图备份',
+            mode: '备份模式',
+            mode_interval: '循环间隔',
+            mode_schedule: '定时模式',
+            interval_hours: '间隔小时',
+            interval_minutes: '间隔分钟',
+            schedule_time: '每天备份时间',
+            schedule_days: '每隔几天',
+            only_if_online: '仅在有玩家在线时执行',
+            interval: '备份间隔 (小时)',
+            max_count: '保留备份数量',
+            manual_backup: '手动备份',
+            one_click_restore: '一键还原',
+            backup_success: '备份成功',
+            restore_confirm: '确定要回档吗？此操作将替换当前地图文件夹。',
+            panel_tips: '提示: 面板备份仅包含 world 文件夹，不依赖任何模组。'
         },
         easyauth: {
             users: '用户管理',
@@ -552,7 +587,12 @@ export const messages = {
             action_sent: 'Action Sent',
             select_fail: 'Selection Failed',
             save_fail: 'Save Failed',
-            server_offline: 'Server is offline'
+            server_offline: 'Server is offline',
+            note: 'Note',
+            lock: 'Lock',
+            unlock: 'Unlock',
+            locked: 'Locked',
+            edit_note: 'Edit Note'
         },
         login: {
             title: 'MC Panel',
@@ -750,6 +790,13 @@ export const messages = {
             config: 'Config',
             type_full: 'Full',
             type_diff: 'Diff',
+            type_auto: 'Auto',
+            type_manual: 'Manual',
+            clone: 'Clone to New Instance',
+            clone_success: 'Cloned successfully',
+            import: 'Import Backup',
+            import_success: 'Imported successfully',
+            prompt_clone_name: 'New Instance Name',
             confirm_restore_title: 'Confirm Restore',
             confirm_restore_msg: 'Are you sure you want to restore {name}? Server will stop and current world will be backed up.',
             progress_restoring: 'Restoring...',
@@ -779,7 +826,30 @@ export const messages = {
                 buffer: 'Buffer',
                 path: 'Backup Path',
                 blacklist: 'Blacklist'
-            }
+            },
+            prompt_note: 'Backup Note (Optional)'
+        },
+        map_backup: {
+            title: 'Map Backup',
+            strategy: 'Backup Strategy',
+            strategy_mod: 'Advanced Backups Mod',
+            strategy_panel: 'Built-in Panel Backup',
+            auto_enabled: 'Enable Auto Map Backup',
+            mode: 'Backup Mode',
+            mode_interval: 'Interval',
+            mode_schedule: 'Schedule',
+            interval_hours: 'Hours',
+            interval_minutes: 'Minutes',
+            schedule_time: 'Backup Time',
+            schedule_days: 'Every N Days',
+            only_if_online: 'Only If Players Online',
+            interval: 'Interval (Hours)',
+            max_count: 'Max Backups to Keep',
+            manual_backup: 'Manual Backup',
+            one_click_restore: 'Rollback',
+            backup_success: 'Backup Successful',
+            restore_confirm: 'Are you sure you want to rollback? This will replace the current world folder.',
+            panel_tips: 'Tip: Panel backup only includes the world folder and works without any mods.'
         },
         easyauth: {
             users: 'Users',

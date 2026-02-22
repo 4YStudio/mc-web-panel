@@ -97,19 +97,19 @@ const app = createApp({
             socket.on('status', s => store.isRunning = s);
             socket.on('players_update', p => store.onlinePlayers = p);
             socket.on('system_stats', d => {
-                // Partial update to preserve mc stats if missing in update
+                // Partial update to preserve mc stats and instance-specific settings if missing in update
                 if (d.mc) {
-                    store.stats = d;
+                    Object.assign(store.stats, d);
                 } else {
                     // Preserve existing mc stats if backend didn't send them
                     const oldMc = store.stats.mc;
-                    store.stats = d;
+                    Object.assign(store.stats, d);
                     store.stats.mc = oldMc;
                 }
-                store.hasBackupMod = d.hasBackupMod;
-                store.hasEasyAuth = d.hasEasyAuth;
-                store.hasVoicechat = d.hasVoicechat;
-                store.isSetup = d.isSetup;
+                if (d.hasBackupMod !== undefined) store.hasBackupMod = d.hasBackupMod;
+                if (d.hasEasyAuth !== undefined) store.hasEasyAuth = d.hasEasyAuth;
+                if (d.hasVoicechat !== undefined) store.hasVoicechat = d.hasVoicechat;
+                if (d.isSetup !== undefined) store.isSetup = d.isSetup;
             });
 
             // 回档进度监听
@@ -120,18 +120,29 @@ const app = createApp({
                 store.task.message = data.message;
                 store.task.subMessage = data.percent + '%';
             });
-            socket.on('restore_completed', () => {
+
+            const handleRestoreProgress = (data) => {
+                store.task.visible = true;
+                store.task.title = '系统回档中';
+                store.task.percent = data.percent;
+                store.task.message = data.message;
+                store.task.subMessage = data.percent + '%';
+            };
+            const handleRestoreCompleted = () => {
                 store.task.percent = 100;
                 store.task.message = '回档成功！';
                 setTimeout(() => {
                     store.task.visible = false;
                     showToast('回档流程结束');
                 }, 1000);
-            });
-            socket.on('restore_error', (msg) => {
+            };
+            const handleRestoreError = (msg) => {
                 store.task.visible = false;
                 showToast('回档出错: ' + msg, 'danger');
-            });
+            };
+
+            socket.on('restore_completed', handleRestoreCompleted);
+            socket.on('restore_error', handleRestoreError);
 
             // 更新进度监听
             let autoRefreshPoll = null;
@@ -204,8 +215,15 @@ const app = createApp({
                         store.stats.mc.maxPlayers = s.maxPlayers;
                         store.stats.mc.motd = s.motd;
                         store.stats.version = s.version;
+                        store.stats.backupStrategy = s.backupStrategy;
+                        store.stats.autoBackupEnabled = s.autoBackupEnabled;
+                        store.stats.autoBackupInterval = s.autoBackupInterval;
+                        store.stats.maxBackupCount = s.maxBackupCount;
                     });
                     socket.on(`players_update:${newId}`, p => store.onlinePlayers = p);
+                    socket.on(`restore_progress:${newId}`, handleRestoreProgress);
+                    socket.on(`restore_completed:${newId}`, handleRestoreCompleted);
+                    socket.on(`restore_error:${newId}`, handleRestoreError);
                 }
             });
 

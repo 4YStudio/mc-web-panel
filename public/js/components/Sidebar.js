@@ -20,7 +20,11 @@ export default {
                 <a class="nav-link" :class="{active: store.view === 'mods'}" @click="selectView('mods')"><i class="fa-solid fa-microchip"></i> {{ $t('sidebar.mods') }}</a>
                 <a class="nav-link" :class="{active: store.view === 'modrinth'}" @click="selectView('modrinth')"><i class="fa-solid fa-cloud-arrow-down"></i> {{ $t('sidebar.modrinth') }}</a>
                 <a class="nav-link" :class="{active: store.view === 'files'}" @click="selectView('files')"><i class="fa-solid fa-folder-open"></i> {{ $t('sidebar.files') }}</a>
-                <a v-if="store.hasBackupMod" class="nav-link" :class="{active: store.view === 'backups'}" @click="selectView('backups')"><i class="fa-solid fa-clock-rotate-left"></i> {{ $t('sidebar.backups') }}</a>
+                <a v-if="currentInstance && (currentInstance.hasBackupMod || currentInstance.backupStrategy === 'panel')" 
+                   class="nav-link" :class="{active: store.view === 'backups'}" @click="selectView('backups')">
+                    <i class="fa-solid fa-clock-rotate-left"></i> 
+                    {{ (currentInstance && currentInstance.backupStrategy === 'panel') ? $t('map_backup.title') : $t('sidebar.backups') }}
+                </a>
                 <a v-if="store.hasEasyAuth" class="nav-link" :class="{active: store.view === 'easyauth'}" @click="selectView('easyauth')"><i class="fa-solid fa-user-shield"></i> {{ $t('sidebar.auth') }}</a>
                 <a v-if="store.hasVoicechat" class="nav-link" :class="{active: store.view === 'voicechat'}" @click="selectView('voicechat')"><i class="fa-solid fa-microphone"></i> {{ $t('sidebar.voicechat') }}</a>
                 <a class="nav-link" :class="{active: store.view === 'players'}" @click="selectView('players')"><i class="fa-solid fa-users"></i> {{ $t('sidebar.players') }}</a>

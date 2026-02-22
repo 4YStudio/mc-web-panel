@@ -23,7 +23,7 @@ const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -667,6 +667,16 @@ if (cluster.isPrimary) {
                         jarName: inst.jarName,
                         javaArgs: inst.javaArgs,
                         javaPath: inst.javaPath,
+                        backupStrategy: inst.backupStrategy || (hasBackupMod ? 'mod' : 'panel'),
+                        autoBackupEnabled: inst.autoBackupEnabled || false,
+                        autoBackupMode: inst.autoBackupMode || 'interval',
+                        autoBackupInterval: inst.autoBackupInterval || 12,
+                        autoBackupIntervalHours: inst.autoBackupIntervalHours || 12,
+                        autoBackupIntervalMinutes: inst.autoBackupIntervalMinutes || 0,
+                        autoBackupScheduleTime: inst.autoBackupScheduleTime || "03:00",
+                        autoBackupScheduleDays: inst.autoBackupScheduleDays || 1,
+                        autoBackupOnlyIfPlayersOnline: inst.autoBackupOnlyIfPlayersOnline || false,
+                        maxBackupCount: inst.maxBackupCount || 10,
                         hasBackupMod, hasEasyAuth, hasVoicechat,
                         isSetup,
                         hasIcon
@@ -720,6 +730,10 @@ if (cluster.isPrimary) {
                 jarName: jarName || appConfig.jarName,
                 javaArgs: javaArgs || appConfig.javaArgs,
                 javaPath: javaPath || appConfig.javaPath,
+                backupStrategy: 'panel', // Default to panel for new instances
+                autoBackupEnabled: false,
+                autoBackupInterval: 12, // Default 12 hours
+                maxBackupCount: 10,
                 createdAt: new Date().toISOString()
             });
             saveInstances(instanceConfig);
@@ -731,7 +745,9 @@ if (cluster.isPrimary) {
     });
 
     app.post('/api/instances/update', requireAuth, (req, res) => {
-        const { id, name, jarName, javaArgs, javaPath } = req.body;
+        const { id, name, jarName, javaArgs, javaPath, backupStrategy, autoBackupEnabled, autoBackupInterval, maxBackupCount,
+            autoBackupMode, autoBackupIntervalHours, autoBackupIntervalMinutes, autoBackupScheduleTime, autoBackupScheduleDays, autoBackupOnlyIfPlayersOnline
+        } = req.body;
         const inst = instanceConfig.instances.find(i => i.id === id);
         if (!inst) return res.status(404).json({ error: '实例不存在' });
 
@@ -739,6 +755,16 @@ if (cluster.isPrimary) {
         if (jarName) inst.jarName = jarName;
         if (javaArgs) inst.javaArgs = javaArgs;
         if (javaPath) inst.javaPath = javaPath;
+        if (backupStrategy) inst.backupStrategy = backupStrategy;
+        if (autoBackupEnabled !== undefined) inst.autoBackupEnabled = autoBackupEnabled;
+        if (autoBackupInterval !== undefined) inst.autoBackupInterval = autoBackupInterval;
+        if (autoBackupMode !== undefined) inst.autoBackupMode = autoBackupMode;
+        if (autoBackupIntervalHours !== undefined) inst.autoBackupIntervalHours = autoBackupIntervalHours;
+        if (autoBackupIntervalMinutes !== undefined) inst.autoBackupIntervalMinutes = autoBackupIntervalMinutes;
+        if (autoBackupScheduleTime !== undefined) inst.autoBackupScheduleTime = autoBackupScheduleTime;
+        if (autoBackupScheduleDays !== undefined) inst.autoBackupScheduleDays = autoBackupScheduleDays;
+        if (autoBackupOnlyIfPlayersOnline !== undefined) inst.autoBackupOnlyIfPlayersOnline = autoBackupOnlyIfPlayersOnline;
+        if (maxBackupCount !== undefined) inst.maxBackupCount = maxBackupCount;
 
         saveInstances(instanceConfig);
         res.json({ success: true });
@@ -1326,7 +1352,15 @@ if (cluster.isPrimary) {
         const { filename, folder, type } = req.body;
         const BACKUP_DIFF_DIR = path.join(instDir, 'backups', 'differential');
         const BACKUP_SNAP_DIR = path.join(instDir, 'backups', 'snapshots');
+        const BACKUP_PANEL_DIR = path.join(instDir, 'backups', 'panel');
         const WORLD_DIR = path.join(instDir, 'world');
+
+        let targetZipPath = '';
+        if (folder === 'panel') {
+            targetZipPath = path.join(BACKUP_PANEL_DIR, filename);
+        } else {
+            targetZipPath = path.join(folder === 'differential' ? BACKUP_DIFF_DIR : BACKUP_SNAP_DIR, filename);
+        }
 
         const sendProgress = (step, total, msg) => {
             io.emit(`restore_progress:${instanceId}`, {
@@ -1349,7 +1383,6 @@ if (cluster.isPrimary) {
         }
 
         try {
-            const targetZipPath = path.join(folder === 'differential' ? BACKUP_DIFF_DIR : BACKUP_SNAP_DIR, filename);
             if (!fs.existsSync(targetZipPath)) return res.status(404).json({ error: '备份文件不存在' });
 
             sendProgress(30, 100, '正在备份当前地图...');
@@ -1400,20 +1433,314 @@ if (cluster.isPrimary) {
         const { filename, folder } = req.body;
         const BACKUP_DIFF_DIR = path.join(instDir, 'backups', 'differential');
         const BACKUP_SNAP_DIR = path.join(instDir, 'backups', 'snapshots');
+        const BACKUP_PANEL_DIR = path.join(instDir, 'backups', 'panel');
+
         try {
-            const targetPath = path.join(folder === 'differential' ? BACKUP_DIFF_DIR : BACKUP_SNAP_DIR, filename);
+            let targetPath = '';
+            if (folder === 'panel') {
+                targetPath = path.join(BACKUP_PANEL_DIR, filename);
+            } else {
+                targetPath = path.join(folder === 'differential' ? BACKUP_DIFF_DIR : BACKUP_SNAP_DIR, filename);
+            }
+
             const resolvedPath = path.resolve(targetPath);
-            if (!resolvedPath.startsWith(path.resolve(BACKUP_DIFF_DIR)) && !resolvedPath.startsWith(path.resolve(BACKUP_SNAP_DIR))) {
+            if (!resolvedPath.startsWith(path.resolve(BACKUP_DIFF_DIR)) &&
+                !resolvedPath.startsWith(path.resolve(BACKUP_SNAP_DIR)) &&
+                !resolvedPath.startsWith(path.resolve(BACKUP_PANEL_DIR))) {
                 return res.status(403).json({ error: 'Access Denied' });
             }
+
             if (fs.existsSync(targetPath)) {
+                // Check lock status for panel backups
+                if (folder === 'panel') {
+                    const metaPath = targetPath + '.meta.json';
+                    if (fs.existsSync(metaPath)) {
+                        const meta = await fs.readJson(metaPath);
+                        if (meta.locked) return res.status(403).json({ error: '备份已锁定，无法删除' });
+                    }
+                }
+
                 await fs.remove(targetPath);
+
+                // Also remove metadata if exists
+                if (folder === 'panel') {
+                    const metaPath = targetPath + '.meta.json';
+                    if (fs.existsSync(metaPath)) await fs.remove(metaPath).catch(() => { });
+                }
+
                 res.json({ success: true });
             } else {
-                res.status(404).json({ error: '备份文件不存在' });
+                res.status(404).json({ error: 'File not found' });
             }
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
+
+    // --- Panel-Side Map Backup Logic ---
+
+    const createPanelBackup = async (instanceId, isAuto = false, note = '') => {
+        const instDir = getInstanceDir(instanceId);
+        if (!instDir) return;
+        const WORLD_DIR = path.join(instDir, 'world');
+        const BACKUP_PANEL_DIR = path.join(instDir, 'backups', 'panel');
+        const state = getOrCreateInstanceState(instanceId);
+        const instConfig = instanceConfig.instances.find(i => i.id === instanceId);
+
+        if (!fs.existsSync(WORLD_DIR)) {
+            if (!isAuto) throw new Error('地图文件夹 (world) 不存在');
+            return;
+        }
+
+        await fs.ensureDir(BACKUP_PANEL_DIR);
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `manual_world_${timestamp}.zip`;
+        const autoFilename = `auto_world_${timestamp}.zip`;
+        const finalFilename = isAuto ? autoFilename : filename;
+        const zipPath = path.join(BACKUP_PANEL_DIR, finalFilename);
+
+        appendLog(instanceId, `[系统] ${isAuto ? '自动' : '手动'}备份开始: ${finalFilename}...\n`);
+
+        if (state.process) {
+            state.process.stdin.write('save-all flush\n');
+            await new Promise(r => setTimeout(r, 2000));
+        }
+
+        return new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(zipPath);
+            const archive = archiver('zip', { zlib: { level: 5 } });
+
+            output.on('close', async () => {
+                const metaPath = zipPath + '.meta.json';
+                await fs.writeJson(metaPath, { note, locked: false, createdAt: new Date() }, { spaces: 2 });
+                appendLog(instanceId, `[系统] 备份完成！大小: ${(archive.pointer() / 1024 / 1024).toFixed(1)} MB\n`);
+
+                if (instConfig && instConfig.maxBackupCount > 0) {
+                    try {
+                        const files = await fs.readdir(BACKUP_PANEL_DIR);
+                        const autoBackups = files.filter(f => f.startsWith('auto_world_') && f.endsWith('.zip')).sort();
+
+                        const candidates = [];
+                        for (const f of autoBackups) {
+                            const mPath = path.join(BACKUP_PANEL_DIR, f + '.meta.json');
+                            let isLocked = false;
+                            if (fs.existsSync(mPath)) {
+                                const meta = await fs.readJson(mPath);
+                                if (meta.locked) isLocked = true;
+                            }
+                            if (!isLocked) candidates.push(f);
+                        }
+
+                        if (candidates.length > instConfig.maxBackupCount) {
+                            const toDelete = candidates.slice(0, candidates.length - instConfig.maxBackupCount);
+                            for (const f of toDelete) {
+                                await fs.remove(path.join(BACKUP_PANEL_DIR, f));
+                                await fs.remove(path.join(BACKUP_PANEL_DIR, f + '.meta.json')).catch(() => { });
+                                appendLog(instanceId, `[系统] 已清理旧备份: ${f}\n`);
+                            }
+                        }
+                    } catch (e) { console.error('Cleanup failed:', e); }
+                }
+                resolve();
+            });
+
+            archive.on('error', (err) => {
+                appendLog(instanceId, `[错误] 备份失败: ${err.message}\n`);
+                reject(err);
+            });
+
+            archive.pipe(output);
+            archive.directory(WORLD_DIR, false);
+            archive.finalize();
+        });
+    };
+
+    app.get('/api/backups/panel/list', requireAuth, withInstance, async (req, res) => {
+        const BACKUP_PANEL_DIR = path.join(req.instDir, 'backups', 'panel');
+        try {
+            const backups = [];
+            if (fs.existsSync(BACKUP_PANEL_DIR)) {
+                const files = await fs.readdir(BACKUP_PANEL_DIR);
+                for (const file of files) {
+                    if (file.endsWith('.zip')) {
+                        const filePath = path.join(BACKUP_PANEL_DIR, file);
+                        const stat = await fs.stat(filePath);
+                        const metaPath = filePath + '.meta.json';
+                        let meta = { note: '', locked: false };
+                        if (fs.existsSync(metaPath)) {
+                            try { meta = await fs.readJson(metaPath); } catch (e) { }
+                        }
+                        backups.push({
+                            name: file,
+                            path: filePath,
+                            folder: 'panel',
+                            size: stat.size,
+                            mtime: stat.mtime,
+                            type: file.startsWith('auto_') ? 'auto' : 'full',
+                            note: meta.note || '',
+                            locked: !!meta.locked
+                        });
+                    }
+                }
+            }
+            backups.sort((a, b) => b.mtime - a.mtime);
+            res.json(backups);
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/backups/panel/create', requireAuth, withInstance, async (req, res) => {
+        try {
+            await createPanelBackup(req.instanceId, false, req.body.note || '');
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/backups/panel/update', requireAuth, withInstance, async (req, res) => {
+        const { filename, note, locked } = req.body;
+        const BACKUP_PANEL_DIR = path.join(req.instDir, 'backups', 'panel');
+        const zipPath = path.join(BACKUP_PANEL_DIR, filename);
+        const metaPath = zipPath + '.meta.json';
+        try {
+            if (!fs.existsSync(zipPath)) return res.status(404).json({ error: '备份不存在' });
+            let meta = {};
+            if (fs.existsSync(metaPath)) meta = await fs.readJson(metaPath);
+            if (note !== undefined) meta.note = note;
+            if (locked !== undefined) meta.locked = locked;
+            await fs.writeJson(metaPath, meta, { spaces: 2 });
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/backups/panel/clone', requireAuth, withInstance, async (req, res) => {
+        const { filename, newName } = req.body;
+        const { instDir, instanceId } = req;
+        const sourceInst = instanceConfig.instances.find(i => i.id === instanceId);
+        if (!sourceInst) return res.status(404).json({ error: '原实例不存在' });
+        const zipPath = path.join(instDir, 'backups', 'panel', filename);
+
+        if (!fs.existsSync(zipPath)) return res.status(404).json({ error: '备份文件不存在' });
+        if (!newName) return res.status(400).json({ error: '新实例名称不能为空' });
+
+        try {
+            const newId = crypto.randomBytes(4).toString('hex');
+            const newDir = `instances/${newId}`;
+            const absNewDir = path.join(BASE_DIR, newDir);
+            await fs.ensureDir(absNewDir);
+
+            // 1. 复制环境文件 (排除地图、备份和日志，确保 mods, config, jar 等全量同步)
+            await fs.copy(instDir, absNewDir, {
+                filter: (src) => {
+                    const rel = path.relative(instDir, src);
+                    if (!rel) return true; // 根目录本身
+                    const top = rel.split(path.sep)[0];
+                    return !['world', 'backups', 'logs'].includes(top);
+                }
+            });
+
+            // 2. 解压备份到新实例的 world 文件夹
+            const AdmZip = require('adm-zip');
+            const zip = new AdmZip(zipPath);
+            const newWorldDir = path.join(absNewDir, 'world');
+            await fs.ensureDir(newWorldDir);
+            zip.extractAllTo(newWorldDir, true);
+
+            // 3. 注册新实例
+            instanceConfig.instances.push({
+                id: newId,
+                name: newName,
+                dir: newDir,
+                jarName: sourceInst.jarName,
+                javaArgs: sourceInst.javaArgs,
+                javaPath: sourceInst.javaPath,
+                backupStrategy: 'panel',
+                autoBackupEnabled: false,
+                autoBackupInterval: 12,
+                maxBackupCount: 10,
+                createdAt: new Date().toISOString()
+            });
+            saveInstances(instanceConfig);
+            getOrCreateInstanceState(newId);
+
+            res.json({ success: true, newId });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/backups/panel/import', requireAuth, withInstance, upload.single('backup'), async (req, res) => {
+        if (!req.file) return res.status(400).json({ error: '未检测到文件' });
+        const { instDir } = req;
+        const BACKUP_PANEL_DIR = path.join(instDir, 'backups', 'panel');
+        await fs.ensureDir(BACKUP_PANEL_DIR);
+
+        const targetPath = path.join(BACKUP_PANEL_DIR, fixFileName(req.file.originalname));
+        try {
+            await fs.move(req.file.path, targetPath, { overwrite: true });
+
+            // Create default meta
+            const metaPath = targetPath + '.meta.json';
+            await fs.writeJson(metaPath, { note: 'Imported Backup', locked: false, createdAt: new Date() }, { spaces: 2 });
+
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/backups/panel/download', requireAuth, withInstance, (req, res) => {
+        const { filename } = req.query;
+        const BACKUP_PANEL_DIR = path.join(req.instDir, 'backups', 'panel');
+        const zipPath = path.join(BACKUP_PANEL_DIR, filename);
+        if (!fs.existsSync(zipPath)) return res.status(404).send('Not Found');
+        res.download(zipPath);
+    });
+
+    // Scheduler for Panel Backups
+    const lastBackupTimes = new Map(); // instanceId -> timestamp
+
+    setInterval(() => {
+        instanceConfig.instances.forEach(async (inst) => {
+            if (!inst.autoBackupEnabled) return;
+            if (inst.backupStrategy !== 'panel') return;
+
+            const state = getOrCreateInstanceState(inst.id);
+            // Dynamic check: Skip if server is not running
+            if (!state.process) return;
+
+            // Dynamic check: Skip if onlyIfPlayersOnline is true and no players
+            if (inst.autoBackupOnlyIfPlayersOnline && state.onlinePlayers.size === 0) return;
+
+            const now = new Date();
+            const lastTime = lastBackupTimes.get(inst.id) || 0;
+            const mode = inst.autoBackupMode || 'interval';
+
+            let shouldBackup = false;
+            if (mode === 'interval') {
+                const hours = inst.autoBackupIntervalHours !== undefined ? inst.autoBackupIntervalHours : (inst.autoBackupInterval || 12);
+                const minutes = inst.autoBackupIntervalMinutes || 0;
+                const intervalMs = (hours * 60 + minutes) * 60 * 1000;
+                if (Date.now() - lastTime >= intervalMs) shouldBackup = true;
+            } else if (mode === 'schedule') {
+                const [targetH, targetM] = (inst.autoBackupScheduleTime || "03:00").split(':').map(Number);
+                const scheduleDays = inst.autoBackupScheduleDays || 1;
+
+                if (now.getHours() === targetH && now.getMinutes() === targetM) {
+                    const daysSinceLast = (Date.now() - lastTime) / (1000 * 60 * 60 * 24);
+                    if (daysSinceLast >= scheduleDays - 0.01) shouldBackup = true; // 0.01 allowance for minute jitter
+                }
+            }
+
+            if (shouldBackup) {
+                lastBackupTimes.set(inst.id, Date.now());
+                try {
+                    await createPanelBackup(inst.id, true);
+                } catch (e) {
+                    console.error(`Auto backup failed for ${inst.id}:`, e);
+                }
+            }
+        });
+    }, 60000); // Check every minute
 
     // --- 面板设置 API (新增) ---
 
