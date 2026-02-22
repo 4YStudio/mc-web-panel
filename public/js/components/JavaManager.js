@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, onUnmounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, computed, onMounted, onUnmounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
@@ -160,6 +160,7 @@ export default {
                                 <div class="modern-progress-bar" :style="{width: (activeInstall.percent || 0) + '%'}"></div>
                             </div>
                         </div>
+                        <span class="text-muted text-nowrap me-2" style="font-size: 0.7rem;" v-if="formattedJavaSpeed">{{ formattedJavaSpeed }}</span>
                         <span class="text-muted text-nowrap" style="font-size: 0.7rem;">{{ activeInstall.message }}</span>
                         <button class="btn btn-sm btn-link text-danger p-0 ms-1" @click="cancelInstall" :title="$t('common.cancel')" :disabled="cancelling">
                             <i class="fa-solid fa-times-circle"></i>
@@ -189,6 +190,16 @@ export default {
 
         const activeInstall = ref(null);
         const cancelling = ref(false);
+
+        const formattedJavaSpeed = computed(() => {
+            const speed = activeInstall.value?.speed;
+            if (!speed || speed <= 0) return '';
+            if (speed >= 1024 * 1024) {
+                return (speed / 1024 / 1024).toFixed(2) + ' MB/s';
+            } else {
+                return (speed / 1024).toFixed(0) + ' KB/s';
+            }
+        });
 
         const cancelInstall = async () => {
             if (!activeInstall.value) return;
@@ -362,7 +373,7 @@ export default {
             installed, available, sources, selectedSource,
             loadingInstalled, loadingAvailable, detecting,
             showAddLocal, localJavaPath, addingLocal,
-            installing, installProgress, activeInstall, cancelling,
+            installing, installProgress, activeInstall, cancelling, formattedJavaSpeed,
             loadInstalled, fetchAvailable, installJava, removeJava,
             addLocalJava, detectSystemJava, isInstalled, cancelInstall
         };

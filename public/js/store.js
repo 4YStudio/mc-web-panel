@@ -26,6 +26,7 @@ export const store = reactive({
         title: '',           // 标题
         message: '',         // 主消息
         subMessage: '',      // 副消息 (如 10MB/100MB)
-        percent: 0           // 进度百分比 0-100
+        percent: 0,          // 进度百分比 0-100
+        speed: 0             // 下载速度 (B/s)
     }
 });

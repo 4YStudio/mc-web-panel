@@ -65,8 +65,35 @@ export default {
                             <select class="form-select" v-model="config.consoleInfoPosition">
                                 <option value="top">{{ $t('panel_settings.pos_top') }}</option>
                                 <option value="sidebar">{{ $t('panel_settings.pos_sidebar') }}</option>
-                                <option value="hide">{{ $t('panel_settings.pos_hide') }}</option>
-                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 高级设置 -->
+            <div class="col-md-6">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
+                    <div class="card-header bg-secondary-subtle text-secondary border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
+                        <i class="fa-solid fa-gear me-2"></i>{{ $t('panel_settings.advanced') }}
+                    </div>
+                    <div class="card-body p-3 p-md-4">
+                        <div class="mb-3 mb-md-4">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.github_proxy') }}</label>
+                            <div class="input-group input-group-sm">
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fa-solid fa-list-ul"></i>
+                                </button>
+                                <ul class="dropdown-menu shadow-sm border-0">
+                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = ''"><i class="fa-solid fa-ban me-2 opacity-50"></i>{{ $t('common.disabled') }}</a></li>
+                                    <li><hr class="dropdown-divider opacity-50"></li>
+                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://gh-proxy.org'">gh-proxy.org</a></li>
+                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://hk.gh-proxy.org'">hk.gh-proxy.org</a></li>
+                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://cdn.gh-proxy.org'">cdn.gh-proxy.org</a></li>
+                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://edgeone.gh-proxy.org'">edgeone.gh-proxy.org</a></li>
+                                </ul>
+                                <input type="text" class="form-control" v-model="config.githubProxy" :placeholder="$t('panel_settings.github_proxy_desc')">
+                            </div>
+                            <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.github_proxy_desc') }}</div>
                         </div>
                     </div>
                 </div>
@@ -151,7 +178,8 @@ export default {
             monitorInterval: 2000,
             aiEndpoint: '',
             aiKey: '',
-            aiModel: ''
+            aiModel: '',
+            githubProxy: ''
         });
 
         const javaArgsText = ref('');

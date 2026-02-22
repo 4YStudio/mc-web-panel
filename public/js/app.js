@@ -182,6 +182,7 @@ const app = createApp({
             socket.on('update_progress', (data) => {
                 store.task.percent = data.progress;
                 store.task.subMessage = data.progress + '%';
+                store.task.speed = data.speed || 0;
             });
 
             // Fallback: if socket disconnects during an update, start auto-refresh poll

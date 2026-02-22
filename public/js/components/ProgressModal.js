@@ -25,8 +25,9 @@ export default {
             <div class="d-flex justify-content-between align-items-center mt-2">
                 <span class="progress-msg text-truncate">{{ store.task.message }}</span>
                 <div class="d-flex align-items-center gap-2">
+                    <span class="progress-pct fw-bold text-primary me-2" v-if="formattedSpeed">{{ formattedSpeed }}</span>
                     <span class="progress-pct" v-if="store.task.percent > 0">{{ store.task.percent.toFixed(0) }}%</span>
-                    <button v-if="store.task.canCancel" class="btn btn-sm btn-outline-danger py-0 px-2" @click="handleCancel" style="height: 24px; line-height: 1;">
+                    <button v-if="store.task.canCancel" class="btn btn-sm btn-outline-danger py-0 px-2 shadow-sm" @click="handleCancel" style="height: 24px; line-height: 1; border-radius: 8px;">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -47,10 +48,20 @@ export default {
             return 'fa-spinner fa-spin';
         });
 
+        const formattedSpeed = computed(() => {
+            const speed = store.task.speed;
+            if (!speed || speed <= 0) return '';
+            if (speed >= 1024 * 1024) {
+                return (speed / 1024 / 1024).toFixed(2) + ' MB/s';
+            } else {
+                return (speed / 1024).toFixed(0) + ' KB/s';
+            }
+        });
+
         const handleCancel = () => {
             if (store.task.onCancel) store.task.onCancel();
         };
 
-        return { store, clampedPercent, iconClass, handleCancel };
+        return { store, clampedPercent, iconClass, handleCancel, formattedSpeed };
     }
 };

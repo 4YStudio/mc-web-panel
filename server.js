@@ -22,8 +22,9 @@ const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
+const { pipeline } = require('node:stream/promises');
 
-const APP_VERSION = '1.7.2';
+const APP_VERSION = '1.7.3';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -126,6 +127,7 @@ const DEFAULT_CONFIG = {
     maxLogHistory: 1000,
     monitorInterval: 2000,
     javaPath: 'java',
+    githubProxy: '',
     sessionSecret: ''
 };
 
@@ -140,6 +142,16 @@ if (!appConfig.sessionSecret) {
 if (!fs.existsSync(CONFIG_FILE)) {
     fs.ensureDirSync(DATA_DIR);
     fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+}
+
+// GitHub 代理加速
+function applyGithubProxy(url) {
+    if (appConfig.githubProxy && (url.includes('github.com') || url.includes('githubusercontent.com'))) {
+        let proxy = appConfig.githubProxy;
+        if (!proxy.endsWith('/')) proxy += '/';
+        return proxy + url;
+    }
+    return url;
 }
 
 // 迁移逻辑: mc_server -> instances/default
@@ -910,7 +922,7 @@ if (cluster.isPrimary) {
 
             const response = await axios({
                 method: 'get',
-                url: downloadUrl,
+                url: applyGithubProxy(downloadUrl),
                 responseType: 'stream',
                 timeout: 600000, // 10 min timeout
                 signal: controller.signal
@@ -920,22 +932,32 @@ if (cluster.isPrimary) {
             let downloadedBytes = 0;
 
             const writer = fs.createWriteStream(tmpFile);
+            let lastUpdateTime = Date.now();
+            let lastDownloadedBytes = 0;
+
             response.data.on('data', (chunk) => {
                 downloadedBytes += chunk.length;
-                if (totalBytes > 0) {
-                    const percent = Math.round((downloadedBytes / totalBytes) * 80); // 80% for download
-                    io.emit('java_install_progress', {
-                        featureVersion, step: 'downloading', percent,
-                        message: `下载中... ${(downloadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalBytes / 1024 / 1024).toFixed(1)}MB`
-                    });
+                const now = Date.now();
+                if (now - lastUpdateTime >= 1000) {
+                    const speed = (downloadedBytes - lastDownloadedBytes) / ((now - lastUpdateTime) / 1000);
+                    lastUpdateTime = now;
+                    lastDownloadedBytes = downloadedBytes;
+
+                    if (totalBytes > 0) {
+                        const percent = Math.round((downloadedBytes / totalBytes) * 80); // 80% for download
+                        io.emit('java_install_progress', {
+                            featureVersion, step: 'downloading', percent,
+                            message: `下载中... ${(downloadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalBytes / 1024 / 1024).toFixed(1)}MB`,
+                            speed: speed
+                        });
+                    }
                 }
             });
-            response.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-            });
+            await pipeline(
+                response.data,
+                writer,
+                { signal: controller.signal }
+            );
 
             io.emit('java_install_progress', { featureVersion, step: 'extracting', percent: 85, message: '正在解压...' });
 
@@ -980,9 +1002,9 @@ if (cluster.isPrimary) {
             io.emit('java_install_progress', { featureVersion, step: 'done', percent: 100, message: `安装完成! (${detectedVer})` });
 
         } catch (e) {
-            if (axios.isCancel(e)) {
+            if (e.name === 'AbortError' || e.code === 'ERR_CANCELED' || (controller && controller.signal.aborted)) {
                 console.log(`[Java Install] Cancelled: ${featureVersion}`);
-                io.emit('java_install_progress', { featureVersion, step: 'error', percent: 0, message: '已取消' });
+                io.emit('java_install_progress', { featureVersion, step: 'error', percent: 0, message: '已取消更新' });
             } else {
                 console.error('[Java Install Error]', e);
                 io.emit('java_install_progress', { featureVersion, step: 'error', percent: 0, message: '安装失败: ' + e.message });
@@ -1923,7 +1945,7 @@ if (cluster.isPrimary) {
         appendLog(instanceId, `Installing mod: ${filename}...`);
 
         try {
-            const response = await axios.get(url, { responseType: 'stream' });
+            const response = await axios.get(applyGithubProxy(url), { responseType: 'stream' });
             const writer = fs.createWriteStream(dest);
             response.data.pipe(writer);
 
@@ -2119,7 +2141,7 @@ if (cluster.isPrimary) {
     // 2. 保存面板配置
     app.post('/api/panel/config', requireAuth, async (req, res) => {
         try {
-            const { port, defaultLang, theme, consoleInfoPosition, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel } = req.body;
+            const { port, defaultLang, theme, consoleInfoPosition, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy } = req.body;
 
             // 验证配置
             if (port && (port < 1024 || port > 65535)) {
@@ -2160,6 +2182,7 @@ if (cluster.isPrimary) {
             if (aiEndpoint !== undefined) appConfig.aiEndpoint = aiEndpoint;
             if (aiKey !== undefined) appConfig.aiKey = aiKey;
             if (aiModel !== undefined) appConfig.aiModel = aiModel;
+            if (githubProxy !== undefined) appConfig.githubProxy = githubProxy;
             if (consoleInfoPosition !== undefined) appConfig.consoleInfoPosition = consoleInfoPosition;
 
             // 保存到文件
@@ -2589,7 +2612,7 @@ if (cluster.isPrimary) {
                 return res.status(404).json({ error: `未找到对应架构 ( ${arch} ) 的发布文件` });
             }
 
-            const downloadUrl = asset.browser_download_url;
+            const downloadUrl = applyGithubProxy(asset.browser_download_url);
             const newExePath = APP_EXECUTABLE + '.new';
             const oldExePath = APP_EXECUTABLE + '.old';
 
@@ -2610,62 +2633,83 @@ if (cluster.isPrimary) {
             // 追踪进度
             const totalLength = parseInt(response.headers['content-length'], 10);
             let downloadedLength = 0;
+            let lastUpdateTime = Date.now();
+            let lastDownloadedLength = 0;
 
             response.data.on('data', (chunk) => {
                 downloadedLength += chunk.length;
-                const progress = Math.round((downloadedLength / totalLength) * 100);
-                io.emit('update_progress', { progress });
-            });
+                const now = Date.now();
+                if (now - lastUpdateTime >= 1000) {
+                    const speed = (downloadedLength - lastDownloadedLength) / ((now - lastUpdateTime) / 1000);
+                    lastUpdateTime = now;
+                    lastDownloadedLength = downloadedLength;
 
-            response.data.pipe(writer);
-
-            writer.on('finish', async () => {
-                try {
-                    console.log('[Update] Download complete. Applying update...');
-                    io.emit('update_status', { step: 'applying', message: '正在应用更新...' });
-
-                    // 给予执行权限
-                    await fs.chmod(newExePath, '755');
-
-                    // 备份旧版本
-                    if (await fs.pathExists(oldExePath)) await fs.remove(oldExePath);
-                    await fs.move(APP_EXECUTABLE, oldExePath);
-
-                    // 替换为新版本
-                    await fs.move(newExePath, APP_EXECUTABLE);
-
-                    console.log('[Update] Update applied. Restarting...');
-                    io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
-
-                    setTimeout(() => {
-                        // 重启逻辑：Master 会捕捉 100 信号并重启 Worker
-                        // 但是为了完全应用新版本（如果是 caxa 打包），建议整个流程由外部（如 systemd）重启
-                        // 这里的 process.exit(100) 只会让 Master 重启 Worker。
-                        // 如果是 caxa，Master 进程的代码是固定的。
-                        // 这里我们选择直接退出 Master，让外部重启（如果支持）。
-                        // 或者触发 Master 重启。
-                        process.send({ type: 'restart_master' }); // 我们需要在主进程处理这个
-                        process.exit(100);
-                    }, 2000);
-
-                    res.json({ success: true, message: '更新已下载并应用，正在重启...' });
-                } catch (err) {
-                    console.error('[Update] Error applying update:', err);
-                    io.emit('update_status', { step: 'error', message: '应用更新失败: ' + err.message });
-                    // 尝试恢复
-                    if (await fs.pathExists(oldExePath) && !await fs.pathExists(APP_EXECUTABLE)) {
-                        await fs.move(oldExePath, APP_EXECUTABLE);
-                    }
+                    const progress = Math.round((downloadedLength / totalLength) * 100);
+                    io.emit('update_progress', { progress, speed });
                 }
             });
 
-            writer.on('error', (err) => {
-                // If it's an abort error, it might not be caught here if the stream is destroyed?
-                // Actually axios signal abort handling usually throws during request or destroys stream.
-                console.error('[Update] Download error:', err);
-                if (err.message === 'Aborted') return; // Handled in catch block ideally, but stream error might differ
-                io.emit('update_status', { step: 'error', message: '下载失败: ' + err.message });
-            });
+            try {
+                await pipeline(
+                    response.data,
+                    writer,
+                    { signal: controller.signal }
+                );
+
+                console.log('[Update] Download complete. Applying update...');
+                io.emit('update_status', { step: 'applying', message: '正在应用更新...' });
+
+                // 给予执行权限
+                await fs.chmod(newExePath, '755');
+
+                // 备份旧版本
+                if (await fs.pathExists(oldExePath)) await fs.remove(oldExePath);
+                await fs.move(APP_EXECUTABLE, oldExePath);
+
+                // 替换为新版本
+                await fs.move(newExePath, APP_EXECUTABLE);
+
+                console.log('[Update] Update applied. Restarting...');
+                io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
+
+                setTimeout(() => {
+                    process.send({ type: 'restart_master' });
+                    process.exit(100);
+                }, 2000);
+
+                res.json({ success: true, message: '更新已下载并应用，正在重启...' });
+
+            } catch (err) {
+                if (err.name === 'AbortError' || err.code === 'ERR_CANCELED' || controller.signal.aborted) {
+                    console.log('[Update] Update cancelled by user.');
+                    io.emit('update_status', { step: 'cancelled', message: '已取消更新' });
+                } else {
+                    console.error('[Update] Error during update:', err);
+                    io.emit('update_status', { step: 'error', message: '更新失败: ' + err.message });
+                }
+
+                // Cleanup temporary files
+                try {
+                    if (await fs.pathExists(newExePath)) await fs.remove(newExePath);
+                } catch (cleanupErr) {
+                    console.error('[Update] Failed to cleanup .new file:', cleanupErr);
+                }
+
+                // If we aborted and hadn't yet moved the old executable, no recovery needed.
+                // If we were in the middle of moving, try to ensure APP_EXECUTABLE exists.
+                if (await fs.pathExists(oldExePath) && !await fs.pathExists(APP_EXECUTABLE)) {
+                    await fs.move(oldExePath, APP_EXECUTABLE);
+                }
+
+                // Don't res.json here if headers sent
+                if (!res.headersSent) {
+                    res.status(500).json({ error: err.message });
+                }
+            } finally {
+                activeDownloads.delete('system_update');
+            }
+
+            // End of update block
 
         } catch (e) {
             if (axios.isCancel(e)) {

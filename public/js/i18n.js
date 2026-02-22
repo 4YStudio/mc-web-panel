@@ -475,7 +475,9 @@ export const messages = {
             console_info_position: '控制台信息展示位置',
             pos_top: '顶部显示',
             pos_sidebar: '侧边栏显示',
-            pos_hide: '不显示'
+            pos_hide: '不显示',
+            github_proxy: 'GitHub 代理加速',
+            github_proxy_desc: '国内用户可选择代理以加速系统更新与 Java 下载'
         },
 
         setup: {
