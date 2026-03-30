@@ -127,7 +127,8 @@ export default {
                                 </td>
                                 <td>
                                     <div class="fw-bold small">Java {{ j.featureVersion }}
-                                        <span v-if="[8,11,17,21].includes(j.featureVersion)" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1" style="font-size: 9px;">LTS</span>
+                                        <span v-if="ltsVersions.includes(j.featureVersion)" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1" style="font-size: 9px;">LTS</span>
+                                        <span v-if="j.imageType === 'jdk'" class="badge bg-info-subtle text-info border border-info-subtle rounded-pill ms-1" style="font-size: 9px;">JDK</span>
                                     </div>
                                     <div class="text-muted font-monospace" style="font-size: 0.7rem;">{{ j.version }}</div>
                                 </td>
@@ -178,6 +179,7 @@ export default {
         const installed = ref([]);
         const available = ref([]);
         const sources = ref([]);
+        const ltsVersions = ref([8, 11, 17, 21]);
         const selectedSource = ref('adoptium');
         const loadingInstalled = ref(false);
         const loadingAvailable = ref(false);
@@ -238,6 +240,9 @@ export default {
             try {
                 const res = await api.get(`/api/java/available?source=${selectedSource.value}`);
                 available.value = res.data.results || [];
+                if (res.data.ltsVersions) {
+                    ltsVersions.value = res.data.ltsVersions;
+                }
             } catch (e) {
                 showToast($t('java.fetch_fail'), 'danger');
             } finally {
@@ -370,7 +375,7 @@ export default {
 
         return {
             store,
-            installed, available, sources, selectedSource,
+            installed, available, sources, ltsVersions, selectedSource,
             loadingInstalled, loadingAvailable, detecting,
             showAddLocal, localJavaPath, addingLocal,
             installing, installProgress, activeInstall, cancelling, formattedJavaSpeed,

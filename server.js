@@ -24,7 +24,7 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
 
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.5';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -88,8 +88,36 @@ if (!APP_EXECUTABLE) {
     }
 }
 
+// --- Method 4: Read from persisted path (fallback for post-restart scenarios) ---
+if (!APP_EXECUTABLE) {
+    try {
+        // Try to find DATA_DIR by checking both cwd/data and possible parent paths
+        const possibleDataDirs = [
+            path.join(process.cwd(), 'data'),
+            path.join(BASE_DIR, 'data')
+        ];
+        for (const dir of possibleDataDirs) {
+            const savedPathFile = path.join(dir, 'executable_path.txt');
+            if (fs.existsSync(savedPathFile)) {
+                const savedPath = fs.readFileSync(savedPathFile, 'utf8').trim();
+                if (savedPath && fs.existsSync(savedPath) && fs.statSync(savedPath).isFile()) {
+                    APP_EXECUTABLE = savedPath;
+                    console.log(`  Recovered APP_EXECUTABLE from saved path: ${APP_EXECUTABLE}`);
+                    break;
+                }
+            }
+        }
+    } catch (e) { }
+}
+
 if (APP_EXECUTABLE) {
     BASE_DIR = path.dirname(APP_EXECUTABLE);
+    // Persist for post-restart recovery
+    try {
+        const dataDir = path.join(BASE_DIR, 'data');
+        fs.ensureDirSync(dataDir);
+        fs.writeFileSync(path.join(dataDir, 'executable_path.txt'), APP_EXECUTABLE);
+    } catch (e) { }
 }
 
 const DATA_DIR = path.join(BASE_DIR, 'data');
@@ -146,9 +174,12 @@ if (!fs.existsSync(CONFIG_FILE)) {
 
 // GitHub 代理加速
 function applyGithubProxy(url) {
+    if (!url || typeof url !== 'string') return url;
     if (appConfig.githubProxy && (url.includes('github.com') || url.includes('githubusercontent.com'))) {
         let proxy = appConfig.githubProxy;
         if (!proxy.endsWith('/')) proxy += '/';
+        // 防重复叠加检查
+        if (url.startsWith(proxy)) return url;
         return proxy + url;
     }
     return url;
@@ -432,13 +463,15 @@ if (cluster.isPrimary) {
         worker.on('message', (msg) => {
             if (msg.type === 'restart_master') {
                 restartingMaster = true;
+                // Use newExecutable from message if provided (e.g. after update renamed the binary)
+                const executableToRun = msg.newExecutable || APP_EXECUTABLE;
                 console.log('Received restart_master signal. Restarting entire panel...');
-                if (APP_EXECUTABLE) {
+                if (executableToRun) {
                     const { spawn } = require('child_process');
-                    const spawnCwd = path.dirname(APP_EXECUTABLE);
-                    console.log(`Spawning new process: ${APP_EXECUTABLE} in ${spawnCwd}`);
+                    const spawnCwd = path.dirname(executableToRun);
+                    console.log(`Spawning new process: ${executableToRun} in ${spawnCwd}`);
                     cleanPid();
-                    const child = spawn(APP_EXECUTABLE, ['--daemon'], {
+                    const child = spawn(executableToRun, ['--daemon'], {
                         detached: true,
                         stdio: 'ignore',
                         cwd: spawnCwd
@@ -846,7 +879,32 @@ if (cluster.isPrimary) {
     const ADOPTIUM_SOURCES = {
         adoptium: 'https://api.adoptium.net/v3',
         tuna: 'https://mirrors.tuna.tsinghua.edu.cn/Adoptium',
-        aliyun: 'https://mirrors.aliyun.com/adoptium'
+        ghproxy: 'ghproxy' // 标记使用 GitHub 代理
+    };
+
+    /**
+     * 将官方下载地址映射为国内加速或镜像源地址
+     */
+    const resolveJavaMirrorUrl = (originalUrl, source, featureVersion, arch, osType) => {
+        if (!originalUrl || source === 'adoptium') return originalUrl;
+        
+        // 方案 A: 使用 GitHub 代理 (最可靠)
+        if (source === 'ghproxy') {
+            return applyGithubProxy(originalUrl);
+        }
+
+        // 方案 B: 映射已知镜像站路径
+        if (source === 'tuna' && ADOPTIUM_SOURCES.tuna) {
+            try {
+                const filename = path.basename(originalUrl);
+                const imageType = originalUrl.includes('-jdk_') ? 'jdk' : 'jre';
+                const mirrorBase = ADOPTIUM_SOURCES.tuna;
+                return `${mirrorBase}/${featureVersion}/${imageType}/${arch}/${osType}/${filename}`;
+            } catch (e) { }
+        }
+
+        // 默认回退到 GitHub 代理 (如果配置了)
+        return applyGithubProxy(originalUrl);
     };
 
     // GET /api/java/installed — 已安装的 Java 列表
@@ -863,32 +921,75 @@ if (cluster.isPrimary) {
             const arch = os.arch() === 'x64' ? 'x64' : os.arch() === 'arm64' ? 'aarch64' : os.arch();
             const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'mac' : 'windows';
 
-            // Get available feature versions (LTS: 8, 11, 17, 21)
-            const featureVersions = [8, 11, 17, 21, 22];
-            const results = [];
+            // Get available feature versions from Adoptium API
+            let featureVersions = [8, 11, 17, 21, 22]; // Fallback
+            let ltsVersions = [8, 11, 17, 21];
+            try {
+                const infoUrl = `${ADOPTIUM_SOURCES.adoptium}/info/available_releases`;
+                const infoResp = await axios.get(infoUrl, { timeout: 10000, headers: { 'User-Agent': MODRINTH_UA } });
+                if (infoResp.data && infoResp.data.available_releases) {
+                    featureVersions = infoResp.data.available_releases;
+                }
+                if (infoResp.data && infoResp.data.available_lts_releases) {
+                    ltsVersions = infoResp.data.available_lts_releases;
+                }
+            } catch (e) {
+                console.warn(`[Java] Failed to fetch available releases, using fallback: ${e.message}`);
+            }
 
-            for (const fv of featureVersions) {
+            // 并行拉取元数据，提高响应速度
+            const results = [];
+            const fetchVersionData = async (fv) => {
+                const tryFetch = async (imageType) => {
+                    const url = `${ADOPTIUM_SOURCES.adoptium}/assets/latest/${fv}/hotspot?architecture=${arch}&os=${osType}&image_type=${imageType}`;
+                    return await axios.get(url, { 
+                        timeout: 30000, 
+                        headers: { 'User-Agent': MODRINTH_UA } 
+                    });
+                };
+
                 try {
-                    const url = `${baseUrl}/assets/latest/${fv}/hotspot?architecture=${arch}&os=${osType}&image_type=jre`;
-                    const resp = await axios.get(url, { timeout: 15000 });
+                    // 优先尝试 JRE
+                    let resp;
+                    let typeUsed = 'jre';
+                    try {
+                        resp = await tryFetch('jre');
+                    } catch (e) {
+                        if (e.response?.status === 404) {
+                            // JRE 不存在，尝试 JDK
+                            resp = await tryFetch('jdk');
+                            typeUsed = 'jdk';
+                        } else {
+                            throw e;
+                        }
+                    }
+
                     if (resp.data && resp.data.length > 0) {
                         const asset = resp.data[0];
-                        results.push({
+                        const originalDownloadUrl = asset.binary?.package?.link;
+                        const downloadUrl = resolveJavaMirrorUrl(originalDownloadUrl, source, fv, arch, osType);
+
+                        return {
                             featureVersion: fv,
                             version: asset.version?.openjdk_version || asset.version?.semver || `${fv}`,
                             releaseName: asset.release_name,
-                            downloadUrl: asset.binary?.package?.link,
+                            downloadUrl: downloadUrl,
                             size: asset.binary?.package?.size || 0,
+                            imageType: typeUsed,
+                            vendor: asset.vendor || 'Adoptium',
                             checksum: asset.binary?.package?.checksum
-                        });
+                        };
                     }
                 } catch (e) {
                     // Skip unavailable versions
-                    console.log(`[Java] Version ${fv} not available from ${source}: ${e.message}`);
                 }
-            }
+                return null;
+            };
 
-            res.json({ source, results });
+            const allResults = await Promise.all(featureVersions.map(fv => fetchVersionData(fv)));
+            const finalResults = allResults.filter(r => r !== null);
+
+            res.json({ source, results: finalResults, ltsVersions });
         } catch (e) {
             res.status(500).json({ error: '获取可用版本失败: ' + e.message });
         }
@@ -1105,7 +1206,7 @@ if (cluster.isPrimary) {
         res.json([
             { id: 'adoptium', name: 'Adoptium (Official)', url: ADOPTIUM_SOURCES.adoptium },
             { id: 'tuna', name: '清华大学镜像', url: ADOPTIUM_SOURCES.tuna },
-            { id: 'aliyun', name: '阿里云镜像', url: ADOPTIUM_SOURCES.aliyun }
+            { id: 'ghproxy', name: 'GitHub 代理加速 (推荐)', url: appConfig.githubProxy || 'Mirror' }
         ]);
     });
 
@@ -2605,7 +2706,8 @@ if (cluster.isPrimary) {
 
             const arch = process.arch === 'x64' ? 'linux-x64' : 'linux-arm64';
             const version = gh.data.tag_name.replace(/^v/, '');
-            const assetName = `MWP-${version}-${arch}`;
+            const versionCompact = version.replace(/\./g, '');
+            const assetName = `MWP-${versionCompact}-${arch}`;
             const asset = gh.data.assets.find(a => a.name === assetName);
 
             if (!asset) {
@@ -2662,18 +2764,32 @@ if (cluster.isPrimary) {
                 // 给予执行权限
                 await fs.chmod(newExePath, '755');
 
+                // 计算新的可执行文件路径（包含新版本号）
+                const newVersionedName = `MWP-${versionCompact}-${arch}`;
+                const newVersionedPath = path.join(path.dirname(APP_EXECUTABLE), newVersionedName);
+
                 // 备份旧版本
                 if (await fs.pathExists(oldExePath)) await fs.remove(oldExePath);
                 await fs.move(APP_EXECUTABLE, oldExePath);
 
-                // 替换为新版本
-                await fs.move(newExePath, APP_EXECUTABLE);
+                // 替换为新版本（使用新版本名称）
+                await fs.move(newExePath, newVersionedPath);
 
-                console.log('[Update] Update applied. Restarting...');
+                // 更新 APP_EXECUTABLE 指向新路径
+                APP_EXECUTABLE = newVersionedPath;
+
+                // 更新持久化路径
+                try {
+                    const dataDir = path.join(path.dirname(APP_EXECUTABLE), 'data');
+                    fs.ensureDirSync(dataDir);
+                    fs.writeFileSync(path.join(dataDir, 'executable_path.txt'), APP_EXECUTABLE);
+                } catch (e) { }
+
+                console.log(`[Update] Update applied. New executable: ${APP_EXECUTABLE}. Restarting...`);
                 io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
 
                 setTimeout(() => {
-                    process.send({ type: 'restart_master' });
+                    process.send({ type: 'restart_master', newExecutable: APP_EXECUTABLE });
                     process.exit(100);
                 }, 2000);
 

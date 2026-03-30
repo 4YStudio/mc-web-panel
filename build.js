@@ -87,7 +87,17 @@ async function prepareBuildDir() {
     manifest.dirs.forEach(d => { if (fs.existsSync(d)) fs.cpSync(d, path.join(BUILD_DIR, d), { recursive: true }); });
 
     console.log('Installing production dependencies...');
-    execSync('npm install --omit=dev --no-package-lock --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+    // Copy existing node_modules from the project root to avoid a slow fresh npm install
+    if (fs.existsSync('node_modules')) {
+        console.log('  Copying node_modules from project root...');
+        fs.cpSync('node_modules', path.join(BUILD_DIR, 'node_modules'), { recursive: true });
+        // Remove devDependencies from the copied node_modules
+        console.log('  Pruning devDependencies...');
+        execSync('npm prune --omit=dev --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+    } else {
+        // Fallback: fresh install if no node_modules exists
+        execSync('npm install --omit=dev --no-package-lock --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+    }
 
     console.log('Pruning...');
     try {
@@ -158,7 +168,7 @@ async function buildTarget(target) {
     await fetchSqliteBindings(target, BUILD_DIR);
 
     const pkg = require('./package.json');
-    const outputName = `MWP-${pkg.version}-${target.name}${target.ext}`;
+    const outputName = `MWP-${pkg.version.replace(/\./g, '')}-${target.name}${target.ext}`;
     console.log(`Packaging to ${outputName}...`);
 
     // Map targets to caxa stubs
