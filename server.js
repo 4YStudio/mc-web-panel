@@ -24,7 +24,7 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
 
-const APP_VERSION = '1.7.6';
+const APP_VERSION = '1.7.7';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -471,28 +471,28 @@ if (cluster.isPrimary) {
                 if (executableToRun) {
                     const { spawn } = require('child_process');
                     const spawnCwd = path.dirname(executableToRun);
-                    
+
                     // Detect if we should use 'start' or '--daemon' based on how we were launched
                     const args = process.argv.slice(1).some(arg => arg === 'start') ? ['start'] : ['--daemon'];
-                    
+
                     console.log(`[Restart] Spawning new process: ${executableToRun} with args: ${JSON.stringify(args)}`);
                     console.log(`[Restart] CWD: ${spawnCwd}`);
-                    
+
                     cleanPid();
                     const child = spawn(executableToRun, args, {
                         detached: true,
                         stdio: 'ignore',
                         cwd: spawnCwd
                     });
-                    
+
                     if (child.pid) {
                         console.log(`[Restart] New process spawned with PID: ${child.pid}. Exiting current master...`);
                     }
-                    
+
                     child.on('error', (err) => {
                         console.error('[Restart] Failed to spawn new process:', err);
                     });
-                    
+
                     child.unref();
                     // Give it a bit more time to ensure child process is initialized
                     setTimeout(() => process.exit(0), 1000);
