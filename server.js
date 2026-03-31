@@ -24,7 +24,7 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
 
-const APP_VERSION = '1.7.5';
+const APP_VERSION = '1.7.6';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -122,6 +122,7 @@ if (APP_EXECUTABLE) {
 
 const DATA_DIR = path.join(BASE_DIR, 'data');
 const INSTANCES_DIR = path.join(BASE_DIR, 'instances');
+const GLOBAL_BACKUP_DIR = path.join(BASE_DIR, 'backups', 'global');
 const INSTANCES_FILE = path.join(DATA_DIR, 'instances.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
@@ -129,6 +130,7 @@ const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 // --- 多实例迁移与初始化 ---
 fs.ensureDirSync(DATA_DIR);
 fs.ensureDirSync(INSTANCES_DIR);
+fs.ensureDirSync(GLOBAL_BACKUP_DIR);
 
 const loadInstances = () => {
     try {
@@ -469,19 +471,33 @@ if (cluster.isPrimary) {
                 if (executableToRun) {
                     const { spawn } = require('child_process');
                     const spawnCwd = path.dirname(executableToRun);
-                    console.log(`Spawning new process: ${executableToRun} in ${spawnCwd}`);
+                    
+                    // Detect if we should use 'start' or '--daemon' based on how we were launched
+                    const args = process.argv.slice(1).some(arg => arg === 'start') ? ['start'] : ['--daemon'];
+                    
+                    console.log(`[Restart] Spawning new process: ${executableToRun} with args: ${JSON.stringify(args)}`);
+                    console.log(`[Restart] CWD: ${spawnCwd}`);
+                    
                     cleanPid();
-                    const child = spawn(executableToRun, ['--daemon'], {
+                    const child = spawn(executableToRun, args, {
                         detached: true,
                         stdio: 'ignore',
                         cwd: spawnCwd
                     });
+                    
+                    if (child.pid) {
+                        console.log(`[Restart] New process spawned with PID: ${child.pid}. Exiting current master...`);
+                    }
+                    
                     child.on('error', (err) => {
-                        console.error('Failed to spawn new process:', err);
+                        console.error('[Restart] Failed to spawn new process:', err);
                     });
+                    
                     child.unref();
-                    setTimeout(() => process.exit(0), 500);
+                    // Give it a bit more time to ensure child process is initialized
+                    setTimeout(() => process.exit(0), 1000);
                 } else {
+                    console.log('[Restart] No executable path found, exiting...');
                     process.exit(0);
                 }
             }
@@ -887,7 +903,7 @@ if (cluster.isPrimary) {
      */
     const resolveJavaMirrorUrl = (originalUrl, source, featureVersion, arch, osType) => {
         if (!originalUrl || source === 'adoptium') return originalUrl;
-        
+
         // 方案 A: 使用 GitHub 代理 (最可靠)
         if (source === 'ghproxy') {
             return applyGithubProxy(originalUrl);
@@ -942,9 +958,9 @@ if (cluster.isPrimary) {
             const fetchVersionData = async (fv) => {
                 const tryFetch = async (imageType) => {
                     const url = `${ADOPTIUM_SOURCES.adoptium}/assets/latest/${fv}/hotspot?architecture=${arch}&os=${osType}&image_type=${imageType}`;
-                    return await axios.get(url, { 
-                        timeout: 30000, 
-                        headers: { 'User-Agent': MODRINTH_UA } 
+                    return await axios.get(url, {
+                        timeout: 30000,
+                        headers: { 'User-Agent': MODRINTH_UA }
                     });
                 };
 
@@ -1677,6 +1693,74 @@ if (cluster.isPrimary) {
         });
     };
 
+    const createGlobalBackup = async (options = { configs: true, java: [], instances: [] }, note = '') => {
+        await fs.ensureDir(GLOBAL_BACKUP_DIR);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `global_backup_${timestamp}.zip`;
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+
+        // Notify all consoles
+        instanceConfig.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份开始: ${filename}...\n`));
+
+        return new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(zipPath);
+            const archive = archiver('zip', { zlib: { level: 5 } });
+
+            output.on('close', async () => {
+                const metaPath = zipPath + '.meta.json';
+                await fs.writeJson(metaPath, { note, options, createdAt: new Date() }, { spaces: 2 });
+                instanceConfig.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份完成！大小: ${(archive.pointer() / 1024 / 1024).toFixed(1)} MB\n`));
+                resolve({ filename, size: archive.pointer() });
+            });
+
+            archive.on('error', (err) => {
+                instanceConfig.instances.forEach(inst => appendLog(inst.id, `[错误] 全局备份失败: ${err.message}\n`));
+                reject(err);
+            });
+
+            archive.pipe(output);
+
+            if (options.configs) {
+                // Only backup specific files in data/ to avoid recursive backups or large logs
+                const files = fs.readdirSync(DATA_DIR);
+                for (const file of files) {
+                    const fullPath = path.join(DATA_DIR, file);
+                    if (fs.statSync(fullPath).isFile() && (file.endsWith('.json') || file === 'executable_path.txt')) {
+                        archive.file(fullPath, { name: `data/${file}` });
+                    }
+                }
+            }
+
+            // Backup selected Java versions (IDs)
+            if (Array.isArray(options.java)) {
+                for (const javaId of options.java) {
+                    const javaPath = path.join(DATA_DIR, 'java', javaId);
+                    if (fs.existsSync(javaPath)) {
+                        archive.directory(javaPath, `data/java/${javaId}`);
+                    }
+                }
+            } else if (options.java === true) {
+                const javaDir = path.join(DATA_DIR, 'java');
+                if (fs.existsSync(javaDir)) archive.directory(javaDir, 'data/java');
+            }
+
+            // Backup selected Instances (IDs)
+            if (Array.isArray(options.instances)) {
+                for (const instId of options.instances) {
+                    const instPath = path.join(INSTANCES_DIR, instId);
+                    if (fs.existsSync(instPath)) {
+                        archive.directory(instPath, `instances/${instId}`);
+                    }
+                }
+            } else if (options.instances === true) {
+                // Backup all instances
+                archive.directory(INSTANCES_DIR, 'instances');
+            }
+
+            archive.finalize();
+        });
+    };
+
     app.get('/api/backups/panel/list', requireAuth, withInstance, async (req, res) => {
         const BACKUP_PANEL_DIR = path.join(req.instDir, 'backups', 'panel');
         try {
@@ -1806,6 +1890,150 @@ if (cluster.isPrimary) {
             await fs.writeJson(metaPath, { note: 'Imported Backup', locked: false, createdAt: new Date() }, { spaces: 2 });
 
             res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // --- Global Backup APIs ---
+    app.get('/api/backups/global/list', async (req, res) => {
+        // Allow unauthenticated access if not setup yet (for setup wizard)
+        if (!appConfig.isSetup || req.session.authenticated) {
+            try {
+                const backups = [];
+                if (fs.existsSync(GLOBAL_BACKUP_DIR)) {
+                    const files = await fs.readdir(GLOBAL_BACKUP_DIR);
+                    for (const file of files) {
+                        if (file.endsWith('.zip')) {
+                            const filePath = path.join(GLOBAL_BACKUP_DIR, file);
+                            const stat = await fs.stat(filePath);
+                            const metaPath = filePath + '.meta.json';
+                            let meta = { note: '', options: {} };
+                            if (fs.existsSync(metaPath)) {
+                                try { meta = await fs.readJson(metaPath); } catch (e) { }
+                            }
+                            backups.push({
+                                name: file,
+                                size: stat.size,
+                                mtime: stat.mtime,
+                                note: meta.note || '',
+                                options: meta.options || {}
+                            });
+                        }
+                    }
+                }
+                backups.sort((a, b) => b.mtime - a.mtime);
+                res.json(backups);
+            } catch (e) { res.status(500).json({ error: e.message }); }
+        } else {
+            res.status(401).json({ error: 'Unauthorized' });
+        }
+    });
+
+    app.post('/api/backups/global/create', requireAuth, async (req, res) => {
+        const { options, note } = req.body;
+        try {
+            const result = await createGlobalBackup(options, note);
+            res.json({ success: true, ...result });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/backups/global/delete', requireAuth, async (req, res) => {
+        const { filename } = req.body;
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+        try {
+            if (fs.existsSync(zipPath)) {
+                await fs.remove(zipPath);
+                const metaPath = zipPath + '.meta.json';
+                if (fs.existsSync(metaPath)) await fs.remove(metaPath).catch(() => { });
+                res.json({ success: true });
+            } else {
+                res.status(404).json({ error: 'File not found' });
+            }
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.get('/api/backups/global/download', requireAuth, (req, res) => {
+        const { filename } = req.query;
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+        if (!fs.existsSync(zipPath)) return res.status(404).send('Not Found');
+        res.download(zipPath);
+    });
+
+    app.post('/api/backups/global/import', upload.single('backup'), async (req, res) => {
+        // Allow unauthenticated access if not setup yet (for setup wizard)
+        if (!appConfig.isSetup || req.session.authenticated) {
+            if (!req.file) return res.status(400).json({ error: 'No file' });
+            const targetPath = path.join(GLOBAL_BACKUP_DIR, fixFileName(req.file.originalname));
+            try {
+                await fs.move(req.file.path, targetPath, { overwrite: true });
+                const metaPath = targetPath + '.meta.json';
+                await fs.writeJson(metaPath, { note: 'Imported Global Backup', createdAt: new Date() }, { spaces: 2 });
+                res.json({ success: true, filename: path.basename(targetPath) });
+            } catch (e) { res.status(500).json({ error: e.message }); }
+        } else {
+            res.status(401).json({ error: 'Unauthorized' });
+        }
+    });
+
+    app.post('/api/backups/global/restore', async (req, res) => {
+        // Allow unauthenticated access if not setup yet (for setup wizard)
+        if (appConfig.isSetup && !req.session.authenticated) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { filename } = req.body;
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+        if (!fs.existsSync(zipPath)) return res.status(404).json({ error: 'Backup not found' });
+
+        try {
+            // 1. Stop all MC servers
+            for (const [id, state] of instancesState) {
+                if (state.process) {
+                    appendLog(id, '[系统] 全局还原中，正在停止服务器...\n');
+                    state.process.kill();
+                }
+            }
+
+            // 2. Extract backup to a temporary location
+            const tempExtractDir = path.join(os.tmpdir(), `panel-restore-${Date.now()}`);
+            await fs.ensureDir(tempExtractDir);
+
+            const zip = new AdmZip(zipPath);
+            zip.extractAllTo(tempExtractDir, true);
+
+            // 3. Apply changes (move files from temp back to BASE_DIR)
+            // We use a separate async function to do this then restart the master
+            const applyAndRestart = async () => {
+                try {
+                    // Restore data (configs)
+                    const dataRestoreDir = path.join(tempExtractDir, 'data');
+                    if (fs.existsSync(dataRestoreDir)) {
+                        const files = fs.readdirSync(dataRestoreDir);
+                        for (const file of files) {
+                            await fs.copy(path.join(dataRestoreDir, file), path.join(DATA_DIR, file), { overwrite: true });
+                        }
+                    }
+
+                    // Restore instances
+                    const instancesRestoreDir = path.join(tempExtractDir, 'instances');
+                    if (fs.existsSync(instancesRestoreDir)) {
+                        await fs.copy(instancesRestoreDir, INSTANCES_DIR, { overwrite: true });
+                    }
+
+                    // Clean up temp
+                    await fs.remove(tempExtractDir).catch(() => { });
+
+                    // Exit with 100 to signal master to restart this worker
+                    process.exit(100);
+                } catch (e) {
+                    console.error('Failed to apply backup:', e);
+                }
+            };
+
+            res.json({ success: true, message: 'Restore started, panel will restart.' });
+
+            // Execute after response
+            setTimeout(applyAndRestart, 1000);
+
         } catch (e) {
             res.status(500).json({ error: e.message });
         }

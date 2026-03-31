@@ -51,7 +51,9 @@ export const messages = {
             lock: '锁定',
             unlock: '解锁',
             locked: '已锁定',
-            edit_note: '编辑备注'
+            edit_note: '编辑备注',
+            processing: '处理中...',
+            no_data: '暂无数据'
         },
         login: {
             title: 'MC 面板',
@@ -477,7 +479,18 @@ export const messages = {
             pos_sidebar: '侧边栏显示',
             pos_hide: '不显示',
             github_proxy: 'GitHub 代理加速',
-            github_proxy_desc: '国内用户可选择代理以加速系统更新与 Java 下载'
+            github_proxy_desc: '国内用户可选择代理以加速系统更新与 Java 下载',
+            backup_maintenance: '备份与维护',
+            create_global_backup: '创建全局备份',
+            backup_include: '包含内容',
+            backup_configs: '面板配置',
+            backup_java: 'Java 环境',
+            backup_instances: '游戏实例',
+            restore_global_confirm: '确定要还原备份 {name} 吗？这会覆盖当前所有配置和实例，完成后面板将重启。',
+            restoring: '正在应用备份，面板即将重启...',
+            import_backup: '导入备份',
+            no_instances: '没有发现实例',
+            no_java: '没有从面板下载的 Java'
         },
 
         setup: {
@@ -494,7 +507,10 @@ export const messages = {
             install_timeout_toast: '安装超时，请检查日志',
             fetch_fail_mc: '获取游戏版本失败',
             fetch_fail_loader: '获取加载器版本失败',
-            loading_versions: '正在获取版本列表...'
+            loading_versions: '正在获取版本列表...',
+            restore_from_backup: '从备份恢复',
+            restoring_uploading: '正在上传备份...',
+            restoring_applying: '正在应用备份，面板即将重启...'
         },
         java: {
             title: 'Java 管理',
@@ -594,7 +610,9 @@ export const messages = {
             lock: 'Lock',
             unlock: 'Unlock',
             locked: 'Locked',
-            edit_note: 'Edit Note'
+            edit_note: 'Edit Note',
+            processing: 'Processing...',
+            no_data: 'No data'
         },
         login: {
             title: 'MC Panel',
@@ -1014,7 +1032,20 @@ export const messages = {
             ai_model_placeholder: 'e.g., gpt-3.5-turbo',
             ai_test: 'Test Connection',
             ai_test_success: 'Connection Success',
-            ai_test_fail: 'Connection Failed'
+            ai_test_fail: 'Connection Failed',
+            github_proxy: 'GitHub Proxy',
+            github_proxy_desc: 'Proxy for faster updates and Java downloads',
+            backup_maintenance: 'Backup & Maintenance',
+            create_global_backup: 'Create Global Backup',
+            backup_include: 'Include Content',
+            backup_configs: 'Panel Configs',
+            backup_java: 'Java Environments',
+            backup_instances: 'Server Instances',
+            restore_global_confirm: 'Are you sure you want to restore backup {name}? This will overwrite all current configs and instances. The panel will restart after completion.',
+            restoring: 'Applying backup, panel will restart...',
+            import_backup: 'Import Backup',
+            no_instances: 'No instances found',
+            no_java: 'No Java downloaded from panel'
         },
 
         setup: {
@@ -1031,7 +1062,10 @@ export const messages = {
             install_timeout_toast: 'Installation timed out (check logs)',
             fetch_fail_mc: 'Failed to fetch MC versions',
             fetch_fail_loader: 'Failed to fetch Loader versions',
-            loading_versions: 'Loading versions...'
+            loading_versions: 'Loading versions...',
+            restore_from_backup: 'Restore from Backup',
+            restoring_uploading: 'Uploading backup...',
+            restoring_applying: 'Applying backup, panel will restart...'
         },
         java: {
             title: 'Java Management',

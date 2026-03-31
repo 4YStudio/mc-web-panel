@@ -1,7 +1,7 @@
 import { ref, reactive, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal } from '../utils.js';
+import { showToast, openModal, waitForPanel } from '../utils.js';
 
 export default {
     template: `
@@ -155,6 +155,68 @@ export default {
                     </div>
                 </div>
             </div>
+
+            <!-- 备份与维护 -->
+            <div class="col-md-12">
+                <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                    <div class="card-header bg-warning-subtle text-warning-emphasis border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fa-solid fa-box-archive me-2"></i>{{ $t('panel_settings.backup_maintenance') || '备份与维护' }}</span>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-warning btn-sm rounded-pill fw-bold" @click="triggerRestoreImport">
+                                    <i class="fa-solid fa-file-import me-1"></i>{{ $t('panel_settings.import_backup') || '导入备份' }}
+                                </button>
+                                <button class="btn btn-warning btn-sm rounded-pill fw-bold" @click="askCreateGlobalBackup">
+                                    <i class="fa-solid fa-plus me-1"></i>{{ $t('panel_settings.create_global_backup') || '创建全局备份' }}
+                                </button>
+                                <input type="file" ref="restoreInput" class="d-none" accept=".zip" @change="handleRestoreImport">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-body-tertiary">
+                                    <tr class="small text-uppercase text-muted fw-bold">
+                                        <th class="px-4">{{ $t('common.name') }}</th>
+                                        <th>{{ $t('common.size') }}</th>
+                                        <th>{{ $t('common.time') }}</th>
+                                        <th class="text-end px-4">{{ $t('common.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="b in globalBackups" :key="b.name">
+                                        <td class="px-4">
+                                            <div class="fw-bold small">{{ b.name }}</div>
+                                            <div class="text-muted" style="font-size: 0.7rem;">{{ b.note || '-' }}</div>
+                                        </td>
+                                        <td class="small">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
+                                        <td class="small text-muted">{{ new Date(b.mtime).toLocaleString() }}</td>
+                                        <td class="text-end px-4">
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <button class="btn btn-xs btn-outline-success border-0" @click="downloadGlobalBackup(b)" :title="$t('common.download')">
+                                                    <i class="fa-solid fa-download"></i>
+                                                </button>
+                                                <button class="btn btn-xs btn-outline-primary border-0" @click="askRestoreGlobalBackup(b)" :title="$t('backups.restore')">
+                                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                                </button>
+                                                <button class="btn btn-xs btn-outline-danger border-0" @click="deleteGlobalBackup(b)" :title="$t('common.delete')">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!globalBackups.length">
+                                        <td colspan="4" class="text-center text-muted py-4 small">
+                                            {{ $t('common.no_data') || '暂无全局备份' }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     `,
@@ -165,6 +227,7 @@ export default {
         const loading = ref(true);
         const saving = ref(false);
         const testingAI = ref(false);
+        const globalBackups = ref([]);
         const config = reactive({
             port: 3000,
             defaultLang: 'zh',
@@ -184,6 +247,9 @@ export default {
 
         const javaArgsText = ref('');
         const jars = ref([]);
+        const instances = ref([]);
+        const javaList = ref([]);
+        const restoreInput = ref(null);
 
         const loadJars = async () => {
             try {
@@ -192,6 +258,168 @@ export default {
             } catch (e) {
                 console.error('Failed to load jars:', e);
             }
+        };
+
+        const loadGlobalBackups = async () => {
+            try {
+                const res = await api.get('/api/backups/global/list');
+                globalBackups.value = res.data;
+            } catch (e) { }
+        };
+
+        const loadInstances = async () => {
+            try {
+                const res = await api.get('/api/instances/list');
+                instances.value = res.data;
+            } catch (e) { }
+        };
+
+        const loadJavaList = async () => {
+            try {
+                const res = await api.get('/api/java/installed');
+                javaList.value = res.data;
+            } catch (e) { }
+        };
+
+        const triggerRestoreImport = () => restoreInput.value.click();
+        const handleRestoreImport = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            saving.value = true;
+            const formData = new FormData();
+            formData.append('backup', file);
+
+            try {
+                showToast($t('setup.restoring_uploading') || '正在上传备份...', 'info');
+                const uploadRes = await api.post('/api/backups/global/import', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                
+                showToast($t('panel_settings.restoring') || '正在应用备份，面板即将重启...', 'info');
+                await api.post('/api/backups/global/restore', { filename: uploadRes.data.filename });
+                
+                setTimeout(() => window.location.reload(), 5000);
+            } catch (e) {
+                saving.value = false;
+                showToast(e.response?.data?.error || e.message, 'danger');
+            }
+            e.target.value = '';
+        };
+
+        const askCreateGlobalBackup = () => {
+            const managedJava = javaList.value.filter(j => j.source !== 'local');
+
+            const instanceListHtml = instances.value.length ? `
+                <div class="mt-2 p-2 bg-body-tertiary rounded small" style="max-height: 150px; overflow-y: auto;">
+                    ${instances.value.map(i => `
+                        <div class="form-check mb-1">
+                            <input class="form-check-input check-inst-item" type="checkbox" value="${i.id}" id="check-inst-${i.id}" checked>
+                            <label class="form-check-label" for="check-inst-${i.id}">${i.name} <span class="opacity-50">(${i.id})</span></label>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : `<div class="small text-muted py-2">${$t('panel_settings.no_instances')}</div>`;
+
+            const javaListHtml = managedJava.length ? `
+                <div class="mt-2 p-2 bg-body-tertiary rounded small" style="max-height: 150px; overflow-y: auto;">
+                    ${managedJava.map(j => `
+                        <div class="form-check mb-1">
+                            <input class="form-check-input check-java-item" type="checkbox" value="${j.id}" id="check-java-${j.id}" checked>
+                            <label class="form-check-label" for="check-java-${j.id}">Java ${j.featureVersion} <span class="opacity-50">(${j.id})</span></label>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : `<div class="small text-muted py-2">${$t('panel_settings.no_java')}</div>`;
+
+            openModal({
+                title: $t('panel_settings.create_global_backup') || '创建全局备份',
+                message: `
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">${$t('backups.prompt_note') || '备注'}</label>
+                        <input type="text" id="backup-note" class="form-control form-control-sm" placeholder="e.g. Before update">
+                    </div>
+                    <div class="small fw-bold text-muted mb-2">${$t('panel_settings.backup_include') || '包含内容'}</div>
+                    <div class="form-check small mb-1">
+                        <input class="form-check-input" type="checkbox" id="check-configs" checked>
+                        <label class="form-check-label" for="check-configs">${$t('panel_settings.backup_configs') || '面板配置 (data/*.json)'}</label>
+                    </div>
+                    
+                    <div class="mt-3 ms-2">
+                        <div class="form-check small mb-1">
+                            <input class="form-check-input" type="checkbox" id="check-java-all" checked onchange="document.querySelectorAll('.check-java-item').forEach(i=>i.checked=this.checked)">
+                            <label class="form-check-label fw-bold" for="check-java-all">${$t('panel_settings.backup_java') || 'Java 环境'}</label>
+                        </div>
+                        ${javaListHtml}
+                    </div>
+
+                    <div class="mt-3 ms-2">
+                        <div class="form-check small mb-1">
+                            <input class="form-check-input" type="checkbox" id="check-inst-all" checked onchange="document.querySelectorAll('.check-inst-item').forEach(i=>i.checked=this.checked)">
+                            <label class="form-check-label fw-bold" for="check-inst-all">${$t('panel_settings.backup_instances') || '游戏实例'}</label>
+                        </div>
+                        ${instanceListHtml}
+                    </div>
+                `,
+                callback: async () => {
+                    const note = document.getElementById('backup-note').value;
+                    const configs = document.getElementById('check-configs').checked;
+                    
+                    const javaItems = Array.from(document.querySelectorAll('.check-java-item:checked')).map(i => i.value);
+                    const instItems = Array.from(document.querySelectorAll('.check-inst-item:checked')).map(i => i.value);
+                    
+                    const options = {
+                        configs,
+                        java: javaItems,
+                        instances: instItems
+                    };
+
+                    try {
+                        showToast($t('common.processing') || '正在创建备份...', 'info');
+                        await api.post('/api/backups/global/create', { note, options });
+                        showToast($t('common.success'), 'success');
+                        loadGlobalBackups();
+                    } catch (e) {
+                        showToast(e.message, 'danger');
+                    }
+                }
+            });
+        };
+
+        const downloadGlobalBackup = (b) => {
+            window.open(`/api/backups/global/download?filename=${encodeURIComponent(b.name)}`, '_blank');
+        };
+
+        const askRestoreGlobalBackup = (b) => {
+            openModal({
+                title: $t('backups.restore') || '恢复备份',
+                message: $t('panel_settings.restore_global_confirm') || `确定要还原备份 ${b.name} 吗？这会覆盖当前所有配置和实例，完成后面板将重启。`,
+                callback: async () => {
+                    try {
+                        showToast($t('panel_settings.restoring') || '正在应用备份，面板即将重启...', 'info');
+                        await api.post('/api/backups/global/restore', { filename: b.name });
+                        setTimeout(() => window.location.reload(), 5000);
+                    } catch (e) {
+                        showToast(e.message, 'danger');
+                    }
+                }
+            });
+        };
+
+        const deleteGlobalBackup = (b) => {
+            openModal({
+                title: $t('common.delete'),
+                message: $t('backups.confirm_delete_msg', { name: b.name }),
+                callback: async () => {
+                    try {
+                        await api.post('/api/backups/global/delete', { filename: b.name });
+                        showToast($t('common.success'), 'success');
+                        loadGlobalBackups();
+                    } catch (e) {
+                        showToast(e.message, 'danger');
+                    }
+                }
+            });
         };
 
         const loadConfig = async () => {
@@ -250,15 +478,15 @@ export default {
                                 const portChanged = currentPort !== newPort;
                                 await api.post('/api/panel/restart');
                                 showToast($t('panel_settings.restarting'), 'info');
-                                setTimeout(() => {
-                                    if (portChanged) {
-                                        const protocol = window.location.protocol;
-                                        const hostname = window.location.hostname;
-                                        window.location.href = `${protocol}//${hostname}:${newPort}`;
-                                    } else {
-                                        window.location.reload();
-                                    }
-                                }, 3000);
+                                
+                                await waitForPanel(portChanged ? newPort : null);
+                                if (portChanged) {
+                                    const protocol = window.location.protocol;
+                                    const hostname = window.location.hostname;
+                                    window.location.href = `${protocol}//${hostname}:${newPort}`;
+                                } else {
+                                    window.location.reload();
+                                }
                             } catch (e) {
                                 showToast($t('common.error'), 'danger');
                             }
@@ -338,11 +566,16 @@ export default {
         onMounted(() => {
             loadConfig();
             loadJars();
+            loadGlobalBackups();
+            loadInstances();
+            loadJavaList();
         });
 
         return {
-            store, loading, saving, testingAI, config, javaArgsText, jars,
-            saveConfig, testAI, reset2FA
+            store, loading, saving, testingAI, globalBackups, config, javaArgsText, jars,
+            saveConfig, testAI, reset2FA,
+            askCreateGlobalBackup, downloadGlobalBackup, askRestoreGlobalBackup, deleteGlobalBackup,
+            restoreInput, triggerRestoreImport, handleRestoreImport
         };
     }
 };

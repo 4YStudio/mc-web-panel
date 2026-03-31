@@ -74,3 +74,41 @@ export const confirmModalAction = () => {
     if (modalData.value.callback) modalData.value.callback(modalData.value.inputValue);
     if (modalInstance) modalInstance.hide();
 };
+
+/**
+ * 等待面板重新上线
+ * @param {string|number} targetPort 目标端口 (可选)
+ * @returns {Promise<void>}
+ */
+export const waitForPanel = (targetPort = null) => {
+    return new Promise((resolve) => {
+        const check = async () => {
+            try {
+                let url = '/api/system/version';
+                if (targetPort) {
+                    const protocol = window.location.protocol;
+                    const hostname = window.location.hostname;
+                    url = `${protocol}//${hostname}:${targetPort}/api/system/version`;
+                }
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                
+                // 使用 fetch 探测。由于重启过程会有连接重置，所以 catch 错误并重试
+                await fetch(url, { 
+                    cache: 'no-store', 
+                    mode: 'no-cors', 
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+                
+                // 只要 fetch 没有抛出错误 (即使是 opaque 响应) 都说明服务已启动
+                resolve();
+            } catch (e) {
+                setTimeout(check, 1000);
+            }
+        };
+        // 初始等待 1.5s 确保旧进程已经开始关闭
+        setTimeout(check, 1500);
+    });
+};

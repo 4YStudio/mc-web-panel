@@ -1,7 +1,7 @@
 import { ref, watch, onMounted } from '/js/vue.esm-browser.js';
 import { store } from '../store.js';
 import { api } from '../api.js';
-import { showToast } from '../utils.js';
+import { showToast, waitForPanel } from '../utils.js';
 
 export default {
     template: `
@@ -13,12 +13,26 @@ export default {
             </div>
             <h4 class="mb-4 fw-bold">{{ $t('login.title') }}</h4>
             
-            <div v-if="!store.auth.isSetup" class="mb-4">
-                <div class="p-2 bg-white rounded d-inline-block shadow-sm">
+            <div v-if="!store.auth.isSetup" class="mb-4 animate-in">
+                <div class="p-2 bg-white rounded d-inline-block shadow-sm mb-2">
                     <img :src="store.auth.qrCode" class="img-fluid" style="width: 150px;">
                 </div>
-                <div class="small text-muted mt-2 font-monospace">{{ store.auth.secret }}</div>
-                <div class="alert alert-info mt-3 small">{{ $t('login.prompt_scan') }}</div>
+                <div class="small text-muted mb-3 font-monospace">{{ store.auth.secret }}</div>
+                
+                <div v-if="restoring" class="mb-3">
+                    <div class="modern-progress" style="height: 6px;">
+                        <div class="modern-progress-bar" :style="{width: uploadPercent + '%'}"></div>
+                    </div>
+                    <div class="text-muted small mt-1" style="font-size: 0.7rem;">{{ uploadPercent }}% - {{ $t('setup.restoring_uploading') }}</div>
+                </div>
+
+                <div class="d-grid gap-2 mb-3">
+                    <div class="alert alert-info small m-0">{{ $t('login.prompt_scan') }}</div>
+                    <button class="btn btn-outline-warning btn-sm py-2 border-dashed fw-bold" @click="triggerRestore" :disabled="restoring">
+                        <i class="fa-solid fa-file-import me-1"></i>{{ $t('setup.restore_from_backup') }}
+                    </button>
+                    <input type="file" ref="restoreInput" class="d-none" accept=".zip" @change="handleRestore">
+                </div>
             </div>
 
             <div class="mb-4">
@@ -42,6 +56,9 @@ export default {
     `,
     setup() {
         const hasIcon = ref(false);
+        const restoring = ref(false);
+        const uploadPercent = ref(0);
+        const restoreInput = ref(null);
 
         const checkIcon = async () => {
             const img = new Image();
@@ -75,7 +92,40 @@ export default {
             localStorage.setItem('lang', store.lang);
         };
 
-        return { store, login, toggleTheme, toggleLang, hasIcon };
+        const triggerRestore = () => restoreInput.value.click();
+
+        const handleRestore = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            restoring.value = true;
+            uploadPercent.value = 0;
+            const formData = new FormData();
+            formData.append('backup', file);
+
+            try {
+                showToast('setup.restoring_uploading', 'info');
+                const uploadRes = await api.post('/api/backups/global/import', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    onUploadProgress: (p) => {
+                        uploadPercent.value = Math.round((p.loaded * 100) / p.total);
+                    }
+                });
+                
+                showToast('setup.restoring_applying', 'info');
+                await api.post('/api/backups/global/restore', { filename: uploadRes.data.filename });
+                
+                // Wait for reboot then reload
+                await waitForPanel();
+                window.location.reload();
+            } catch (e) {
+                restoring.value = false;
+                showToast(e.response?.data?.error || e.message, 'danger');
+            }
+            e.target.value = '';
+        };
+
+        return { store, login, toggleTheme, toggleLang, hasIcon, restoring, uploadPercent, restoreInput, triggerRestore, handleRestore };
     }
 };
 import { messages } from '../i18n.js';

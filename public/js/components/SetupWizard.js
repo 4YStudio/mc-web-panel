@@ -41,11 +41,13 @@ export default {
                     </div>
 
                     <!-- Step 3: Install -->
-                    <div class="d-grid" v-if="selectedMc && selectedLoader && !loadingLoaders">
+                    <div class="d-grid gap-2" v-if="selectedMc && selectedLoader && !loadingLoaders">
                         <button class="btn btn-primary btn-lg" @click="install" :disabled="installing">
                              <span v-if="installing" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                              {{ installing ? $t('setup.installing') : $t('setup.install') }}
                         </button>
+                    </div>
+
                     </div>
                 </div>
             </div>
@@ -123,6 +125,7 @@ export default {
                 showToast(t('setup.install_fail_toast'), 'danger');
             }
         };
+
 
         onMounted(fetchMc);
 
