@@ -885,7 +885,26 @@ if (cluster.isPrimary) {
     const activeDownloads = new Map(); // key: featureVersion or 'system_update', value: AbortController
 
     const readJavaInstalled = () => {
-        try { return fs.readJsonSync(JAVA_INSTALLED_FILE); } catch (e) { return { installations: [] }; }
+        try {
+            const data = fs.readJsonSync(JAVA_INSTALLED_FILE);
+            // 自动修正逻辑：修复之前可能被误识别为 Java 1 的 Java 8 (1.8) 等版本
+            let changed = false;
+            data.installations = data.installations.map(inst => {
+                if (inst.featureVersion === 1 && inst.version.startsWith('1.')) {
+                    const match = inst.version.match(/^1\.(\d+)/);
+                    if (match) {
+                        inst.featureVersion = parseInt(match[1]);
+                        changed = true;
+                    }
+                }
+                return inst;
+            });
+            if (changed) {
+                console.log('[Java] Fixed legacy Java 1 entries to correct feature versions');
+                writeJavaInstalled(data);
+            }
+            return data;
+        } catch (e) { return { installations: [] }; }
     };
     const writeJavaInstalled = (data) => {
         fs.writeJsonSync(JAVA_INSTALLED_FILE, data, { spaces: 2 });
@@ -1180,9 +1199,14 @@ if (cluster.isPrimary) {
             return res.status(400).json({ error: '指定路径无法运行 Java: ' + localPath });
         }
 
-        // Parse feature version from detected version
-        const fvMatch = detectedVer.match(/^(\d+)/);
-        const featureVersion = fvMatch ? parseInt(fvMatch[1]) : 0;
+        // Parse feature version from detected version (handles 1.8 -> 8, 11 -> 11)
+        const fvMatch = detectedVer.match(/^(\d+)(?:\.(\d+))?/);
+        let featureVersion = 0;
+        if (fvMatch) {
+            const major = parseInt(fvMatch[1]);
+            const minor = fvMatch[2] ? parseInt(fvMatch[2]) : 0;
+            featureVersion = (major === 1 && minor > 0) ? minor : major;
+        }
 
         const id = `local-${Date.now()}`;
         const data = readJavaInstalled();
