@@ -24,7 +24,7 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
 
-const APP_VERSION = '1.7.7';
+const APP_VERSION = '1.7.8';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -1248,6 +1248,448 @@ if (cluster.isPrimary) {
             { id: 'tuna', name: '清华大学镜像', url: ADOPTIUM_SOURCES.tuna },
             { id: 'ghproxy', name: 'GitHub 代理加速 (推荐)', url: appConfig.githubProxy || 'Mirror' }
         ]);
+    });
+
+    // --- FRP 内网穿透管理 API (多配置/多进程) ---
+    const FRP_DIR = path.join(DATA_DIR, 'frp');
+    const FRP_META_FILE = path.join(FRP_DIR, 'frp.json');
+    fs.ensureDirSync(FRP_DIR);
+
+    // { installed, version, installedAt, frpcPath, configs: [{ id, name, config, createdAt }] }
+    const readFrpMeta = () => {
+        try {
+            const data = fs.readJsonSync(FRP_META_FILE);
+            if (!data.configs) data.configs = [];
+            return data;
+        } catch (e) { return { installed: false, configs: [] }; }
+    };
+    const writeFrpMeta = (data) => {
+        fs.writeJsonSync(FRP_META_FILE, data, { spaces: 2 });
+    };
+
+    const getFrpBinaryPath = () => {
+        return path.join(FRP_DIR, process.platform === 'win32' ? 'frpc.exe' : 'frpc');
+    };
+    const getConfigFilePath = (configId) => {
+        return path.join(FRP_DIR, `frpc-${configId}.toml`);
+    };
+
+    // Multi-process tracking: Map<configId, { process, logs[] }>
+    const frpInstances = new Map();
+    const MAX_FRP_LOGS = 500;
+
+    const appendFrpLog = (configId, line) => {
+        const entry = `[${new Date().toLocaleTimeString()}] ${line}`;
+        const inst = frpInstances.get(configId);
+        if (inst) {
+            inst.logs.push(entry);
+            if (inst.logs.length > MAX_FRP_LOGS) inst.logs.shift();
+        }
+        io.emit('frp_log', { configId, line: entry });
+    };
+
+    const startFrpProcess = (configId, configFilePath) => {
+        const frpcPath = getFrpBinaryPath();
+        const proc = spawn(frpcPath, ['-c', configFilePath], {
+            cwd: FRP_DIR,
+            env: { ...process.env }
+        });
+        const inst = { process: proc, logs: [] };
+        frpInstances.set(configId, inst);
+
+        appendFrpLog(configId, `frpc 进程已启动 (PID: ${proc.pid})`);
+        io.emit('frp_status', { configId, running: true });
+
+        proc.stdout.on('data', (data) => {
+            data.toString().split('\n').filter(l => l.trim()).forEach(l => appendFrpLog(configId, l));
+        });
+        proc.stderr.on('data', (data) => {
+            data.toString().split('\n').filter(l => l.trim()).forEach(l => appendFrpLog(configId, '[stderr] ' + l));
+        });
+        proc.on('error', (err) => {
+            appendFrpLog(configId, 'frpc 启动失败: ' + err.message);
+            frpInstances.delete(configId);
+            io.emit('frp_status', { configId, running: false });
+        });
+        proc.on('exit', (code, signal) => {
+            appendFrpLog(configId, `frpc 进程退出 (code: ${code}, signal: ${signal})`);
+            frpInstances.delete(configId);
+            io.emit('frp_status', { configId, running: false });
+        });
+        return proc;
+    };
+
+    const stopFrpProcess = async (configId) => {
+        const inst = frpInstances.get(configId);
+        if (!inst) return;
+        try { inst.process.kill('SIGTERM'); } catch (e) { }
+        appendFrpLog(configId, '正在停止 frpc...');
+        await new Promise(resolve => {
+            const check = setInterval(() => {
+                if (!frpInstances.has(configId)) { clearInterval(check); resolve(); }
+            }, 200);
+            setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+        });
+    };
+
+    // GET /api/frp/status
+    app.get('/api/frp/status', requireAuth, (req, res) => {
+        const meta = readFrpMeta();
+        const frpcPath = getFrpBinaryPath();
+        const installed = meta.installed && fs.existsSync(frpcPath);
+        // Build running state for each config
+        const configs = (meta.configs || []).map(c => ({
+            ...c,
+            running: frpInstances.has(c.id),
+            config: undefined // Don't send full config in list
+        }));
+        res.json({
+            installed,
+            version: installed ? (meta.version || 'Unknown') : null,
+            installedAt: meta.installedAt || null,
+            configs
+        });
+    });
+
+    // GET /api/frp/releases — 从 GitHub 获取 frp 版本列表
+    app.get('/api/frp/releases', requireAuth, async (req, res) => {
+        try {
+            const arch = os.arch() === 'x64' ? 'amd64' : os.arch() === 'arm64' ? 'arm64' : os.arch();
+            const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'darwin' : 'windows';
+
+            const apiUrl = 'https://api.github.com/repos/fatedier/frp/releases';
+            const resp = await axios.get(apiUrl, {
+                timeout: 15000,
+                headers: { 'User-Agent': MODRINTH_UA, 'Accept': 'application/vnd.github.v3+json' },
+                params: { per_page: 15 }
+            });
+
+            const releases = resp.data
+                .filter(r => !r.prerelease && !r.draft)
+                .map(r => {
+                    const suffix = osType === 'windows' ? `${osType}_${arch}.zip` : `${osType}_${arch}.tar.gz`;
+                    const asset = r.assets.find(a => a.name.includes(suffix));
+                    return asset ? {
+                        version: r.tag_name.replace(/^v/, ''),
+                        tagName: r.tag_name,
+                        releaseName: r.name,
+                        publishedAt: r.published_at,
+                        downloadUrl: asset.browser_download_url,
+                        size: asset.size,
+                        fileName: asset.name
+                    } : null;
+                })
+                .filter(r => r !== null);
+
+            const meta = readFrpMeta();
+            res.json({ releases, installedVersion: meta.installed ? meta.version : null });
+        } catch (e) {
+            console.error('[FRP] Failed to fetch releases:', e.message);
+            res.status(500).json({ error: '获取版本列表失败: ' + e.message });
+        }
+    });
+
+    // POST /api/frp/install — 下载安装 frpc
+    app.post('/api/frp/install', requireAuth, async (req, res) => {
+        const { version, downloadUrl } = req.body;
+        if (!downloadUrl || !version) return res.status(400).json({ error: '参数不完整' });
+
+        // Stop all running frpc processes
+        for (const [cid] of frpInstances) {
+            await stopFrpProcess(cid);
+        }
+
+        res.json({ success: true, message: '开始下载...' });
+
+        const controller = new AbortController();
+        activeDownloads.set('frp-install', controller);
+
+        try {
+            const isZip = downloadUrl.endsWith('.zip');
+            const tmpFile = path.join(FRP_DIR, isZip ? 'frp-tmp.zip' : 'frp-tmp.tar.gz');
+
+            io.emit('frp_install_progress', { step: 'downloading', percent: 0, message: '正在下载...' });
+
+            const proxiedUrl = applyGithubProxy(downloadUrl);
+            const response = await axios({
+                method: 'get',
+                url: proxiedUrl,
+                responseType: 'stream',
+                timeout: 600000,
+                signal: controller.signal
+            });
+
+            const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+            let downloadedBytes = 0;
+            const writer = fs.createWriteStream(tmpFile);
+            let lastUpdateTime = Date.now();
+            let lastDownloadedBytes = 0;
+
+            response.data.on('data', (chunk) => {
+                downloadedBytes += chunk.length;
+                const now = Date.now();
+                if (now - lastUpdateTime >= 1000) {
+                    const speed = (downloadedBytes - lastDownloadedBytes) / ((now - lastUpdateTime) / 1000);
+                    lastUpdateTime = now;
+                    lastDownloadedBytes = downloadedBytes;
+                    if (totalBytes > 0) {
+                        const percent = Math.round((downloadedBytes / totalBytes) * 80);
+                        io.emit('frp_install_progress', {
+                            step: 'downloading', percent,
+                            message: `下载中... ${(downloadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalBytes / 1024 / 1024).toFixed(1)}MB`,
+                            speed
+                        });
+                    }
+                }
+            });
+
+            await pipeline(response.data, writer, { signal: controller.signal });
+
+            io.emit('frp_install_progress', { step: 'extracting', percent: 85, message: '正在解压...' });
+
+            const { execSync } = require('child_process');
+            const extractDir = path.join(FRP_DIR, 'extract-tmp');
+            fs.ensureDirSync(extractDir);
+
+            if (isZip) {
+                const zip = new AdmZip(tmpFile);
+                zip.extractAllTo(extractDir, true);
+            } else {
+                execSync(`tar -xzf "${tmpFile}" -C "${extractDir}"`, { timeout: 120000 });
+            }
+
+            const frpcName = process.platform === 'win32' ? 'frpc.exe' : 'frpc';
+            let frpcSource = null;
+            const findFrpc = (dir) => {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isFile() && entry.name === frpcName) { frpcSource = fullPath; return; }
+                    if (entry.isDirectory()) findFrpc(fullPath);
+                    if (frpcSource) return;
+                }
+            };
+            findFrpc(extractDir);
+
+            if (!frpcSource) throw new Error('在下载的包中未找到 frpc 二进制文件');
+
+            const frpcDest = getFrpBinaryPath();
+            await fs.copy(frpcSource, frpcDest, { overwrite: true });
+
+            if (process.platform !== 'win32') {
+                try { execSync(`chmod +x "${frpcDest}"`); } catch (e) { }
+            }
+
+            await fs.remove(tmpFile);
+            await fs.remove(extractDir);
+
+            let detectedVer = version;
+            try {
+                const verOutput = execSync(`"${frpcDest}" --version`, { encoding: 'utf8', timeout: 5000 }).trim();
+                if (verOutput) detectedVer = verOutput;
+            } catch (e) { }
+
+            const meta = readFrpMeta();
+            meta.installed = true;
+            meta.version = detectedVer;
+            meta.installedAt = new Date().toISOString();
+            meta.frpcPath = frpcDest;
+            writeFrpMeta(meta);
+
+            io.emit('frp_install_progress', { step: 'done', percent: 100, message: `安装完成! (${detectedVer})` });
+        } catch (e) {
+            if (e.name === 'AbortError' || e.code === 'ERR_CANCELED' || (controller && controller.signal.aborted)) {
+                io.emit('frp_install_progress', { step: 'error', percent: 0, message: '已取消' });
+            } else {
+                console.error('[FRP Install Error]', e);
+                io.emit('frp_install_progress', { step: 'error', percent: 0, message: '安装失败: ' + e.message });
+            }
+            try { await fs.remove(path.join(FRP_DIR, 'frp-tmp.tar.gz')); } catch (e2) { }
+            try { await fs.remove(path.join(FRP_DIR, 'frp-tmp.zip')); } catch (e2) { }
+            try { await fs.remove(path.join(FRP_DIR, 'extract-tmp')); } catch (e2) { }
+        } finally {
+            activeDownloads.delete('frp-install');
+        }
+    });
+
+    // POST /api/frp/install/cancel
+    app.post('/api/frp/install/cancel', requireAuth, (req, res) => {
+        if (activeDownloads.has('frp-install')) {
+            activeDownloads.get('frp-install').abort();
+            activeDownloads.delete('frp-install');
+            res.json({ success: true, message: '已取消' });
+        } else {
+            res.status(404).json({ error: '没有正在进行的安装' });
+        }
+    });
+
+    // POST /api/frp/uninstall
+    app.post('/api/frp/uninstall', requireAuth, async (req, res) => {
+        for (const [cid] of frpInstances) {
+            await stopFrpProcess(cid);
+        }
+        const frpcPath = getFrpBinaryPath();
+        try { await fs.remove(frpcPath); } catch (e) { }
+        const meta = readFrpMeta();
+        meta.installed = false;
+        meta.version = null;
+        writeFrpMeta(meta);
+        res.json({ success: true });
+    });
+
+    // --- 多配置 CRUD ---
+
+    // GET /api/frp/configs — 获取所有配置
+    app.get('/api/frp/configs', requireAuth, (req, res) => {
+        const meta = readFrpMeta();
+        const configs = (meta.configs || []).map(c => ({
+            ...c,
+            running: frpInstances.has(c.id)
+        }));
+        res.json(configs);
+    });
+
+    // GET /api/frp/configs/:id — 获取单个配置详情
+    app.get('/api/frp/configs/:id', requireAuth, (req, res) => {
+        const meta = readFrpMeta();
+        const cfg = (meta.configs || []).find(c => c.id === req.params.id);
+        if (!cfg) return res.status(404).json({ error: '配置不存在' });
+        res.json({ ...cfg, running: frpInstances.has(cfg.id) });
+    });
+
+    // POST /api/frp/configs — 创建或更新配置
+    app.post('/api/frp/configs', requireAuth, (req, res) => {
+        const { id, name, config } = req.body;
+        if (!name) return res.status(400).json({ error: '名称不能为空' });
+        if (config === undefined) return res.status(400).json({ error: '缺少配置内容' });
+
+        const meta = readFrpMeta();
+        if (!meta.configs) meta.configs = [];
+
+        if (id) {
+            // Update existing
+            const idx = meta.configs.findIndex(c => c.id === id);
+            if (idx === -1) return res.status(404).json({ error: '配置不存在' });
+            meta.configs[idx].name = name;
+            meta.configs[idx].config = config;
+            // Write config file
+            fs.writeFileSync(getConfigFilePath(id), config, 'utf8');
+            writeFrpMeta(meta);
+            res.json({ success: true, id });
+        } else {
+            // Create new
+            const newId = 'frp-' + Date.now();
+            const newCfg = {
+                id: newId,
+                name,
+                config,
+                createdAt: new Date().toISOString()
+            };
+            meta.configs.push(newCfg);
+            fs.writeFileSync(getConfigFilePath(newId), config, 'utf8');
+            writeFrpMeta(meta);
+            res.json({ success: true, id: newId });
+        }
+    });
+
+    // POST /api/frp/configs/delete — 删除配置
+    app.post('/api/frp/configs/delete', requireAuth, async (req, res) => {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: '缺少配置 ID' });
+
+        // Stop if running
+        if (frpInstances.has(id)) {
+            await stopFrpProcess(id);
+        }
+
+        const meta = readFrpMeta();
+        const idx = (meta.configs || []).findIndex(c => c.id === id);
+        if (idx === -1) return res.status(404).json({ error: '配置不存在' });
+        meta.configs.splice(idx, 1);
+        writeFrpMeta(meta);
+
+        // Remove config file
+        try { await fs.remove(getConfigFilePath(id)); } catch (e) { }
+        res.json({ success: true });
+    });
+
+    // --- 进程控制 (按配置 ID) ---
+
+    // POST /api/frp/start
+    app.post('/api/frp/start', requireAuth, (req, res) => {
+        const { configId } = req.body;
+        if (!configId) return res.status(400).json({ error: '缺少配置 ID' });
+        if (frpInstances.has(configId)) return res.status(400).json({ error: '该配置已在运行中' });
+
+        const meta = readFrpMeta();
+        const frpcPath = getFrpBinaryPath();
+        if (!meta.installed || !fs.existsSync(frpcPath)) {
+            return res.status(400).json({ error: 'FRP 客户端未安装' });
+        }
+        const cfg = (meta.configs || []).find(c => c.id === configId);
+        if (!cfg) return res.status(404).json({ error: '配置不存在' });
+
+        const configFilePath = getConfigFilePath(configId);
+        // Ensure file exists
+        if (!fs.existsSync(configFilePath)) {
+            fs.writeFileSync(configFilePath, cfg.config || '', 'utf8');
+        }
+
+        try {
+            const proc = startFrpProcess(configId, configFilePath);
+            res.json({ success: true, pid: proc.pid });
+        } catch (e) {
+            res.status(500).json({ error: '启动失败: ' + e.message });
+        }
+    });
+
+    // POST /api/frp/stop
+    app.post('/api/frp/stop', requireAuth, async (req, res) => {
+        const { configId } = req.body;
+        if (!configId) return res.status(400).json({ error: '缺少配置 ID' });
+        if (!frpInstances.has(configId)) return res.status(400).json({ error: '该配置未在运行' });
+        try {
+            await stopFrpProcess(configId);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: '停止失败: ' + e.message });
+        }
+    });
+
+    // POST /api/frp/restart
+    app.post('/api/frp/restart', requireAuth, async (req, res) => {
+        const { configId } = req.body;
+        if (!configId) return res.status(400).json({ error: '缺少配置 ID' });
+
+        if (frpInstances.has(configId)) {
+            await stopFrpProcess(configId);
+        }
+
+        const meta = readFrpMeta();
+        const frpcPath = getFrpBinaryPath();
+        if (!meta.installed || !fs.existsSync(frpcPath)) {
+            return res.status(400).json({ error: 'FRP 客户端未安装' });
+        }
+        const cfg = (meta.configs || []).find(c => c.id === configId);
+        if (!cfg) return res.status(404).json({ error: '配置不存在' });
+
+        const configFilePath = getConfigFilePath(configId);
+        if (!fs.existsSync(configFilePath)) {
+            fs.writeFileSync(configFilePath, cfg.config || '', 'utf8');
+        }
+
+        try {
+            const proc = startFrpProcess(configId, configFilePath);
+            res.json({ success: true, pid: proc.pid });
+        } catch (e) {
+            res.status(500).json({ error: '重启失败: ' + e.message });
+        }
+    });
+
+    // GET /api/frp/logs/:configId
+    app.get('/api/frp/logs/:configId', requireAuth, (req, res) => {
+        const inst = frpInstances.get(req.params.configId);
+        res.json({ logs: inst ? inst.logs : [] });
     });
 
     // --- EasyAuth 管理 API (sqlite3 兼容版 - 修复表名) ---

@@ -30,6 +30,9 @@ export default {
                     <button @click="store.view = 'java'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
                          <i class="fa-brands fa-java text-white me-2"></i>{{ $t('instance_manager.manage_java') }}
                     </button>
+                    <button @click="store.view = 'frp'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
+                         <i class="fa-solid fa-network-wired text-white me-2"></i>{{ $t('frp.title') }}
+                    </button>
                     <button @click="store.view = 'about'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
                         <i class="fa-solid fa-circle-info text-white me-2"></i>{{ $t('about.title') }}
                     </button>
@@ -56,6 +59,7 @@ export default {
                                     <li><hr class="dropdown-divider opacity-10"></li>
                                     <li><button class="dropdown-item rounded-3 py-2 font-weight-bold" @click="store.view = 'panel-settings'; showMobileMenu = false"><i class="fa-solid fa-gear me-2 w-20 text-primary"></i>{{ $t('panel_settings.title') }}</button></li>
                                     <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'java'; showMobileMenu = false"><i class="fa-brands fa-java me-2 w-20 text-primary"></i>{{ $t('instance_manager.manage_java') }}</button></li>
+                                    <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'frp'; showMobileMenu = false"><i class="fa-solid fa-network-wired me-2 w-20 text-primary"></i>{{ $t('frp.title') }}</button></li>
                                     <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'about'; showMobileMenu = false"><i class="fa-solid fa-circle-info me-2 w-20 text-primary"></i>{{ $t('about.title') }}</button></li>
                                     <li><hr class="dropdown-divider opacity-10"></li>
                                     <li><button class="dropdown-item rounded-3 py-2 text-danger fw-bold" @click="logout(); showMobileMenu = false"><i class="fa-solid fa-right-from-bracket me-2 w-20"></i>{{ $t('common.logout') }}</button></li>

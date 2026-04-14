@@ -21,6 +21,7 @@ import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
 import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
+import FrpManager from './components/FrpManager.js';
 import { createI18n } from './i18n.js?v=1.5.0';
 import { socket } from './socket.js';
 
@@ -43,7 +44,8 @@ const app = createApp({
         ModrinthBrowser,
         About,
         JavaManager,
-        InstanceManager
+        InstanceManager,
+        FrpManager
     },
     setup() {
         const sidebarOpen = ref(false);

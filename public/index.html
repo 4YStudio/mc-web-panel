@@ -84,6 +84,14 @@
                 </div>
             </div>
 
+            <!-- FRP 内网穿透视图 (顶级独立界面) -->
+            <div v-else-if="store.view === 'frp'"
+                class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto" key="frp">
+                <div class="container-xxl p-0">
+                    <frp-manager></frp-manager>
+                </div>
+            </div>
+
             <!-- 关于页面 (顶级独立界面) -->
             <div v-else-if="store.view === 'about'" class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto"
                 key="about">
