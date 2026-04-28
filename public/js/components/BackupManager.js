@@ -1,7 +1,7 @@
 import { ref, reactive, onMounted, watch, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal } from '../utils.js';
+import { showToast, openModal, uploadFileWithChunk, isLargeFile } from '../utils.js';
 
 // 这里为了简单，配置项的 label 暂时保留硬编码或需要后端提供 i18n key。
 // 假设用户接受配置项本身是技术性的英文或中文。在此演示中，主要汉化界面元素。
@@ -471,12 +471,29 @@ export default {
         const handleImport = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const formData = new FormData();
-            formData.append('backup', file);
+
             try {
-                await api.post('/api/backups/panel/import', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                if (isLargeFile(file)) {
+                    store.task.visible = true;
+                    store.task.title = $t('common.upload');
+                    store.task.percent = 0;
+                    store.task.message = file.name;
+                    await uploadFileWithChunk(file, {
+                        initUrl: '/api/backups/panel/import-chunk/init',
+                        completeUrl: '/api/backups/panel/import-chunk/complete',
+                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
+                            store.task.percent = Math.round((bytesDone * 100) / bytesTotal);
+                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
+                        }
+                    });
+                    setTimeout(() => { store.task.visible = false; }, 500);
+                } else {
+                    const formData = new FormData();
+                    formData.append('backup', file);
+                    await api.post('/api/backups/panel/import', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                }
                 showToast($t('backups.import_success'));
                 loadBackups();
             } catch (e) { showToast(e.message, 'danger'); }

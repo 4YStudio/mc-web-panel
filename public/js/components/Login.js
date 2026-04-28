@@ -1,7 +1,7 @@
 import { ref, watch, onMounted } from '/js/vue.esm-browser.js';
 import { store } from '../store.js';
 import { api } from '../api.js';
-import { showToast, waitForPanel } from '../utils.js';
+import { showToast, waitForPanel, uploadFileWithChunk, isLargeFile } from '../utils.js';
 
 export default {
     template: `
@@ -100,20 +100,33 @@ export default {
 
             restoring.value = true;
             uploadPercent.value = 0;
-            const formData = new FormData();
-            formData.append('backup', file);
 
             try {
-                showToast('setup.restoring_uploading', 'info');
-                const uploadRes = await api.post('/api/backups/global/import', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                    onUploadProgress: (p) => {
-                        uploadPercent.value = Math.round((p.loaded * 100) / p.total);
-                    }
-                });
+                let filename;
+                if (isLargeFile(file)) {
+                    const chunkResult = await uploadFileWithChunk(file, {
+                        initUrl: '/api/backups/global/import-chunk/init',
+                        completeUrl: '/api/backups/global/import-chunk/complete',
+                        onProgress: (bytesDone, bytesTotal) => {
+                            uploadPercent.value = Math.round((bytesDone * 100) / bytesTotal);
+                        }
+                    });
+                    filename = chunkResult.filename;
+                } else {
+                    const formData = new FormData();
+                    formData.append('backup', file);
+                    showToast('setup.restoring_uploading', 'info');
+                    const uploadRes = await api.post('/api/backups/global/import', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                        onUploadProgress: (p) => {
+                            uploadPercent.value = Math.round((p.loaded * 100) / p.total);
+                        }
+                    });
+                    filename = uploadRes.data.filename;
+                }
                 
                 showToast('setup.restoring_applying', 'info');
-                await api.post('/api/backups/global/restore', { filename: uploadRes.data.filename });
+                await api.post('/api/backups/global/restore', { filename });
                 
                 // Wait for reboot then reload
                 await waitForPanel();

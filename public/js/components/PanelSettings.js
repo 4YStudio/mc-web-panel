@@ -1,7 +1,7 @@
 import { ref, reactive, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal, waitForPanel } from '../utils.js';
+import { showToast, openModal, waitForPanel, uploadFileWithChunk, isLargeFile } from '../utils.js';
 
 export default {
     template: `
@@ -287,17 +287,35 @@ export default {
             if (!file) return;
 
             saving.value = true;
-            const formData = new FormData();
-            formData.append('backup', file);
-
             try {
-                showToast($t('setup.restoring_uploading') || '正在上传备份...', 'info');
-                const uploadRes = await api.post('/api/backups/global/import', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                let filename;
+                if (isLargeFile(file)) {
+                    store.task.visible = true;
+                    store.task.title = $t('setup.restoring_uploading') || '正在上传备份...';
+                    store.task.percent = 0;
+                    store.task.message = file.name;
+                    const chunkResult = await uploadFileWithChunk(file, {
+                        initUrl: '/api/backups/global/import-chunk/init',
+                        completeUrl: '/api/backups/global/import-chunk/complete',
+                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
+                            store.task.percent = Math.round((bytesDone * 100) / bytesTotal);
+                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
+                        }
+                    });
+                    filename = chunkResult.filename;
+                    setTimeout(() => { store.task.visible = false; }, 500);
+                } else {
+                    const formData = new FormData();
+                    formData.append('backup', file);
+                    showToast($t('setup.restoring_uploading') || '正在上传备份...', 'info');
+                    const uploadRes = await api.post('/api/backups/global/import', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    filename = uploadRes.data.filename;
+                }
                 
                 showToast($t('panel_settings.restoring') || '正在应用备份，面板即将重启...', 'info');
-                await api.post('/api/backups/global/restore', { filename: uploadRes.data.filename });
+                await api.post('/api/backups/global/restore', { filename });
                 
                 setTimeout(() => window.location.reload(), 5000);
             } catch (e) {

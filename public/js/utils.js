@@ -112,3 +112,64 @@ export const waitForPanel = (targetPort = null) => {
         setTimeout(check, 1500);
     });
 };
+
+const CHUNK_SIZE = 10 * 1024 * 1024;
+const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024;
+
+export const uploadFileWithChunk = async (file, options = {}) => {
+    const {
+        initUrl,
+        uploadUrl = '/api/files/chunk/upload',
+        completeUrl,
+        cancelUrl = '/api/files/chunk/cancel',
+        fieldName = 'chunk',
+        extraInitData = {},
+        onProgress = () => {},
+    } = options;
+
+    const isLargeFile = file.size >= LARGE_FILE_THRESHOLD;
+
+    if (!isLargeFile) {
+        return null;
+    }
+
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    let uploadId = null;
+
+    try {
+        const initRes = await axios.post(initUrl, {
+            fileName: file.name,
+            fileSize: file.size,
+            totalChunks,
+            ...extraInitData,
+        });
+        uploadId = initRes.data.uploadId;
+
+        let uploadedBytes = 0;
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunkBlob = file.slice(start, end);
+
+            const fd = new FormData();
+            fd.append(fieldName, chunkBlob);
+            fd.append('uploadId', uploadId);
+            fd.append('chunkIndex', i);
+
+            await axios.post(uploadUrl, fd);
+
+            uploadedBytes += (end - start);
+            onProgress(uploadedBytes, file.size, i + 1, totalChunks);
+        }
+
+        const completeRes = await axios.post(completeUrl, { uploadId });
+        return completeRes.data;
+    } catch (e) {
+        if (uploadId) {
+            try { await axios.post(cancelUrl, { uploadId }); } catch (_) {}
+        }
+        throw e;
+    }
+};
+
+export const isLargeFile = (file) => file.size >= LARGE_FILE_THRESHOLD;

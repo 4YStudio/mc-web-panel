@@ -24,7 +24,7 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
 
-const APP_VERSION = '1.7.8';
+const APP_VERSION = '1.7.9';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -2361,6 +2361,65 @@ if (cluster.isPrimary) {
         }
     });
 
+    app.post('/api/backups/panel/import-chunk/init', requireAuth, withInstance, async (req, res) => {
+        const { instDir } = req;
+        const { fileName, fileSize, totalChunks } = req.body;
+        const uploadId = crypto.randomBytes(16).toString('hex');
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        await fs.ensureDir(chunkDir);
+        await fs.writeJson(path.join(chunkDir, '.meta'), {
+            type: 'panel-backup',
+            fileName: fixFileName(fileName),
+            fileSize,
+            totalChunks,
+            instDir,
+            createdAt: Date.now()
+        });
+        res.json({ uploadId });
+    });
+
+    app.post('/api/backups/panel/import-chunk/complete', requireAuth, withInstance, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        const metaPath = path.join(chunkDir, '.meta');
+        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: 'Upload session not found' });
+
+        try {
+            const meta = await fs.readJson(metaPath);
+            const { fileName, totalChunks, instDir } = meta;
+            if (!instDir.startsWith(req.instDir)) return res.status(403).json({ error: 'Access Denied' });
+
+            const BACKUP_PANEL_DIR = path.join(instDir, 'backups', 'panel');
+            await fs.ensureDir(BACKUP_PANEL_DIR);
+            const finalPath = path.join(BACKUP_PANEL_DIR, fileName);
+
+            const writeStream = fs.createWriteStream(finalPath);
+            for (let i = 0; i < totalChunks; i++) {
+                const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
+                if (!fs.existsSync(chunkFile)) {
+                    writeStream.close();
+                    await fs.remove(finalPath).catch(() => {});
+                    return res.status(400).json({ error: `Chunk ${i} missing` });
+                }
+                const data = fs.readFileSync(chunkFile);
+                writeStream.write(data);
+            }
+            await new Promise((resolve, reject) => {
+                writeStream.end(resolve);
+                writeStream.on('error', reject);
+            });
+
+            const metaJsonPath = finalPath + '.meta.json';
+            await fs.writeJson(metaJsonPath, { note: 'Imported Backup', locked: false, createdAt: new Date() }, { spaces: 2 });
+            await fs.remove(chunkDir);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) {}
+        }
+    });
+
     // --- Global Backup APIs ---
     app.get('/api/backups/global/list', async (req, res) => {
         // Allow unauthenticated access if not setup yet (for setup wizard)
@@ -2439,6 +2498,62 @@ if (cluster.isPrimary) {
             } catch (e) { res.status(500).json({ error: e.message }); }
         } else {
             res.status(401).json({ error: 'Unauthorized' });
+        }
+    });
+
+    app.post('/api/backups/global/import-chunk/init', async (req, res) => {
+        if (!(appConfig.isSetup ? req.session.authenticated : true)) return res.status(401).json({ error: 'Unauthorized' });
+        const { fileName, fileSize, totalChunks } = req.body;
+        const uploadId = crypto.randomBytes(16).toString('hex');
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        await fs.ensureDir(chunkDir);
+        await fs.writeJson(path.join(chunkDir, '.meta'), {
+            type: 'global-backup',
+            fileName: fixFileName(fileName),
+            fileSize,
+            totalChunks,
+            createdAt: Date.now()
+        });
+        res.json({ uploadId });
+    });
+
+    app.post('/api/backups/global/import-chunk/complete', async (req, res) => {
+        if (!(appConfig.isSetup ? req.session.authenticated : true)) return res.status(401).json({ error: 'Unauthorized' });
+        const { uploadId } = req.body;
+        if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        const metaPath = path.join(chunkDir, '.meta');
+        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: 'Upload session not found' });
+
+        try {
+            const meta = await fs.readJson(metaPath);
+            const { fileName, totalChunks } = meta;
+            const finalPath = path.join(GLOBAL_BACKUP_DIR, fileName);
+            await fs.ensureDir(GLOBAL_BACKUP_DIR);
+
+            const writeStream = fs.createWriteStream(finalPath);
+            for (let i = 0; i < totalChunks; i++) {
+                const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
+                if (!fs.existsSync(chunkFile)) {
+                    writeStream.close();
+                    await fs.remove(finalPath).catch(() => {});
+                    return res.status(400).json({ error: `Chunk ${i} missing` });
+                }
+                const data = fs.readFileSync(chunkFile);
+                writeStream.write(data);
+            }
+            await new Promise((resolve, reject) => {
+                writeStream.end(resolve);
+                writeStream.on('error', reject);
+            });
+
+            const metaJsonPath = finalPath + '.meta.json';
+            await fs.writeJson(metaJsonPath, { note: 'Imported Global Backup', createdAt: new Date() }, { spaces: 2 });
+            await fs.remove(chunkDir);
+            res.json({ success: true, filename: path.basename(finalPath) });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) {}
         }
     });
 
@@ -3217,6 +3332,107 @@ if (cluster.isPrimary) {
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
+
+    const CHUNK_TEMP_DIR = path.join(DATA_DIR, 'chunk_uploads');
+    fs.ensureDirSync(CHUNK_TEMP_DIR);
+
+    app.post('/api/files/chunk/init', requireAuth, withInstance, async (req, res) => {
+        const { instDir } = req;
+        const { fileName, fileSize, totalChunks, targetPath } = req.body;
+        const destDir = targetPath ? path.join(instDir, targetPath) : instDir;
+        if (!destDir.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
+
+        const uploadId = crypto.randomBytes(16).toString('hex');
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        await fs.ensureDir(chunkDir);
+        await fs.writeJson(path.join(chunkDir, '.meta'), {
+            fileName: fixFileName(fileName),
+            fileSize,
+            totalChunks,
+            destDir,
+            createdAt: Date.now()
+        });
+        res.json({ uploadId });
+    });
+
+    app.post('/api/files/chunk/upload', requireAuth, withInstance, upload.single('chunk'), async (req, res) => {
+        const { uploadId, chunkIndex } = req.body;
+        if (!uploadId || chunkIndex === undefined) return res.status(400).json({ error: 'Missing params' });
+
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        const metaPath = path.join(chunkDir, '.meta');
+        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: 'Upload session not found' });
+
+        try {
+            const chunkFile = path.join(chunkDir, String(chunkIndex).padStart(6, '0'));
+            await fs.move(req.file.path, chunkFile, { overwrite: true });
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/files/chunk/complete', requireAuth, withInstance, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
+
+        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        const metaPath = path.join(chunkDir, '.meta');
+        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: 'Upload session not found' });
+
+        try {
+            const meta = await fs.readJson(metaPath);
+            const { fileName, totalChunks, destDir } = meta;
+            if (!destDir.startsWith(req.instDir)) return res.status(403).json({ error: 'Access Denied' });
+
+            const finalPath = path.join(destDir, fileName);
+            await fs.ensureDir(destDir);
+
+            const writeStream = fs.createWriteStream(finalPath);
+            for (let i = 0; i < totalChunks; i++) {
+                const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
+                if (!fs.existsSync(chunkFile)) {
+                    writeStream.close();
+                    await fs.remove(finalPath).catch(() => {});
+                    return res.status(400).json({ error: `Chunk ${i} missing` });
+                }
+                const data = fs.readFileSync(chunkFile);
+                writeStream.write(data);
+            }
+            await new Promise((resolve, reject) => {
+                writeStream.end(resolve);
+                writeStream.on('error', reject);
+            });
+
+            await fs.remove(chunkDir);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) {}
+        }
+    });
+
+    app.post('/api/files/chunk/cancel', requireAuth, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
+        try {
+            const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
+            if (fs.existsSync(chunkDir)) await fs.remove(chunkDir);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    setInterval(() => {
+        try {
+            if (!fs.existsSync(CHUNK_TEMP_DIR)) return;
+            const now = Date.now();
+            for (const d of fs.readdirSync(CHUNK_TEMP_DIR)) {
+                const metaPath = path.join(CHUNK_TEMP_DIR, d, '.meta');
+                if (fs.existsSync(metaPath)) {
+                    const meta = fs.readJsonSync(metaPath);
+                    if (now - meta.createdAt > 3600000) fs.removeSync(path.join(CHUNK_TEMP_DIR, d));
+                }
+            }
+        } catch (e) {}
+    }, 1800000);
 
     app.post('/api/files/operate', requireAuth, withInstance, async (req, res) => {
         const { instDir } = req;

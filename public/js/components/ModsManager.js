@@ -1,7 +1,7 @@
 import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal } from '../utils.js';
+import { showToast, openModal, uploadFileWithChunk, isLargeFile } from '../utils.js';
 
 const LazyModRow = {
     props: ['file', 'selectedFiles'],
@@ -362,13 +362,15 @@ export default {
             const files = e.target.files;
             if (!files.length) return;
 
-            const fd = new FormData();
-            let totalSize = 0;
+            const largeFiles = [];
+            const smallFiles = [];
             for (let i = 0; i < files.length; i++) {
-                fd.append('files', files[i]);
-                totalSize += files[i].size;
+                if (isLargeFile(files[i])) largeFiles.push(files[i]);
+                else smallFiles.push(files[i]);
             }
-            fd.append('path', 'mods');
+
+            let totalSize = Array.from(files).reduce((s, f) => s + f.size, 0);
+            let uploadedSize = 0;
 
             store.task.visible = true;
             store.task.title = $t('common.loading');
@@ -377,15 +379,37 @@ export default {
             store.task.subMessage = `0 / ${formatSize(totalSize)}`;
 
             try {
-                await api.post('/api/files/upload', fd, {
-                    onUploadProgress: (p) => {
-                        if (p.total) {
-                            const percent = Math.round((p.loaded * 100) / p.total);
-                            store.task.percent = percent;
-                            store.task.subMessage = `${formatSize(p.loaded)} / ${formatSize(p.total)}`;
+                if (smallFiles.length) {
+                    const fd = new FormData();
+                    for (const f of smallFiles) fd.append('files', f);
+                    fd.append('path', 'mods');
+                    const smallTotal = smallFiles.reduce((s, f) => s + f.size, 0);
+                    await api.post('/api/files/upload', fd, {
+                        onUploadProgress: (p) => {
+                            if (p.total) {
+                                const currentUploaded = uploadedSize + p.loaded;
+                                store.task.percent = Math.round((currentUploaded * 100) / totalSize);
+                                store.task.subMessage = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                            }
                         }
-                    }
-                });
+                    });
+                    uploadedSize += smallTotal;
+                }
+
+                for (const file of largeFiles) {
+                    await uploadFileWithChunk(file, {
+                        initUrl: '/api/files/chunk/init',
+                        completeUrl: '/api/files/chunk/complete',
+                        extraInitData: { targetPath: 'mods' },
+                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
+                            const currentUploaded = uploadedSize + bytesDone;
+                            store.task.percent = Math.round((currentUploaded * 100) / totalSize);
+                            store.task.subMessage = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                        }
+                    });
+                    uploadedSize += file.size;
+                }
+
                 showToast($t('common.success'));
                 loadFiles();
             } catch (e) {

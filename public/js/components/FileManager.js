@@ -1,7 +1,7 @@
 import { ref, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { showToast, openModal, t } from '../utils.js';
+import { showToast, openModal, t, uploadFileWithChunk, isLargeFile } from '../utils.js';
 
 export default {
     template: `
@@ -249,22 +249,51 @@ export default {
         const uploadFiles = async (e) => {
             const files = e.target.files;
             if (!files.length) return;
-            const fd = new FormData();
-            let total = 0;
+
+            const largeFiles = [];
+            const smallFiles = [];
             for (let i = 0; i < files.length; i++) {
-                fd.append('files', files[i], files[i].webkitRelativePath || files[i].name);
-                total += files[i].size;
+                if (isLargeFile(files[i])) largeFiles.push(files[i]);
+                else smallFiles.push(files[i]);
             }
-            fd.append('path', currentPath.value);
 
             store.task.visible = true; store.task.title = $t('common.upload'); store.task.percent = 0;
+            let totalSize = Array.from(files).reduce((s, f) => s + f.size, 0);
+            let uploadedSize = 0;
+
             try {
-                await api.post('/api/files/upload', fd, {
-                    onUploadProgress: (p) => {
-                        if (p.total) store.task.percent = Math.round((p.loaded * 100) / p.total);
-                        store.task.message = `${formatSize(p.loaded)} / ${formatSize(p.total)}`;
-                    }
-                });
+                if (smallFiles.length) {
+                    const fd = new FormData();
+                    for (const f of smallFiles) fd.append('files', f, f.webkitRelativePath || f.name);
+                    fd.append('path', currentPath.value);
+                    const smallTotal = smallFiles.reduce((s, f) => s + f.size, 0);
+                    await api.post('/api/files/upload', fd, {
+                        onUploadProgress: (p) => {
+                            if (p.total) {
+                                const currentUploaded = uploadedSize + p.loaded;
+                                store.task.percent = Math.round((currentUploaded * 100) / totalSize);
+                                store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                            }
+                        }
+                    });
+                    uploadedSize += smallTotal;
+                }
+
+                for (const file of largeFiles) {
+                    const chunkResult = await uploadFileWithChunk(file, {
+                        initUrl: '/api/files/chunk/init',
+                        completeUrl: '/api/files/chunk/complete',
+                        extraInitData: { targetPath: currentPath.value },
+                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
+                            const currentUploaded = uploadedSize + bytesDone;
+                            store.task.percent = Math.round((currentUploaded * 100) / totalSize);
+                            store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
+                        }
+                    });
+                    uploadedSize += file.size;
+                }
+
                 showToast($t('common.success')); loadFiles();
             } catch (e) { showToast($t('common.error'), 'danger'); }
             finally { setTimeout(() => store.task.visible = false, 500); e.target.value = ''; }
