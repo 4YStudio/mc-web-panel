@@ -423,7 +423,23 @@ export const messages = {
                 simulation_distance: '模拟距离',
                 max_tick_time: '最大Tick时间',
                 rate_limit: '速率限制'
-            }
+            },
+            fabric_version: 'Fabric 核心版本',
+            current_mc: '当前 MC 版本',
+            current_loader: '当前 Loader 版本',
+            change_version: '更换版本',
+            target_mc: '目标 MC 版本',
+            target_loader: '目标 Loader 版本',
+            choose_mc: '选择 MC 版本',
+            choose_loader: '选择 Loader 版本',
+            apply: '应用',
+            stop_server_first: '请先停止服务器再更换版本',
+            version_change_tips: '更换核心版本不会影响地图和配置文件，但可能与部分 Mod 不兼容。建议更换后检查 Mod 兼容性。',
+            fetch_versions_fail: '获取版本列表失败',
+            change_version_confirm: '确定要将 Fabric 核心更换为 MC {mc} / Loader {loader} 吗？',
+            version_changing: '正在下载并更换 Fabric 核心...',
+            version_change_success: 'Fabric 核心版本更换成功',
+            version_change_timeout: '版本更换超时，请检查服务器日志确认状态'
         },
         panel_settings: {
             title: '面板设置',
@@ -1036,7 +1052,23 @@ export const messages = {
                 simulation_distance: 'Simulation Distance',
                 max_tick_time: 'Max Tick Time',
                 rate_limit: 'Rate Limit'
-            }
+            },
+            fabric_version: 'Fabric Core Version',
+            current_mc: 'Current MC Version',
+            current_loader: 'Current Loader Version',
+            change_version: 'Change Version',
+            target_mc: 'Target MC Version',
+            target_loader: 'Target Loader Version',
+            choose_mc: 'Select MC Version',
+            choose_loader: 'Select Loader Version',
+            apply: 'Apply',
+            stop_server_first: 'Please stop the server before changing version',
+            version_change_tips: 'Changing the core version will not affect worlds or configs, but may be incompatible with some mods. Check mod compatibility after changing.',
+            fetch_versions_fail: 'Failed to fetch version list',
+            change_version_confirm: 'Are you sure you want to change the Fabric core to MC {mc} / Loader {loader}?',
+            version_changing: 'Downloading and changing Fabric core...',
+            version_change_success: 'Fabric core version changed successfully',
+            version_change_timeout: 'Version change timed out, please check server logs for status'
         },
         panel_settings: {
             title: 'Panel Settings',

@@ -54,7 +54,12 @@ let modalInstance = null;
 
 export const initModal = () => {
     const el = document.getElementById('confirmModal');
-    if (el) modalInstance = new bootstrap.Modal(el);
+    if (el) {
+        modalInstance = new bootstrap.Modal(el);
+        el.addEventListener('hidden.bs.modal', () => {
+            el.style.zIndex = '';
+        });
+    }
 };
 
 export const openModal = (opts) => {
@@ -67,7 +72,24 @@ export const openModal = (opts) => {
         placeholder: opts.placeholder || '',
         callback: opts.callback
     };
-    if (modalInstance) modalInstance.show();
+    if (modalInstance) {
+        const el = document.getElementById('confirmModal');
+        const hasOpenModal = document.querySelectorAll('.modal.show, .modal.d-block').length > 0;
+        if (hasOpenModal) {
+            el.style.zIndex = '3050';
+        } else {
+            el.style.zIndex = '';
+        }
+        modalInstance.show();
+        if (hasOpenModal) {
+            requestAnimationFrame(() => {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                if (backdrops.length >= 2) {
+                    backdrops[backdrops.length - 1].style.zIndex = '3040';
+                }
+            });
+        }
+    }
 };
 
 export const confirmModalAction = () => {

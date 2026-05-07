@@ -76,9 +76,6 @@ export default {
             </div>
         </div>
 
-        <!-- Backup Strategy Management -->
-        <!-- Backup Strategy Management [MOVED TO GRID BOTTOM] -->
-
         <!-- 文件未找到提示 -->
         <div v-if="notFound" class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
             <i class="fa-solid fa-file-circle-exclamation fa-4x mb-3 opacity-25"></i>
@@ -146,7 +143,7 @@ export default {
                     </div>
                 </div>
                 
-                <!-- 备份策略 (作为网格的一部分) -->
+                <!-- 备份策略 -->
                 <div class="col-md-6">
                     <div class="card h-100 border-primary-subtle shadow-sm overflow-hidden" style="border-radius: 12px;">
                         <div class="card-header bg-primary-subtle text-primary fw-bold border-0 py-2 px-3 small text-uppercase">
@@ -171,7 +168,32 @@ export default {
                     </div>
                 </div>
 
-                <!-- 危险区域 (作为网格的一部分) -->
+                <!-- Fabric 核心版本 (左下角) -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-info-subtle shadow-sm overflow-hidden" style="border-radius: 12px;">
+                        <div class="card-header bg-info-subtle text-info fw-bold border-0 py-2 px-3 small text-uppercase">
+                            <i class="fa-solid fa-cube me-2"></i>{{ $t('properties.fabric_version') }}
+                            <span v-if="fabricChanging" class="spinner-border spinner-border-sm text-info ms-2" role="status"></span>
+                        </div>
+                        <div class="card-body p-3 d-flex flex-column">
+                            <div class="d-flex align-items-center gap-3 mb-3 flex-grow-1">
+                                <div class="flex-fill">
+                                    <div class="small text-muted mb-1">{{ $t('properties.current_mc') }}</div>
+                                    <div class="fw-bold">{{ currentVersion.mc === 'Unknown' ? $t('common.unknown') : currentVersion.mc }}</div>
+                                </div>
+                                <div class="flex-fill">
+                                    <div class="small text-muted mb-1">{{ $t('properties.current_loader') }}</div>
+                                    <div class="fw-bold">{{ currentVersion.loader === 'Unknown' ? $t('common.unknown') : currentVersion.loader }}</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-outline-info w-100 rounded-pill fw-bold mt-auto" @click="openFabricModal" :disabled="fabricChanging">
+                                <i class="fa-solid fa-arrows-rotate me-2"></i>{{ $t('properties.change_version') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 危险区域 (右下角) -->
                 <div class="col-md-6">
                     <div class="card h-100 border-danger-subtle">
                         <div class="card-header bg-danger-subtle text-danger fw-bold">
@@ -200,6 +222,71 @@ export default {
                 </div>
             </div>
         </template>
+
+        <!-- Fabric 版本选择对话框 -->
+        <div class="modal fade" :class="{ show: fabricModalVisible }" :style="{ display: fabricModalVisible ? 'block' : 'none' }" tabindex="-1" @click.self="closeFabricModal">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold">
+                            <i class="fa-solid fa-cube text-primary me-2"></i>{{ $t('properties.change_version') }}
+                        </h5>
+                        <button type="button" class="btn-close" @click="closeFabricModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-center mb-4">
+                            <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-body-tertiary small">
+                                <span class="text-muted">{{ $t('properties.current_mc') }}:</span>
+                                <span class="fw-bold">{{ currentVersion.mc === 'Unknown' ? $t('common.unknown') : currentVersion.mc }}</span>
+                                <span class="text-muted mx-1">/</span>
+                                <span class="text-muted">{{ $t('properties.current_loader') }}:</span>
+                                <span class="fw-bold">{{ currentVersion.loader === 'Unknown' ? $t('common.unknown') : currentVersion.loader }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">
+                                <i class="fa-solid fa-gamepad me-1"></i>{{ $t('properties.target_mc') }}
+                                <span v-if="loadingMcVersions" class="spinner-border spinner-border-sm text-primary ms-1" role="status"></span>
+                            </label>
+                            <select class="form-select" v-model="selectedMc" @change="fetchFabricLoaders" :disabled="loadingMcVersions">
+                                <option value="">{{ loadingMcVersions ? $t('common.loading') : $t('properties.choose_mc') }}</option>
+                                <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">
+                                <i class="fa-solid fa-gear me-1"></i>{{ $t('properties.target_loader') }}
+                                <span v-if="loadingLoaderVersions" class="spinner-border spinner-border-sm text-primary ms-1" role="status"></span>
+                            </label>
+                            <select class="form-select" v-model="selectedLoader" :disabled="loadingLoaderVersions || !selectedMc">
+                                <option value="">{{ loadingLoaderVersions ? $t('common.loading') : $t('properties.choose_loader') }}</option>
+                                <option v-for="v in loaderVersions" :key="v" :value="v">{{ v }}</option>
+                            </select>
+                        </div>
+
+                        <div v-if="store.isRunning" class="alert alert-warning small py-2 mb-0">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                            {{ $t('properties.stop_server_first') }}
+                        </div>
+                        <div v-else-if="selectedMc && selectedLoader" class="alert alert-info small py-2 mb-0">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            {{ $t('properties.version_change_tips') }}
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" @click="closeFabricModal">{{ $t('common.cancel') }}</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4" @click="changeFabricVersion"
+                            :disabled="!selectedMc || !selectedLoader || fabricChanging || store.isRunning">
+                            <span v-if="fabricChanging" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <i v-else class="fa-solid fa-download me-1"></i>{{ $t('properties.apply') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade" :class="{ show: fabricModalVisible }" v-if="fabricModalVisible"></div>
     </div>
     `,
     setup() {
@@ -214,6 +301,106 @@ export default {
         const backupStrategy = ref(store.stats?.backupStrategy || 'panel');
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
+
+        const currentVersion = reactive({ mc: 'Unknown', loader: 'Unknown' });
+        const mcVersions = ref([]);
+        const loaderVersions = ref([]);
+        const selectedMc = ref('');
+        const selectedLoader = ref('');
+        const loadingMcVersions = ref(false);
+        const loadingLoaderVersions = ref(false);
+        const fabricChanging = ref(false);
+        const fabricModalVisible = ref(false);
+
+        const openFabricModal = () => {
+            selectedMc.value = '';
+            selectedLoader.value = '';
+            loaderVersions.value = [];
+            fabricModalVisible.value = true;
+            if (mcVersions.value.length === 0) fetchMcVersions();
+        };
+
+        const closeFabricModal = () => {
+            fabricModalVisible.value = false;
+        };
+
+        const fetchCurrentVersion = async () => {
+            try {
+                const res = await api.get('/api/fabric/current-version');
+                currentVersion.mc = res.data.mc;
+                currentVersion.loader = res.data.loader;
+            } catch (e) { }
+        };
+
+        const fetchMcVersions = async () => {
+            loadingMcVersions.value = true;
+            try {
+                const res = await api.get('/api/fabric/versions/mc');
+                mcVersions.value = res.data;
+            } catch (e) {
+                showToast($t('properties.fetch_versions_fail'), 'danger');
+            } finally {
+                loadingMcVersions.value = false;
+            }
+        };
+
+        const fetchFabricLoaders = async () => {
+            if (!selectedMc.value) return;
+            loaderVersions.value = [];
+            selectedLoader.value = '';
+            loadingLoaderVersions.value = true;
+            try {
+                const res = await api.get(`/api/fabric/versions/loader/${selectedMc.value}`);
+                loaderVersions.value = res.data;
+                if (res.data.length > 0) selectedLoader.value = res.data[0];
+            } catch (e) {
+                showToast($t('properties.fetch_versions_fail'), 'danger');
+            } finally {
+                loadingLoaderVersions.value = false;
+            }
+        };
+
+        const changeFabricVersion = () => {
+            openModal({
+                title: $t('properties.change_version'),
+                message: $t('properties.change_version_confirm', { mc: selectedMc.value, loader: selectedLoader.value }),
+                callback: async () => {
+                    fabricChanging.value = true;
+                    try {
+                        await api.post('/api/fabric/change-version', {
+                            gameVersion: selectedMc.value,
+                            loaderVersion: selectedLoader.value
+                        });
+                        showToast($t('properties.version_changing'), 'info');
+                        let checks = 0;
+                        const interval = setInterval(async () => {
+                            checks++;
+                            try {
+                                const res = await api.get('/api/fabric/current-version');
+                                if (res.data.mc === selectedMc.value && res.data.loader === selectedLoader.value) {
+                                    clearInterval(interval);
+                                    fabricChanging.value = false;
+                                    currentVersion.mc = res.data.mc;
+                                    currentVersion.loader = res.data.loader;
+                                    fabricModalVisible.value = false;
+                                    showToast($t('properties.version_change_success'), 'success');
+                                }
+                            } catch (e) { }
+                            if (checks > 60) {
+                                clearInterval(interval);
+                                fabricChanging.value = false;
+                                showToast($t('properties.version_change_timeout'), 'warning');
+                                fetchCurrentVersion();
+                            }
+                        }, 2000);
+                    } catch (e) {
+                        fabricChanging.value = false;
+                        const msg = e.response?.data?.error || e.message;
+                        showToast(msg, 'danger');
+                    }
+                }
+            });
+        };
 
         const updateIconPreview = () => {
             // Force reload with timestamp. We assume it might exist, or let error handler catch it.
@@ -363,7 +550,10 @@ export default {
         onMounted(() => {
             loadFile();
             updateIconPreview();
+            fetchCurrentVersion();
         });
+
+
 
         const saveBackupStrategy = async () => {
             try {
@@ -381,7 +571,10 @@ export default {
             editMode, fileContent, formModel, PROP_GROUPS, notFound,
             saveConfig, toggleEditMode, iconUrl, iconInput,
             uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon,
-            askReinstall, backupStrategy, saveBackupStrategy
+            askReinstall, backupStrategy, saveBackupStrategy,
+            currentVersion, mcVersions, loaderVersions, selectedMc, selectedLoader,
+            loadingMcVersions, loadingLoaderVersions, fabricChanging, fabricModalVisible,
+            openFabricModal, closeFabricModal, fetchFabricLoaders, changeFabricVersion, store
         };
     }
 };

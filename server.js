@@ -2804,6 +2804,100 @@ if (cluster.isPrimary) {
         }
     });
 
+    // --- Fabric Version Management API ---
+    app.get('/api/fabric/current-version', requireAuth, withInstance, async (req, res) => {
+        const { instDir, instState } = req;
+        try {
+            const vFile = path.join(instDir, 'server-version.json');
+            if (fs.existsSync(vFile)) {
+                const vData = await fs.readJson(vFile);
+                return res.json({ mc: vData.gameVersion, loader: vData.loaderVersion });
+            }
+            if (instState.detectedVersion.mc !== 'Unknown') {
+                return res.json(instState.detectedVersion);
+            }
+            res.json({ mc: 'Unknown', loader: 'Unknown' });
+        } catch (e) {
+            res.json({ mc: 'Unknown', loader: 'Unknown' });
+        }
+    });
+
+    app.get('/api/fabric/versions/mc', requireAuth, async (req, res) => {
+        try {
+            const resp = await axios.get('https://meta.fabricmc.net/v2/versions/game');
+            const stable = resp.data.filter(v => v.stable).map(v => v.version);
+            res.json(stable);
+        } catch (e) { res.status(500).json({ error: 'Failed to fetch MC versions' }); }
+    });
+
+    app.get('/api/fabric/versions/loader/:gameVersion', requireAuth, async (req, res) => {
+        try {
+            const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${req.params.gameVersion}`);
+            const loaders = [...new Set(resp.data.map(v => v.loader.version))];
+            res.json(loaders);
+        } catch (e) { res.status(500).json({ error: 'Failed to fetch Fabric loader versions' }); }
+    });
+
+    app.post('/api/fabric/change-version', requireAuth, withInstance, async (req, res) => {
+        const { instDir, instState, instanceId } = req;
+        const { gameVersion, loaderVersion } = req.body;
+        if (!gameVersion || !loaderVersion) return res.status(400).json({ error: 'Missing version info' });
+
+        if (instState.process) {
+            return res.status(400).json({ error: 'Server is running. Please stop it before changing version.' });
+        }
+
+        const instConf = instanceConfig.instances.find(i => i.id === instanceId);
+        const jarName = instConf.jarName || appConfig.jarName;
+        const targetJar = path.join(instDir, jarName);
+        const versionFile = path.join(instDir, 'server-version.json');
+        const oldJarBackup = path.join(instDir, jarName + '.bak');
+
+        console.log(`Changing Fabric Server version: MC ${gameVersion}, Loader ${loaderVersion} for instance ${instanceId}`);
+        res.json({ success: true, message: 'Version change started' });
+
+        try {
+            if (fs.existsSync(targetJar)) {
+                await fs.copy(targetJar, oldJarBackup);
+            }
+
+            const installerUrl = `https://meta.fabricmc.net/v2/versions/loader/${gameVersion}/${loaderVersion}/1.0.1/server/jar`;
+            const writer = fs.createWriteStream(targetJar);
+            const response = await axios({
+                url: installerUrl,
+                method: 'GET',
+                responseType: 'stream'
+            });
+
+            response.data.pipe(writer);
+
+            writer.on('finish', () => {
+                console.log(`Fabric version change download complete for instance ${instanceId}`);
+                fs.writeJsonSync(versionFile, { gameVersion, loaderVersion, installDate: new Date() });
+                if (fs.existsSync(oldJarBackup)) fs.removeSync(oldJarBackup);
+                instState.detectedVersion = { mc: gameVersion, loader: loaderVersion };
+                appendLog(instanceId, `[系统] Fabric 核心已更换为 MC ${gameVersion} / Loader ${loaderVersion}\n`);
+            });
+
+            writer.on('error', (err) => {
+                console.error('Fabric version change download failed', err);
+                if (fs.existsSync(oldJarBackup)) {
+                    fs.copySync(oldJarBackup, targetJar);
+                    fs.removeSync(oldJarBackup);
+                }
+                appendLog(instanceId, `[错误] Fabric 核心更换失败: ${err.message}\n`);
+            });
+
+        } catch (e) {
+            console.error(e);
+            if (fs.existsSync(oldJarBackup)) {
+                fs.copySync(oldJarBackup, targetJar);
+                fs.removeSync(oldJarBackup);
+            }
+            appendLog(instanceId, `[错误] Fabric 核心更换失败: ${e.message}\n`);
+        }
+    });
+
     // Modrinth API / AI Translate
     app.get('/api/mods/modrinth/search', requireAuth, async (req, res) => {
         const { q, facets, offset, limit, index } = req.query;

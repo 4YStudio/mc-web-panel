@@ -87,15 +87,16 @@ async function prepareBuildDir() {
     manifest.dirs.forEach(d => { if (fs.existsSync(d)) fs.cpSync(d, path.join(BUILD_DIR, d), { recursive: true }); });
 
     console.log('Installing production dependencies...');
-    // Copy existing node_modules from the project root to avoid a slow fresh npm install
-    if (fs.existsSync('node_modules')) {
+    const hasPnpm = fs.existsSync('node_modules/.pnpm') || fs.existsSync('pnpm-lock.yaml');
+    if (hasPnpm) {
+        console.log('  Detected pnpm node_modules (symlink-based). Using npm install to avoid symlink issues in packaged app...');
+        execSync('npm install --omit=dev --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+    } else if (fs.existsSync('node_modules')) {
         console.log('  Copying node_modules from project root...');
         fs.cpSync('node_modules', path.join(BUILD_DIR, 'node_modules'), { recursive: true });
-        // Remove devDependencies from the copied node_modules
         console.log('  Pruning devDependencies...');
         execSync('npm prune --omit=dev --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
     } else {
-        // Fallback: fresh install if no node_modules exists
         execSync('npm install --omit=dev --no-package-lock --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
     }
 

@@ -344,7 +344,7 @@ body {
     position: fixed;
     top: 24px;
     right: 24px;
-    z-index: 2000;
+    z-index: 9999;
 }
 
 .toast {
@@ -894,13 +894,12 @@ body {
     width: 100%;
 }
 
-/* Fix for Bootstrap Modal Backdrop appearing over the modal */
 .modal-backdrop {
-    z-index: 2040 !important;
+    z-index: 2040;
 }
 
 .modal {
-    z-index: 2050 !important;
+    z-index: 2050;
 }
 
 
