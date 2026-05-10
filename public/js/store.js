@@ -14,19 +14,27 @@ export const store = reactive({
     hasVoicechat: false,
     logs: [],
     view: 'instance-manager', // Default view to instance manager
+    prevView: 'instance-manager', // Track previous view for back buttons
     consoleInfoPosition: 'top', // 'top', 'sidebar', 'hide'
 
     currentInstanceId: null, // ID of the currently managed instance
     instanceList: [],       // List of all instances
     javaInstallations: [],  // List of installed Java versions
 
+    customLogoUrl: '',      // Custom logo URL from appearance settings
+    customBgUrl: '',        // Custom background image URL from appearance settings
+
     // --- 新增：全局任务进度状态 ---
     task: {
-        visible: false,      // 是否显示弹窗
-        title: '',           // 标题
-        message: '',         // 主消息
-        subMessage: '',      // 副消息 (如 10MB/100MB)
-        percent: 0,          // 进度百分比 0-100
-        speed: 0             // 下载速度 (B/s)
-    }
+        visible: false,
+        title: '',
+        message: '',
+        subMessage: '',
+        percent: 0,
+        speed: 0
+    },
+
+    // --- 插件系统 ---
+    pluginSidebarItems: [],
+    pluginComponents: {}
 });

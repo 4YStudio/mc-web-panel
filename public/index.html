@@ -6,19 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <title>MC Server Panel Ultra</title>
-    <!-- 1. 修改 Bootstrap CSS -->
     <link href="/css/bootstrap.min.css" rel="stylesheet">
-    <!-- 2. 修改 Font Awesome -->
     <link rel="stylesheet" href="/css/all.min.css">
-    <!-- 自定义样式 -->
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 
 <body>
 
     <div id="app" class="d-flex h-100" v-cloak>
 
-        <!-- 全局提示 Toast -->
         <div class="toast-container">
             <transition-group name="toast">
                 <div v-for="t in toasts" :key="t.id" class="toast show align-items-center mb-2" :data-type="t.type">
@@ -30,13 +29,8 @@
             </transition-group>
         </div>
 
-
-
-
-        <!-- 进度条组件 (注意这里改成了小写加横线) -->
         <progress-modal></progress-modal>
 
-        <!-- 全局 Modal -->
         <div class="modal fade" id="confirmModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
@@ -46,8 +40,11 @@
                     </div>
                     <div class="modal-body">
                         <div v-html="modalData.message" class="mb-3"></div>
-                        <input v-if="modalData.mode === 'input'" v-model="modalData.inputValue" class="form-control"
-                            :placeholder="modalData.placeholder" @keyup.enter="confirmModalAction">
+                        <div v-if="modalData.mode === 'input'" :class="{'input-group': modalData.suffix}">
+                            <input v-model="modalData.inputValue" class="form-control"
+                                :placeholder="modalData.placeholder" @keyup.enter="confirmModalAction">
+                            <span v-if="modalData.suffix" class="input-group-text bg-body-secondary text-muted">{{ modalData.suffix }}</span>
+                        </div>
                         <select v-if="modalData.mode === 'select'" v-model="modalData.inputValue" class="form-select">
                             <option v-for="opt in modalData.options" :value="opt.value">{{ opt.label }}</option>
                         </select>
@@ -60,56 +57,51 @@
             </div>
         </div>
 
-        <!-- 视图切换过渡 -->
         <Transition name="page-fade" mode="out-in">
-            <!-- 登录视图 -->
             <login v-if="!store.auth.loggedIn" key="login"></login>
 
-            <!-- 实例管理视图 (独立主界面) -->
             <instance-manager v-else-if="store.view === 'instance-manager'" class="w-100" key="hub"></instance-manager>
 
-            <!-- Java 管理视图 (顶级独立界面) -->
-            <div v-else-if="store.view === 'java'" class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto"
-                key="java">
+            <div v-else-if="store.view === 'java'" class="w-100 vh-100 p-4 p-md-5 overflow-auto" key="java">
                 <div class="container-xxl p-0">
                     <java-manager></java-manager>
                 </div>
             </div>
 
-            <!-- 面板设置视图 (顶级独立界面) -->
             <div v-else-if="store.view === 'panel-settings'"
-                class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto" key="settings">
+                class="w-100 vh-100 p-4 p-md-5 overflow-auto" key="settings">
                 <div class="container-xxl p-0">
                     <panel-settings></panel-settings>
                 </div>
             </div>
 
-            <!-- FRP 内网穿透视图 (顶级独立界面) -->
-            <div v-else-if="store.view === 'frp'"
-                class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto" key="frp">
-                <div class="container-xxl p-0">
-                    <frp-manager></frp-manager>
-                </div>
-            </div>
-
-            <!-- 关于页面 (顶级独立界面) -->
-            <div v-else-if="store.view === 'about'" class="w-100 vh-100 bg-body-tertiary p-4 p-md-5 overflow-auto"
+            <div v-else-if="store.view === 'about'" class="w-100 vh-100 p-4 p-md-5 overflow-auto"
                 key="about">
                 <div class="container-xxl p-0">
                     <about></about>
                 </div>
             </div>
 
-            <!-- 主视图 (带侧边栏的控制面板) -->
+            <div v-else-if="store.view === 'plugins'" class="w-100 vh-100 p-4 p-md-5 overflow-auto"
+                key="plugins">
+                <div class="container-xxl p-0">
+                    <plugin-manager></plugin-manager>
+                </div>
+            </div>
+
+            <div v-else-if="isPluginView && !store.currentInstanceId" class="w-100 vh-100 p-4 p-md-5 overflow-auto"
+                :key="'plugin-' + store.view">
+                <div class="container-xxl p-0">
+                    <component :is="pluginViewComponent"></component>
+                </div>
+            </div>
+
             <div v-else class="d-flex h-100 w-100" key="main">
-                <!-- 移动端遮罩 -->
                 <div class="mobile-overlay" :class="{show: sidebarOpen}" @click="sidebarOpen = false"></div>
 
-                <!-- 侧栏：添加 show 类控制显示 -->
                 <sidebar class="sidebar" :class="{show: sidebarOpen}" @close-sidebar="sidebarOpen = false"></sidebar>
 
                 <div class="d-flex flex-column w-100 overflow-hidden">
-                    <!-- 移动端顶部栏 -->
                     <div class="mobile-header">
                         <button class="btn btn-link text-body p-0 me-3" @click="sidebarOpen = true">
                             <i class="fa-solid fa-bars fa-lg"></i>
@@ -117,8 +109,7 @@
                         <h5 class="m-0 fw-bold">MC Panel</h5>
                     </div>
 
-                    <div class="content bg-body">
-                        <!-- 动态组件切换：使用 Transition 包裹 -->
+                    <div class="content">
                         <Transition name="fade" mode="out-in">
                             <dashboard v-if="store.view === 'dashboard'" key="dashboard"></dashboard>
                             <server-properties-manager v-else-if="store.view === 'properties'"
@@ -132,6 +123,9 @@
                                 key="voicechat"></voicechat-manager>
                             <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
                             <about v-else-if="store.view === 'about'" key="about"></about>
+                            <div v-else-if="isPluginView" :key="'plugin-' + store.view" class="animate-in">
+                                <component :is="pluginViewComponent"></component>
+                            </div>
                         </Transition>
                     </div>
                 </div>
@@ -143,7 +137,6 @@
     <script src="/js/axios.min.js"></script>
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script src="/js/socket.io.js"></script>
-    <!-- 主入口 -->
     <script type="module" src="js/app.js?v=1.5.0"></script>
 </body>
 

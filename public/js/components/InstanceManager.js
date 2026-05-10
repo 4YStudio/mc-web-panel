@@ -6,43 +6,64 @@ import { ref, reactive, computed, onMounted, onUnmounted } from '/js/vue.esm-bro
 
 export default {
     template: `
-    <div class="animate-in vh-100 w-100 d-flex flex-column bg-body-tertiary overflow-hidden">
-        <!-- Top Navigation (Global) -->
-        <nav class="navbar border-bottom bg-body sticky-top shadow-sm px-3 px-md-4 py-2 z-index-dropdown">
+    <div class="instance-manager-page animate-in vh-100 w-100 d-flex flex-column overflow-hidden">
+        <nav class="topbar border-bottom px-3 px-md-4 py-2">
             <div class="container-fluid p-0 d-flex align-items-center">
-                <span class="navbar-brand fw-bold d-flex align-items-center m-0 py-0 me-3" style="font-size: 1rem;">
-                    <img src="/logo.png" alt="Logo" class="me-2" style="width: 1.2rem; height: 1.2rem; object-fit: contain;">
+                <span class="navbar-brand fw-bold d-flex align-items-center m-0 py-0 me-3 tracking-tight" style="font-size: 1rem;">
+                    <img :src="serverIconUrl" alt="Logo" class="me-2" style="width: 1.2rem; height: 1.2rem; object-fit: contain;" @error="onNavIconError">
                     <span>{{ $t('sidebar.title') }}</span>
                 </span>
                 
-                <!-- Desktop Buttons: right aligned on PC -->
                 <div class="d-none d-md-flex gap-2 align-items-center justify-content-end flex-grow-1">
-                    <button @click="toggleLang" class="btn btn-outline-secondary border shadow-sm btn-sm px-3 fw-bold text-nowrap" style="border-radius: 8px;">
+                    <button @click="toggleLang" class="btn btn-outline-secondary btn-sm px-3 fw-bold text-nowrap">
                         <i class="fa-solid fa-language me-1"></i> {{ store.lang === 'zh' ? 'EN' : '中' }}
                     </button>
-                    <button @click="toggleTheme" class="btn btn-outline-secondary border shadow-sm btn-sm px-3" style="border-radius: 8px;">
+                    <button @click="toggleTheme" class="btn btn-outline-secondary btn-sm px-3">
                         <i class="fa-solid fa-circle-half-stroke"></i>
                     </button>
                     <div class="vr mx-2 opacity-10"></div>
-                    <button @click="store.view = 'panel-settings'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
+                    <button @click="store.view = 'panel-settings'" class="btn btn-sm btn-primary px-3 py-2 fw-bold">
                         <i class="fa-solid fa-gear text-white me-2"></i>{{ $t('panel_settings.title') }}
                     </button>
-                    <button @click="store.view = 'java'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
+                    <button @click="store.view = 'java'" class="btn btn-sm btn-primary px-3 py-2 fw-bold">
                          <i class="fa-brands fa-java text-white me-2"></i>{{ $t('instance_manager.manage_java') }}
                     </button>
-                    <button @click="store.view = 'frp'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
-                         <i class="fa-solid fa-network-wired text-white me-2"></i>{{ $t('frp.title') }}
-                    </button>
-                    <button @click="store.view = 'about'" class="btn btn-sm btn-primary px-3 py-2 fw-bold shadow-sm" style="border-radius: 10px;">
+                    <button @click="store.view = 'about'" class="btn btn-sm btn-primary px-3 py-2 fw-bold">
                         <i class="fa-solid fa-circle-info text-white me-2"></i>{{ $t('about.title') }}
                     </button>
+                    <div class="dropdown" ref="pluginDropdown">
+                        <button class="btn btn-sm btn-primary px-3 py-2 fw-bold" type="button" @click.stop="togglePluginMenu">
+                            <i class="fa-solid fa-puzzle-piece text-white me-2"></i>{{ $t('sidebar.plugins') }}
+                            <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.6rem;"></i>
+                        </button>
+                        <Teleport to="body">
+                            <Transition name="scale">
+                                <ul v-if="showPluginMenu" class="dropdown-menu border-0 shadow-lg p-2 d-block show"
+                                    style="border-radius: 12px; min-width: 220px; position: fixed; z-index: 1070;"
+                                    :style="{right: pluginMenuRight + 'px', top: pluginMenuTop + 'px'}">
+                                    <li v-for="item in store.pluginSidebarItems.filter(i => i.location === 'global' || i.location === 'both')" :key="item.id">
+                                        <button class="dropdown-item rounded-3 py-2 d-flex align-items-center gap-2" @click="selectPlugin(item)">
+                                            <i class="fa-solid" :class="item.icon" :style="item.color ? 'color:' + item.color : ''" style="width: 16px; text-align: center;"></i>
+                                            <span class="fw-medium">{{ $t(item.labelKey) || item.labelKey }}</span>
+                                        </button>
+                                    </li>
+                                    <li v-if="store.pluginSidebarItems.some(i => i.location === 'global' || i.location === 'both')"><hr class="dropdown-divider opacity-10"></li>
+                                    <li>
+                                        <button class="dropdown-item rounded-3 py-2 d-flex align-items-center gap-2" @click="store.view = 'plugins'; showPluginMenu = false">
+                                            <i class="fa-solid fa-gear text-primary" style="width: 16px; text-align: center;"></i>
+                                            <span class="fw-bold text-primary">{{ $t('plugins.title') }}</span>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </Transition>
+                        </Teleport>
+                    </div>
                     <div class="vr mx-2 opacity-10"></div>
-                    <button @click="logout" class="btn btn-sm btn-outline-danger border-0 px-3 py-2 fw-bold" style="border-radius: 10px;">
+                    <button @click="logout" class="btn btn-sm btn-outline-danger border-0 px-3 py-2 fw-bold">
                         <i class="fa-solid fa-right-from-bracket me-2"></i>{{ $t('common.logout') }}
                     </button>
                 </div>
 
-                <!-- Mobile Menu: Dropdown with animation -->
                 <div class="d-flex d-md-none gap-2 ms-auto align-items-center">
                     <button @click="toggleTheme" class="btn btn-link text-body p-1">
                         <i class="fa-solid fa-circle-half-stroke"></i>
@@ -59,7 +80,15 @@ export default {
                                     <li><hr class="dropdown-divider opacity-10"></li>
                                     <li><button class="dropdown-item rounded-3 py-2 font-weight-bold" @click="store.view = 'panel-settings'; showMobileMenu = false"><i class="fa-solid fa-gear me-2 w-20 text-primary"></i>{{ $t('panel_settings.title') }}</button></li>
                                     <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'java'; showMobileMenu = false"><i class="fa-brands fa-java me-2 w-20 text-primary"></i>{{ $t('instance_manager.manage_java') }}</button></li>
-                                    <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'frp'; showMobileMenu = false"><i class="fa-solid fa-network-wired me-2 w-20 text-primary"></i>{{ $t('frp.title') }}</button></li>
+                                    <li v-if="store.pluginSidebarItems.some(i => i.location === 'global' || i.location === 'both')">
+                                        <div class="px-3 py-1 small fw-bold text-muted text-uppercase opacity-50" style="font-size: 0.65rem;">{{ $t('sidebar.plugins') }}</div>
+                                    </li>
+                                    <li v-for="item in store.pluginSidebarItems.filter(i => i.location === 'global' || i.location === 'both')" :key="item.id">
+                                        <button class="dropdown-item rounded-3 py-2 d-flex align-items-center" @click="selectPlugin(item); showMobileMenu = false">
+                                            <i class="fa-solid me-2 w-20" :class="item.icon" :style="item.color ? 'color:' + item.color : ''"></i>{{ $t(item.labelKey) || item.labelKey }}
+                                        </button>
+                                    </li>
+                                    <li><button class="dropdown-item rounded-3 py-2 fw-bold text-primary" style="background: rgba(var(--c-primary-rgb), 0.05);" @click="store.view = 'plugins'; showMobileMenu = false"><i class="fa-solid fa-puzzle-piece me-2 w-20"></i>{{ $t('plugins.title') }}</button></li>
                                     <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'about'; showMobileMenu = false"><i class="fa-solid fa-circle-info me-2 w-20 text-primary"></i>{{ $t('about.title') }}</button></li>
                                     <li><hr class="dropdown-divider opacity-10"></li>
                                     <li><button class="dropdown-item rounded-3 py-2 text-danger fw-bold" @click="logout(); showMobileMenu = false"><i class="fa-solid fa-right-from-bracket me-2 w-20"></i>{{ $t('common.logout') }}</button></li>
@@ -73,13 +102,13 @@ export default {
 
         <div class="flex-grow-1 overflow-auto custom-scrollbar p-3 p-md-5">
             <div class="container-xxl p-0">
-                <div class="d-flex justify-content-between align-items-center mb-4 mb-md-5">
+                <div class="page-header d-flex justify-content-between align-items-center">
                     <div>
                         <h2 class="fw-black m-0 tracking-tight" style="font-size: 1.75rem;">{{ $t('instance_manager.title') }}</h2>
-                        <p class="text-muted fw-medium m-0 opacity-75 small">{{ store.instanceList.length }} {{ $t('instance_manager.title') }}</p>
+                        <p class="text-muted fw-medium m-0 opacity-75 small">{{ $t('instance_manager.instance_count', { count: store.instanceList.length }) }}</p>
                     </div>
                     <div>
-                        <button @click="showCreateModal" class="btn btn-primary px-3 px-md-4 py-2 fw-bold shadow-sm" style="border-radius: 12px;">
+                        <button @click="showCreateModal" class="btn btn-primary px-3 px-md-4 py-2 fw-bold">
                             <i class="fa-solid fa-plus d-md-none"></i>
                             <span class="d-none d-md-inline"><i class="fa-solid fa-plus me-2"></i>{{ $t('instance_manager.create_btn') }}</span>
                         </button>
@@ -88,26 +117,26 @@ export default {
 
         <div class="row g-3 g-md-4 transition-container">
             <div v-for="(inst, idx) in filteredInstances" :key="inst.id" class="col-md-6 col-lg-4 col-xl-3 animate-in" :style="{'animation-delay': (idx * 0.05) + 's'}">
-                <div class="card h-100 border-0 shadow-sm hover-shadow transition-all" :class="{'border-primary border-2': store.currentInstanceId === inst.id}">
+                <div class="card h-100 instance-card" :class="{'instance-card-active': store.currentInstanceId === inst.id}">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div class="d-flex align-items-center">
-                                <div class="me-3 position-relative" style="width: 48px; height: 48px;">
+                                <div class="me-3 position-relative" style="width: 44px; height: 44px;">
                                     <img 
                                         v-if="inst.hasIcon" 
                                         :src="'/api/server/icon?instanceId=' + inst.id + '&t=' + (inst._iconVer || 0)" 
-                                        class="rounded-3 shadow-sm w-100 h-100" 
-                                        style="object-fit: cover;"
+                                        class="rounded-3 w-100 h-100" 
+                                        style="object-fit: cover; box-shadow: 0 2px 8px rgba(var(--c-primary-rgb), 0.1);"
                                     >
                                     <div 
                                         v-else 
-                                        class="bg-primary-subtle text-primary rounded-3 w-100 h-100 d-flex align-items-center justify-content-center"
+                                        class="instance-icon-placeholder rounded-3 w-100 h-100 d-flex align-items-center justify-content-center"
                                     >
-                                        <i class="fa-solid fa-server fa-lg"></i>
+                                        <i class="fa-solid fa-server"></i>
                                     </div>
                                 </div>
                                 <div class="overflow-hidden">
-                                    <h5 class="fw-bold m-0 text-truncate">{{ inst.name }}</h5>
+                                    <h5 class="fw-bold m-0 text-truncate" style="font-size: 0.9375rem;">{{ inst.name }}</h5>
                                     <div class="d-flex align-items-center mt-1">
                                         <span class="status-indicator me-2" :class="inst.isRunning ? 'bg-success' : 'bg-danger'"></span>
                                         <span class="small text-muted">{{ inst.isRunning ? $t('instance_manager.state_running') : $t('instance_manager.state_stopped') }}</span>
@@ -127,7 +156,7 @@ export default {
                             </div>
                         </div>
 
-                            <div class="btn-group w-100 shadow-sm mt-auto instance-card-btn-group">
+                            <div class="btn-group w-100 mt-auto instance-card-btn-group">
                                 <button @click.stop="enterInstance(inst)" class="btn btn-primary px-3" :title="$t('instance_manager.select_btn')">
                                     <i class="fa-solid fa-arrow-right"></i>
                                 </button>
@@ -137,7 +166,7 @@ export default {
                                 <button v-else @click.stop="quickAction(inst, 'stop')" class="btn btn-danger px-3" :title="$t('dashboard.stop')">
                                     <i class="fa-solid fa-stop"></i>
                                 </button>
-                                <button @click.stop="openSettings(inst)" class="btn btn-light border-start-0 border-end-0 px-3" :title="$t('instance_manager.settings_btn')">
+                                <button @click.stop="openSettings(inst)" class="btn btn-outline-secondary px-3" :title="$t('instance_manager.settings_btn')">
                                     <i class="fa-solid fa-gear"></i>
                                 </button>
                                 <button @click.stop="deleteInstance(inst)" class="btn btn-outline-danger px-3" :title="$t('instance_manager.delete_btn')">
@@ -148,27 +177,24 @@ export default {
                 </div>
             </div>
 
-            <!-- Empty State -->
             <div v-if="filteredInstances.length === 0" class="col-12 py-5 text-center">
                 <div class="display-1 text-muted opacity-10 mb-4"><i class="fa-solid fa-folder-open"></i></div>
                 <h4 class="text-muted">{{ $t('instance_manager.no_instances') }}</h4>
             </div>
         </div>
 
-            </div> <!-- End container-xxl -->
-            <!-- End Flex-Grow Content -->
-    </div> <!-- End hub container -->
+            </div>
+    </div>
 
-    <!-- Create/Edit Modal [Moved inside root div to satisfy Transition single-root requirement] -->
     <Teleport to="body">
         <div class="modal fade" id="instanceModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg">
-                    <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <div class="modal-content">
+                    <div class="modal-header">
                         <h5 class="modal-title fw-bold">{{ isEditing ? $t('instance_manager.edit_modal_title') : $t('instance_manager.create_modal_title') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body p-4">
+                    <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.name_label') }}</label>
                             <input type="text" class="form-control" v-model="form.name" :placeholder="$t('instance_manager.name_placeholder')">
@@ -179,16 +205,11 @@ export default {
                         </div>
                         <div class="mb-3 animate-in">
                             <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.java_path_label') }}</label>
-                            <select class="form-select" v-model="form.javaPath">
-                                <option value="">{{ $t('common.unknown') }} (Default)</option>
-                                <option v-for="java in store.javaInstallations" :key="java.path" :value="java.path">
-                                    {{ java.version }} ({{ java.path }})
-                                </option>
-                            </select>
+                            <CustomSelect v-model="form.javaPath" :options="[{value: '', label: $t('common.unknown') + ' (Default)'}, ...store.javaInstallations.map(j => ({value: j.path, label: j.version + ' (' + j.path + ')'}))]" searchable />
                         </div>
                     </div>
-                    <div class="modal-footer border-0 p-4 pt-0">
-                        <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">{{ $t('common.cancel') }}</button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">{{ $t('common.cancel') }}</button>
                         <button type="button" class="btn btn-primary px-4" @click="saveInstance">{{ $t('common.confirm') }}</button>
                     </div>
                 </div>
@@ -207,7 +228,27 @@ export default {
         const modal = ref(null);
         const searchTerm = ref('');
         const showMobileMenu = ref(false);
+        const showPluginMenu = ref(false);
+        const pluginDropdown = ref(null);
+        const pluginMenuRight = ref(0);
+        const pluginMenuTop = ref(0);
         const iconErrors = reactive({});
+
+        const togglePluginMenu = (e) => {
+            showPluginMenu.value = !showPluginMenu.value;
+            if (showPluginMenu.value) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                pluginMenuTop.value = rect.bottom + 8;
+                pluginMenuRight.value = window.innerWidth - rect.right;
+            }
+        };
+
+        const serverIconUrl = computed(() => {
+            return store.customLogoUrl || '/logo.png';
+        });
+        const onNavIconError = () => {
+            // 不需要处理错误，因为使用store.customLogoUrl
+        };
 
         const filteredInstances = computed(() => {
             if (!searchTerm.value) return store.instanceList;
@@ -311,8 +352,16 @@ export default {
             location.reload();
         };
 
+        const selectPlugin = (item) => {
+            showPluginMenu.value = false;
+            if (item.view) {
+                store.view = item.view;
+            }
+        };
+
         let clickHandler = (e) => {
             if (showMobileMenu.value) showMobileMenu.value = false;
+            if (showPluginMenu.value) showPluginMenu.value = false;
         };
 
         onMounted(() => {
@@ -354,7 +403,9 @@ export default {
             saveInstance, showCreateModal, openSettings, enterInstance,
             deleteInstance, quickAction, modal,
             filteredInstances, toggleTheme, toggleLang, logout,
-            showMobileMenu
+            showMobileMenu, showPluginMenu, togglePluginMenu, pluginDropdown,
+            pluginMenuRight, pluginMenuTop, selectPlugin,
+            serverIconUrl, onNavIconError
         };
     }
 };

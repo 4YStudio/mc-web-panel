@@ -7,9 +7,9 @@ export default {
     template: `
     <div class="h-100 d-flex flex-column animate-in overflow-hidden">
         <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 px-1 flex-shrink-0">
+        <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0">
             <div class="d-flex align-items-center overflow-hidden">
-                <button @click="store.view = 'instance-manager'" class="btn-back me-3">
+                <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
                 <h3 class="m-0 fw-bold d-flex align-items-center text-truncate">
@@ -25,8 +25,8 @@ export default {
                 <i v-else class="fa-solid fa-magnifying-glass d-md-none"></i>
                 <span class="d-none d-md-inline"><i class="fa-solid fa-magnifying-glass me-1"></i>{{ $t('java.detect_system') }}</span>
             </button>
-             <button class="btn btn-primary btn-sm fw-bold px-3 shadow-sm" @click="showAddLocal = !showAddLocal" style="border-radius: 10px;">
-                <i class="fa-solid fa-folder-plus me-1"></i>{{ $t('java.add_local') }}
+             <button class="btn btn-primary btn-sm fw-bold px-2 px-md-3 shadow-sm" @click="showAddLocal = !showAddLocal" style="border-radius: 10px;">
+                <i class="fa-solid fa-folder-plus"></i><span class="d-none d-md-inline ms-1">{{ $t('java.add_local') }}</span>
             </button>
         </div>
 
@@ -99,9 +99,7 @@ export default {
             <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 border-0">
                 <span class="fw-bold small text-uppercase text-muted"><i class="fa-solid fa-cloud-arrow-down me-2 text-primary"></i>{{ $t('java.online_install') }}</span>
                 <div class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm border-0 bg-body shadow-sm" style="width: auto; font-size: 0.75rem;" v-model="selectedSource" @change="fetchAvailable">
-                        <option v-for="s in sources" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <CustomSelect v-model="selectedSource" :options="sources.map(s => ({value: s.id, label: s.name}))" size="sm" width="auto" @change="fetchAvailable" />
                     <button class="btn btn-sm btn-link text-primary p-0" @click="fetchAvailable" :disabled="loadingAvailable" :title="$t('common.refresh')">
                         <i class="fa-solid fa-rotate" :class="{'fa-spin': loadingAvailable}"></i>
                     </button>

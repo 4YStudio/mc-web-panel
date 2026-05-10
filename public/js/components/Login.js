@@ -5,17 +5,18 @@ import { showToast, waitForPanel, uploadFileWithChunk, isLargeFile } from '../ut
 
 export default {
     template: `
-    <div class="d-flex align-items-center justify-content-center h-100 w-100" style="background: radial-gradient(circle at center, var(--c-bg-base), #000000 150%);">
-        <div class="glass-card p-4 p-md-5 text-center" style="width: 100%; max-width: 400px;">
+    <div class="login-page d-flex align-items-center justify-content-center h-100 w-100">
+        <div class="glass-card login-card p-5 text-center" style="width: 100%; max-width: 400px;">
             <div class="mb-4">
-                 <img v-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="rounded-circle shadow-lg" width="80" height="80" style="object-fit: cover;">
-                 <img v-else src="/logo.png" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                 <img v-if="store.customLogoUrl" :src="store.customLogoUrl" alt="Logo" class="login-logo">
+                 <img v-else-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="login-logo rounded-circle">
+                 <img v-else src="/logo.png" alt="Logo" class="login-logo">
             </div>
-            <h4 class="mb-4 fw-bold">{{ $t('login.title') }}</h4>
+            <h4 class="mb-4 fw-bold tracking-tight">{{ $t('login.title') }}</h4>
             
             <div v-if="!store.auth.isSetup" class="mb-4 animate-in">
-                <div class="p-2 bg-white rounded d-inline-block shadow-sm mb-2">
-                    <img :src="store.auth.qrCode" class="img-fluid" style="width: 150px;">
+                <div class="p-2 rounded d-inline-block mb-2" style="background: var(--c-primary-subtle);">
+                    <img :src="store.auth.qrCode" class="img-fluid" style="width: 150px; border-radius: 8px;">
                 </div>
                 <div class="small text-muted mb-3 font-monospace">{{ store.auth.secret }}</div>
                 
@@ -27,7 +28,7 @@ export default {
                 </div>
 
                 <div class="d-grid gap-2 mb-3">
-                    <div class="alert alert-info small m-0">{{ $t('login.prompt_scan') }}</div>
+                    <div class="alert alert-info small m-0 py-2">{{ $t('login.prompt_scan') }}</div>
                     <button class="btn btn-outline-warning btn-sm py-2 border-dashed fw-bold" @click="triggerRestore" :disabled="restoring">
                         <i class="fa-solid fa-file-import me-1"></i>{{ $t('setup.restore_from_backup') }}
                     </button>
@@ -36,10 +37,10 @@ export default {
             </div>
 
             <div class="mb-4">
-                <input type="text" v-model="store.auth.token" class="form-control form-control-lg text-center font-monospace" :placeholder="$t('login.placeholder_code')" maxlength="6" @keyup.enter="login" autofocus style="letter-spacing: 4px;">
+                <input type="text" v-model="store.auth.token" class="form-control form-control-lg login-input" :placeholder="$t('login.placeholder_code')" maxlength="6" @keyup.enter="login" autofocus>
             </div>
 
-            <button class="btn btn-primary w-100 btn-lg mb-3 shadow-sm" @click="login">
+            <button class="btn btn-primary w-100 login-btn mb-4" @click="login">
                 {{ $t('login.btn_verify') }}
             </button>
             

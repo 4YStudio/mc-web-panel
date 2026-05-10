@@ -1,4 +1,4 @@
-import { createApp, watch, onMounted, ref } from '/js/vue.esm-browser.js';
+import { createApp, watch, onMounted, ref, computed } from '/js/vue.esm-browser.js';
 import { store } from './store.js';
 import { api } from './api.js';
 import { toasts, removeToast, modalData, confirmModalAction, initModal, showToast } from './utils.js';
@@ -21,7 +21,9 @@ import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
 import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
-import FrpManager from './components/FrpManager.js';
+import PluginManager from './components/PluginManager.js';
+import PluginDevGuide from './components/PluginDevGuide.js';
+import CustomSelect from './components/CustomSelect.js';
 import { createI18n } from './i18n.js?v=1.5.0';
 import { socket } from './socket.js';
 
@@ -45,7 +47,8 @@ const app = createApp({
         About,
         JavaManager,
         InstanceManager,
-        FrpManager
+        PluginManager,
+        PluginDevGuide
     },
     setup() {
         const sidebarOpen = ref(false);
@@ -58,6 +61,15 @@ const app = createApp({
             // Language Init
             const savedLang = localStorage.getItem('lang') || 'zh';
             store.lang = savedLang;
+
+            loadAppearanceImages();
+
+            try {
+                const appearanceRes = await api.get('/api/appearance/config');
+                if (appearanceRes.data) {
+                    applyAppearance(appearanceRes.data);
+                }
+            } catch (_) { }
 
             try {
                 const { data } = await api.get('/api/auth/check');
@@ -82,12 +94,85 @@ const app = createApp({
                 if (configRes.data && configRes.data.consoleInfoPosition) {
                     store.consoleInfoPosition = configRes.data.consoleInfoPosition;
                 }
+                if (configRes.data && configRes.data.appearance) {
+                    applyAppearance(configRes.data.appearance);
+                }
             } catch (e) { console.error('Failed to sync config:', e); }
+        };
+
+        const loadPlugins = async () => {
+            try {
+                const [sidebarRes, componentsRes] = await Promise.all([
+                    api.get('/api/plugins/sidebar-items'),
+                    api.get('/api/plugins/components')
+                ]);
+
+                if (sidebarRes.data) {
+                    store.pluginSidebarItems = sidebarRes.data;
+                }
+
+                if (componentsRes.data) {
+                    for (const [compName, compInfo] of Object.entries(componentsRes.data)) {
+                        try {
+                            const module = await import(`/api/plugins/${compInfo.pluginId}/component/${compName}`);
+                            if (module.default) {
+                                app.component(compName, module.default);
+                                store.pluginComponents[compName] = compInfo.pluginId;
+                            }
+                        } catch (e) {
+                            console.error(`Failed to load plugin component ${compName}:`, e);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load plugins:', e);
+            }
+        };
+
+        const applyAppearance = (appearance) => {
+            const root = document.documentElement;
+            if (appearance.sidebarOpacity !== undefined) {
+                root.style.setProperty('--app-sidebar-opacity', appearance.sidebarOpacity);
+            }
+            if (appearance.contentOpacity !== undefined) {
+                root.style.setProperty('--app-content-opacity', appearance.contentOpacity);
+            }
+            if (appearance.cardOpacity !== undefined) {
+                root.style.setProperty('--app-card-opacity', appearance.cardOpacity);
+            }
+            if (appearance.loginOpacity !== undefined) {
+                root.style.setProperty('--app-login-opacity', appearance.loginOpacity);
+            }
+            if (appearance.instanceOpacity !== undefined) {
+                root.style.setProperty('--app-instance-opacity', appearance.instanceOpacity);
+            }
+        };
+
+        const loadAppearanceImages = async () => {
+            try {
+                await api.get('/api/appearance/logo');
+                store.customLogoUrl = '/api/appearance/logo?t=' + Date.now();
+                const favicon = document.querySelector("link[rel*='icon']") || document.createElement('link');
+                favicon.type = 'image/x-icon';
+                favicon.rel = 'icon';
+                favicon.href = store.customLogoUrl;
+                document.getElementsByTagName('head')[0].appendChild(favicon);
+            } catch (_) { }
+            try {
+                await api.get('/api/appearance/background');
+                store.customBgUrl = '/api/appearance/background?t=' + Date.now();
+                document.documentElement.style.setProperty('--app-bg-image', `url(${store.customBgUrl})`);
+                document.body.classList.add('has-bg-image');
+            } catch (_) { }
         };
 
         const postLogin = () => {
             syncConfig();
+            loadAppearanceImages();
             api.get('/api/server/status').then(res => store.isRunning = res.data.running);
+
+            // Load plugins
+            loadPlugins();
 
             // Socket 监听
             socket.emit('req_history');
@@ -239,10 +324,25 @@ const app = createApp({
             if (val) postLogin();
         });
 
+        watch(() => store.view, (newView, oldView) => {
+            if (newView !== oldView && oldView) {
+                store.prevView = oldView;
+            }
+        });
+
         onMounted(() => {
             init();
             initModal(); // 初始化 Bootstrap Modal
             if (store.auth.loggedIn) postLogin();
+        });
+
+        const isPluginView = computed(() => {
+            return store.pluginSidebarItems.some(item => item.view === store.view);
+        });
+
+        const pluginViewComponent = computed(() => {
+            const item = store.pluginSidebarItems.find(item => item.view === store.view);
+            return item ? item.component : null;
         });
 
         return {
@@ -251,10 +351,14 @@ const app = createApp({
             removeToast,
             modalData,
             confirmModalAction,
-            sidebarOpen
+            sidebarOpen,
+            isPluginView,
+            pluginViewComponent
         };
     }
 });
+
+app.component('CustomSelect', CustomSelect);
 
 app.config.globalProperties.$t = createI18n(store);
 app.mount('#app');

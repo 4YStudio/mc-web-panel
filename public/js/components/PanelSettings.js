@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, onMounted, onUnmounted, watch, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal, waitForPanel, uploadFileWithChunk, isLargeFile } from '../utils.js';
@@ -6,19 +6,18 @@ import { showToast, openModal, waitForPanel, uploadFileWithChunk, isLargeFile } 
 export default {
     template: `
     <div class="h-100 d-flex flex-column animate-in overflow-hidden">
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 px-1 flex-shrink-0">
+        <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0">
             <div class="d-flex align-items-center overflow-hidden">
-                <button @click="store.view = 'instance-manager'" class="btn-back me-3">
+                <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
-                <h3 class="m-0 fw-bold d-flex align-items-center text-truncate">
+                <h3 class="m-0 fw-bold d-flex align-items-center text-truncate tracking-tight">
                     <i class="fa-solid fa-sliders me-2 me-md-3 text-primary d-none d-md-inline"></i>
                     <span>{{ $t('panel_settings.title') }}</span>
                 </h3>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-success btn-sm px-3 px-md-4 py-2 fw-bold shadow-sm" @click="saveConfig" :disabled="saving" style="border-radius: 12px;">
+                <button class="btn btn-success btn-sm px-3 px-md-4 py-2 fw-bold" @click="saveConfig" :disabled="saving">
                     <i class="fa-solid fa-save me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
                 </button>
             </div>
@@ -29,11 +28,10 @@ export default {
             <p class="mt-2 text-muted fw-medium">{{ $t('common.loading') }}</p>
         </div>
 
-        <div v-else class="row g-3 g-md-4 overflow-auto custom-scrollbar pb-5">
-            <!-- 基础设置 -->
+        <div v-else class="row g-3 overflow-auto custom-scrollbar pb-5">
             <div class="col-md-6">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-primary-subtle text-primary border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
+                <div class="card h-100">
+                    <div class="card-header fw-bold py-2 py-md-3 px-3 px-md-4">
                         <i class="fa-solid fa-sliders me-2"></i>{{ $t('panel_settings.basic') }}
                     </div>
                     <div class="card-body p-3 p-md-4">
@@ -45,35 +43,25 @@ export default {
                         
                         <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.default_lang') }}</label>
-                            <select class="form-select" v-model="config.defaultLang">
-                                <option value="zh">中文</option>
-                                <option value="en">English</option>
-                            </select>
+                            <CustomSelect v-model="config.defaultLang" :options="[{value: 'zh', label: '中文'}, {value: 'en', label: 'English'}]" />
                         </div>
                         
                         <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.theme') }}</label>
-                            <select class="form-select" v-model="config.theme">
-                                <option value="light">{{ $t('panel_settings.theme_light') }}</option>
-                                <option value="dark">{{ $t('panel_settings.theme_dark') }}</option>
-                                <option value="auto">{{ $t('panel_settings.theme_auto') }}</option>
-                            </select>
+                            <CustomSelect v-model="config.theme" :options="[{value: 'light', label: $t('panel_settings.theme_light')}, {value: 'dark', label: $t('panel_settings.theme_dark')}, {value: 'auto', label: $t('panel_settings.theme_auto')}]" />
                         </div>
 
                         <div class="mb-0">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.console_info_position') }}</label>
-                            <select class="form-select" v-model="config.consoleInfoPosition">
-                                <option value="top">{{ $t('panel_settings.pos_top') }}</option>
-                                <option value="sidebar">{{ $t('panel_settings.pos_sidebar') }}</option>
+                            <CustomSelect v-model="config.consoleInfoPosition" :options="[{value: 'top', label: $t('panel_settings.pos_top')}, {value: 'sidebar', label: $t('panel_settings.pos_sidebar')}]" />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 高级设置 -->
             <div class="col-md-6">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-secondary-subtle text-secondary border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
+                <div class="card h-100">
+                    <div class="card-header fw-bold py-2 py-md-3 px-3 px-md-4">
                         <i class="fa-solid fa-gear me-2"></i>{{ $t('panel_settings.advanced') }}
                     </div>
                     <div class="card-body p-3 p-md-4">
@@ -99,10 +87,9 @@ export default {
                 </div>
             </div>
 
-            <!-- 安全设置 -->
             <div class="col-md-6">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-danger-subtle text-danger border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
+                <div class="card h-100">
+                    <div class="card-header text-danger fw-bold py-2 py-md-3 px-3 px-md-4">
                         <i class="fa-solid fa-shield-halved me-2"></i>{{ $t('panel_settings.security') }}
                     </div>
                     <div class="card-body p-3 p-md-4">
@@ -126,10 +113,9 @@ export default {
                 </div>
             </div>
 
-            <!-- AI 设置 -->
             <div class="col-md-6">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-info-subtle text-info border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
+                <div class="card h-100">
+                    <div class="card-header text-info fw-bold py-2 py-md-3 px-3 px-md-4">
                         <i class="fa-solid fa-robot me-2"></i>{{ $t('panel_settings.ai_settings') }}
                     </div>
                     <div class="card-body p-3 p-md-4">
@@ -147,7 +133,7 @@ export default {
                             <input type="text" class="form-control" v-model="config.aiModel" :placeholder="$t('panel_settings.ai_model_placeholder')">
                         </div>
                         <div class="d-grid mt-4">
-                            <button class="btn btn-outline-info fw-bold" @click="testAI" :disabled="testingAI" style="border-radius: 12px;">
+                            <button class="btn btn-outline-info fw-bold" @click="testAI" :disabled="testingAI">
                                 <span v-if="testingAI" class="spinner-border spinner-border-sm me-2"></span>
                                 <i v-else class="fa-solid fa-vial me-2"></i>{{ $t('panel_settings.ai_test') }}
                             </button>
@@ -156,67 +142,227 @@ export default {
                 </div>
             </div>
 
-            <!-- 备份与维护 -->
-            <div class="col-md-12">
-                <div class="card border-0 shadow-sm" style="border-radius: 16px;">
-                    <div class="card-header bg-warning-subtle text-warning-emphasis border-0 fw-bold py-2 py-md-3 px-3 px-md-4" style="border-radius: 16px 16px 0 0;">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span><i class="fa-solid fa-box-archive me-2"></i>{{ $t('panel_settings.backup_maintenance') || '备份与维护' }}</span>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-outline-warning btn-sm rounded-pill fw-bold" @click="triggerRestoreImport">
-                                    <i class="fa-solid fa-file-import me-1"></i>{{ $t('panel_settings.import_backup') || '导入备份' }}
-                                </button>
-                                <button class="btn btn-warning btn-sm rounded-pill fw-bold" @click="askCreateGlobalBackup">
-                                    <i class="fa-solid fa-plus me-1"></i>{{ $t('panel_settings.create_global_backup') || '创建全局备份' }}
-                                </button>
-                                <input type="file" ref="restoreInput" class="d-none" accept=".zip" @change="handleRestoreImport">
-                            </div>
-                        </div>
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header fw-bold py-2 py-md-3 px-3 px-md-4" style="color: var(--c-accent);">
+                        <i class="fa-solid fa-palette me-2"></i>{{ $t('panel_settings.appearance') }}
                     </div>
                     <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="bg-body-tertiary">
-                                    <tr class="small text-uppercase text-muted fw-bold">
-                                        <th class="px-4">{{ $t('common.name') }}</th>
-                                        <th>{{ $t('common.size') }}</th>
-                                        <th>{{ $t('common.time') }}</th>
-                                        <th class="text-end px-4">{{ $t('common.actions') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="b in globalBackups" :key="b.name">
-                                        <td class="px-4">
-                                            <div class="fw-bold small">{{ b.name }}</div>
-                                            <div class="text-muted" style="font-size: 0.7rem;">{{ b.note || '-' }}</div>
-                                        </td>
-                                        <td class="small">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
-                                        <td class="small text-muted">{{ new Date(b.mtime).toLocaleString() }}</td>
-                                        <td class="text-end px-4">
-                                            <div class="d-flex justify-content-end gap-1">
-                                                <button class="btn btn-xs btn-outline-success border-0" @click="downloadGlobalBackup(b)" :title="$t('common.download')">
-                                                    <i class="fa-solid fa-download"></i>
+                        <div class="d-flex border-bottom px-3 px-md-4 pt-2 gap-1 overflow-auto" style="flex-shrink: 0;">
+                            <button v-for="tab in appearanceTabs" :key="tab.id" class="btn btn-sm px-3 py-2 fw-bold rounded-top border-0" 
+                                :class="activeAppearanceTab === tab.id ? 'btn-primary' : 'btn-link text-muted'" 
+                                @click="activeAppearanceTab = tab.id" style="font-size: 0.8rem;">
+                                <i class="fa-solid me-md-1" :class="tab.icon"></i><span class="d-none d-md-inline">{{ $t(tab.labelKey) }}</span>
+                            </button>
+                        </div>
+
+                        <div class="p-3 p-md-4">
+                            <div v-if="activeAppearanceTab === 'general'" class="row g-4">
+                                <div class="col-md-7">
+                                    <div class="mb-3 mb-md-4">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.custom_logo') }}</label>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="appearance-preview rounded-3 border d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; overflow: hidden; flex-shrink: 0; background: var(--c-surface-elevated);">
+                                                <img v-if="appearance.logoPreview" :src="appearance.logoPreview" style="width: 100%; height: 100%; object-fit: contain;">
+                                                <i v-else class="fa-solid fa-image text-muted" style="font-size: 1.2rem;"></i>
+                                            </div>
+                                            <div class="d-flex gap-2 flex-grow-1">
+                                                <button class="btn btn-outline-primary btn-sm flex-grow-1" @click="triggerLogoUpload">
+                                                    <i class="fa-solid fa-upload me-1"></i>{{ $t('panel_settings.upload') }}
                                                 </button>
-                                                <button class="btn btn-xs btn-outline-primary border-0" @click="askRestoreGlobalBackup(b)" :title="$t('backups.restore')">
-                                                    <i class="fa-solid fa-clock-rotate-left"></i>
-                                                </button>
-                                                <button class="btn btn-xs btn-outline-danger border-0" @click="deleteGlobalBackup(b)" :title="$t('common.delete')">
+                                                <button v-if="appearance.logoPreview" class="btn btn-outline-danger btn-sm" @click="removeLogo">
                                                     <i class="fa-solid fa-trash"></i>
                                                 </button>
                                             </div>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="!globalBackups.length">
-                                        <td colspan="4" class="text-center text-muted py-4 small">
-                                            {{ $t('common.no_data') || '暂无全局备份' }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                            <input type="file" ref="logoInput" class="d-none" accept="image/*" @change="handleLogoUpload">
+                                        </div>
+                                        <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.logo_desc') }}</div>
+                                    </div>
+
+                                    <div class="mb-3 mb-md-4">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.background_image') }}</label>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="appearance-preview rounded-3 border d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; overflow: hidden; flex-shrink: 0; background: var(--c-surface-elevated);">
+                                                <img v-if="appearance.bgPreview" :src="appearance.bgPreview" style="width: 100%; height: 100%; object-fit: cover;">
+                                                <i v-else class="fa-solid fa-panorama text-muted" style="font-size: 1.2rem;"></i>
+                                            </div>
+                                            <div class="d-flex gap-2 flex-grow-1">
+                                                <button class="btn btn-outline-primary btn-sm flex-grow-1" @click="triggerBgUpload">
+                                                    <i class="fa-solid fa-upload me-1"></i>{{ $t('panel_settings.upload') }}
+                                                </button>
+                                                <button v-if="appearance.bgPreview" class="btn btn-outline-danger btn-sm" @click="removeBackground">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                            <input type="file" ref="bgInput" class="d-none" accept="image/*" @change="handleBgUpload">
+                                        </div>
+                                        <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.background_desc') }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="appearance-preview-box w-100 rounded-4 overflow-hidden border" style="height: 180px; position: relative; background: var(--c-bg);">
+                                        <div v-if="appearance.bgPreview" class="appearance-bg-layer" :style="{ backgroundImage: 'url(' + appearance.bgPreview + ')', backgroundSize: 'cover', backgroundPosition: 'center' }"></div>
+                                        <div class="d-flex h-100">
+                                            <div class="appearance-sidebar-preview" :style="{ opacity: appearance.sidebarOpacity }">
+                                                <div class="px-2 py-2">
+                                                    <div class="d-flex align-items-center gap-2 mb-2 px-1">
+                                                        <div style="width: 20px; height: 20px; border-radius: 6px; background: var(--c-accent); flex-shrink: 0;"></div>
+                                                        <div style="width: 40px; height: 6px; border-radius: 3px; background: var(--c-text-secondary);"></div>
+                                                    </div>
+                                                    <div v-for="i in 5" :key="i" class="d-flex align-items-center gap-2 mb-1 px-1 py-1 rounded" :style="{ background: i === 1 ? 'var(--c-accent-muted)' : 'transparent' }">
+                                                        <div style="width: 12px; height: 12px; border-radius: 3px; background: var(--c-text-tertiary); flex-shrink: 0;"></div>
+                                                        <div style="width: 30px; height: 4px; border-radius: 2px; background: var(--c-text-tertiary);"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="flex-grow-1 p-2" :style="{ opacity: appearance.contentOpacity }">
+                                                <div class="rounded-3 p-2 mb-2" :style="{ opacity: appearance.cardOpacity, background: 'var(--c-surface)' }">
+                                                    <div style="width: 50px; height: 5px; border-radius: 3px; background: var(--c-text-secondary); margin-bottom: 6px;"></div>
+                                                    <div style="width: 100%; height: 4px; border-radius: 2px; background: var(--c-border); margin-bottom: 4px;"></div>
+                                                    <div style="width: 80%; height: 4px; border-radius: 2px; background: var(--c-border);"></div>
+                                                </div>
+                                                <div class="rounded-3 p-2" :style="{ opacity: appearance.cardOpacity, background: 'var(--c-surface)' }">
+                                                    <div style="width: 40px; height: 5px; border-radius: 3px; background: var(--c-text-secondary); margin-bottom: 6px;"></div>
+                                                    <div style="width: 90%; height: 4px; border-radius: 2px; background: var(--c-border); margin-bottom: 4px;"></div>
+                                                    <div style="width: 60%; height: 4px; border-radius: 2px; background: var(--c-border);"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="activeAppearanceTab === 'login'" class="row g-4">
+                                <div class="col-md-7">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.login_opacity') }} <span class="opacity-75">({{ Math.round(appearance.loginOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="form-range" v-model.number="appearance.loginOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="appearance-preview-box w-100 rounded-4 overflow-hidden border" style="height: 180px; position: relative; background: var(--c-bg);">
+                                        <div v-if="appearance.bgPreview" class="appearance-bg-layer" :style="{ backgroundImage: 'url(' + appearance.bgPreview + ')', backgroundSize: 'cover', backgroundPosition: 'center' }"></div>
+                                        <div class="d-flex align-items-center justify-content-center h-100">
+                                            <div class="rounded-4 p-3 text-center" :style="{ opacity: appearance.loginOpacity, background: 'var(--c-surface)', width: '60%' }">
+                                                <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--c-accent); margin: 0 auto 6px;"></div>
+                                                <div style="width: 60%; height: 4px; border-radius: 2px; background: var(--c-text-secondary); margin: 0 auto 8px;"></div>
+                                                <div style="width: 100%; height: 6px; border-radius: 3px; background: var(--c-border); margin-bottom: 6px;"></div>
+                                                <div style="width: 80%; height: 6px; border-radius: 3px; background: var(--c-accent);"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="activeAppearanceTab === 'instance-list'" class="row g-4">
+                                <div class="col-md-7">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.instance_opacity') }} <span class="opacity-75">({{ Math.round(appearance.instanceOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="form-range" v-model.number="appearance.instanceOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="appearance-preview-box w-100 rounded-4 overflow-hidden border" style="height: 180px; position: relative; background: var(--c-bg);">
+                                        <div v-if="appearance.bgPreview" class="appearance-bg-layer" :style="{ backgroundImage: 'url(' + appearance.bgPreview + ')', backgroundSize: 'cover', backgroundPosition: 'center' }"></div>
+                                        <div class="p-2 h-100" :style="{ opacity: appearance.instanceOpacity }">
+                                            <div style="height: 8px; background: var(--c-surface); border-radius: 4px; margin-bottom: 6px;"></div>
+                                            <div class="d-flex gap-1">
+                                                <div style="flex: 1; height: 50px; background: var(--c-surface); border-radius: 6px;"></div>
+                                                <div style="flex: 1; height: 50px; background: var(--c-surface); border-radius: 6px;"></div>
+                                                <div style="flex: 1; height: 50px; background: var(--c-surface); border-radius: 6px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="activeAppearanceTab === 'instance-detail'" class="row g-4">
+                                <div class="col-md-7">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.sidebar_opacity') }} <span class="opacity-75">({{ Math.round(appearance.sidebarOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="form-range" v-model.number="appearance.sidebarOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.content_opacity') }} <span class="opacity-75">({{ Math.round(appearance.contentOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="form-range" v-model.number="appearance.contentOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.card_opacity') }} <span class="opacity-75">({{ Math.round(appearance.cardOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="form-range" v-model.number="appearance.cardOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="appearance-preview-box w-100 rounded-4 overflow-hidden border" style="height: 180px; position: relative; background: var(--c-bg);">
+                                        <div v-if="appearance.bgPreview" class="appearance-bg-layer" :style="{ backgroundImage: 'url(' + appearance.bgPreview + ')', backgroundSize: 'cover', backgroundPosition: 'center' }"></div>
+                                        <div class="d-flex h-100">
+                                            <div class="appearance-sidebar-preview" :style="{ opacity: appearance.sidebarOpacity }">
+                                                <div class="px-2 py-2">
+                                                    <div class="d-flex align-items-center gap-2 mb-2 px-1">
+                                                        <div style="width: 20px; height: 20px; border-radius: 6px; background: var(--c-accent); flex-shrink: 0;"></div>
+                                                        <div style="width: 40px; height: 6px; border-radius: 3px; background: var(--c-text-secondary);"></div>
+                                                    </div>
+                                                    <div v-for="i in 5" :key="i" class="d-flex align-items-center gap-2 mb-1 px-1 py-1 rounded" :style="{ background: i === 1 ? 'var(--c-accent-muted)' : 'transparent' }">
+                                                        <div style="width: 12px; height: 12px; border-radius: 3px; background: var(--c-text-tertiary); flex-shrink: 0;"></div>
+                                                        <div style="width: 30px; height: 4px; border-radius: 2px; background: var(--c-text-tertiary);"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="flex-grow-1 p-2" :style="{ opacity: appearance.contentOpacity }">
+                                                <div class="rounded-3 p-2 mb-2" :style="{ opacity: appearance.cardOpacity, background: 'var(--c-surface)' }">
+                                                    <div style="width: 50px; height: 5px; border-radius: 3px; background: var(--c-text-secondary); margin-bottom: 6px;"></div>
+                                                    <div style="width: 100%; height: 4px; border-radius: 2px; background: var(--c-border); margin-bottom: 4px;"></div>
+                                                    <div style="width: 80%; height: 4px; border-radius: 2px; background: var(--c-border);"></div>
+                                                </div>
+                                                <div class="rounded-3 p-2" :style="{ opacity: appearance.cardOpacity, background: 'var(--c-surface)' }">
+                                                    <div style="width: 40px; height: 5px; border-radius: 3px; background: var(--c-text-secondary); margin-bottom: 6px;"></div>
+                                                    <div style="width: 90%; height: 4px; border-radius: 2px; background: var(--c-border);"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="activeAppearanceTab === 'other'" class="row g-4">
+                                <div class="col-md-7">
+                                    <p class="text-muted small mb-4">{{ $t('panel_settings.other_interfaces_desc') }}</p>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.sidebar_opacity') }} <span class="opacity-75">({{ Math.round(appearance.sidebarOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="range-sm form-range" v-model.number="appearance.sidebarOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.content_opacity') }} <span class="opacity-75">({{ Math.round(appearance.contentOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="range-sm form-range" v-model.number="appearance.contentOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.card_opacity') }} <span class="opacity-75">({{ Math.round(appearance.cardOpacity * 100) }}%)</span></label>
+                                        <input type="range" class="range-sm form-range" v-model.number="appearance.cardOpacity" min="0.3" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="appearance-preview-box w-100 rounded-4 overflow-hidden border d-flex align-items-center justify-content-center" style="height: 180px; position: relative; background: var(--c-bg);">
+                                        <div v-if="appearance.bgPreview" class="appearance-bg-layer" :style="{ backgroundImage: 'url(' + appearance.bgPreview + ')', backgroundSize: 'cover', backgroundPosition: 'center' }"></div>
+                                        <div class="d-flex h-100 w-100">
+                                            <div class="appearance-sidebar-preview" :style="{ opacity: appearance.sidebarOpacity, width: '40px' }"></div>
+                                            <div class="flex-grow-1 p-3">
+                                                <div class="rounded-3 p-3 mb-2" :style="{ opacity: appearance.cardOpacity, background: 'var(--c-surface)' }">
+                                                    <div class="text-center" :style="{ opacity: appearance.contentOpacity }">
+                                                        <i class="fa-solid fa-puzzle-piece text-muted mb-2" style="font-size: 1.2rem;"></i>
+                                                        <div style="width: 40px; height: 4px; border-radius: 2px; background: var(--c-border); margin: 0 auto;"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+
         </div>
     </div>
     `,
@@ -227,7 +373,7 @@ export default {
         const loading = ref(true);
         const saving = ref(false);
         const testingAI = ref(false);
-        const globalBackups = ref([]);
+
         const config = reactive({
             port: 3000,
             defaultLang: 'zh',
@@ -249,7 +395,93 @@ export default {
         const jars = ref([]);
         const instances = ref([]);
         const javaList = ref([]);
-        const restoreInput = ref(null);
+
+        const logoInput = ref(null);
+        const bgInput = ref(null);
+        const appearance = reactive({
+            logoPreview: '',
+            bgPreview: '',
+            sidebarOpacity: 1,
+            contentOpacity: 1,
+            cardOpacity: 1,
+            loginOpacity: 1,
+            instanceOpacity: 1
+        });
+
+        const activeAppearanceTab = ref('general');
+        const appearanceTabs = [
+            { id: 'general', icon: 'fa-palette', labelKey: 'panel_settings.tab_general' },
+            { id: 'login', icon: 'fa-right-to-bracket', labelKey: 'panel_settings.tab_login' },
+            { id: 'instance-list', icon: 'fa-server', labelKey: 'panel_settings.tab_instance_list' },
+            { id: 'instance-detail', icon: 'fa-terminal', labelKey: 'panel_settings.tab_instance_detail' },
+            { id: 'other', icon: 'fa-puzzle-piece', labelKey: 'panel_settings.tab_other' }
+        ];
+
+        const triggerLogoUpload = () => logoInput.value.click();
+        const triggerBgUpload = () => bgInput.value.click();
+
+        const handleLogoUpload = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', 'logo');
+                await api.post('/api/appearance/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                appearance.logoPreview = '/api/appearance/logo?t=' + Date.now();
+                showToast($t('panel_settings.upload_success'), 'success');
+            } catch (err) {
+                showToast($t('common.error') + ': ' + (err.response?.data?.error || err.message), 'danger');
+            }
+            e.target.value = '';
+        };
+
+        const handleBgUpload = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', 'background');
+                await api.post('/api/appearance/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                appearance.bgPreview = '/api/appearance/background?t=' + Date.now();
+                showToast($t('panel_settings.upload_success'), 'success');
+            } catch (err) {
+                showToast($t('common.error') + ': ' + (err.response?.data?.error || err.message), 'danger');
+            }
+            e.target.value = '';
+        };
+
+        const removeLogo = async () => {
+            try {
+                await api.delete('/api/appearance/upload', { data: { type: 'logo' } });
+                appearance.logoPreview = '';
+                showToast($t('common.success'), 'success');
+            } catch (err) {
+                showToast($t('common.error'), 'danger');
+            }
+        };
+
+        const removeBackground = async () => {
+            try {
+                await api.delete('/api/appearance/upload', { data: { type: 'background' } });
+                appearance.bgPreview = '';
+                showToast($t('common.success'), 'success');
+            } catch (err) {
+                showToast($t('common.error'), 'danger');
+            }
+        };
+
+        const loadAppearance = async () => {
+            try {
+                await api.get('/api/appearance/logo');
+                appearance.logoPreview = '/api/appearance/logo?t=' + Date.now();
+            } catch (_) { }
+            try {
+                await api.get('/api/appearance/background');
+                appearance.bgPreview = '/api/appearance/background?t=' + Date.now();
+            } catch (_) { }
+        };
 
         const loadJars = async () => {
             try {
@@ -260,12 +492,7 @@ export default {
             }
         };
 
-        const loadGlobalBackups = async () => {
-            try {
-                const res = await api.get('/api/backups/global/list');
-                globalBackups.value = res.data;
-            } catch (e) { }
-        };
+
 
         const loadInstances = async () => {
             try {
@@ -281,164 +508,9 @@ export default {
             } catch (e) { }
         };
 
-        const triggerRestoreImport = () => restoreInput.value.click();
-        const handleRestoreImport = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
 
-            saving.value = true;
-            try {
-                let filename;
-                if (isLargeFile(file)) {
-                    store.task.visible = true;
-                    store.task.title = $t('setup.restoring_uploading') || '正在上传备份...';
-                    store.task.percent = 0;
-                    store.task.message = file.name;
-                    const chunkResult = await uploadFileWithChunk(file, {
-                        initUrl: '/api/backups/global/import-chunk/init',
-                        completeUrl: '/api/backups/global/import-chunk/complete',
-                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
-                            store.task.percent = Math.round((bytesDone * 100) / bytesTotal);
-                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
-                        }
-                    });
-                    filename = chunkResult.filename;
-                    setTimeout(() => { store.task.visible = false; }, 500);
-                } else {
-                    const formData = new FormData();
-                    formData.append('backup', file);
-                    showToast($t('setup.restoring_uploading') || '正在上传备份...', 'info');
-                    const uploadRes = await api.post('/api/backups/global/import', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' }
-                    });
-                    filename = uploadRes.data.filename;
-                }
-                
-                showToast($t('panel_settings.restoring') || '正在应用备份，面板即将重启...', 'info');
-                await api.post('/api/backups/global/restore', { filename });
-                
-                setTimeout(() => window.location.reload(), 5000);
-            } catch (e) {
-                saving.value = false;
-                showToast(e.response?.data?.error || e.message, 'danger');
-            }
-            e.target.value = '';
-        };
 
-        const askCreateGlobalBackup = () => {
-            const managedJava = javaList.value.filter(j => j.source !== 'local');
 
-            const instanceListHtml = instances.value.length ? `
-                <div class="mt-2 p-2 bg-body-tertiary rounded small" style="max-height: 150px; overflow-y: auto;">
-                    ${instances.value.map(i => `
-                        <div class="form-check mb-1">
-                            <input class="form-check-input check-inst-item" type="checkbox" value="${i.id}" id="check-inst-${i.id}" checked>
-                            <label class="form-check-label" for="check-inst-${i.id}">${i.name} <span class="opacity-50">(${i.id})</span></label>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : `<div class="small text-muted py-2">${$t('panel_settings.no_instances')}</div>`;
-
-            const javaListHtml = managedJava.length ? `
-                <div class="mt-2 p-2 bg-body-tertiary rounded small" style="max-height: 150px; overflow-y: auto;">
-                    ${managedJava.map(j => `
-                        <div class="form-check mb-1">
-                            <input class="form-check-input check-java-item" type="checkbox" value="${j.id}" id="check-java-${j.id}" checked>
-                            <label class="form-check-label" for="check-java-${j.id}">Java ${j.featureVersion} <span class="opacity-50">(${j.id})</span></label>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : `<div class="small text-muted py-2">${$t('panel_settings.no_java')}</div>`;
-
-            openModal({
-                title: $t('panel_settings.create_global_backup') || '创建全局备份',
-                message: `
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">${$t('backups.prompt_note') || '备注'}</label>
-                        <input type="text" id="backup-note" class="form-control form-control-sm" placeholder="e.g. Before update">
-                    </div>
-                    <div class="small fw-bold text-muted mb-2">${$t('panel_settings.backup_include') || '包含内容'}</div>
-                    <div class="form-check small mb-1">
-                        <input class="form-check-input" type="checkbox" id="check-configs" checked>
-                        <label class="form-check-label" for="check-configs">${$t('panel_settings.backup_configs') || '面板配置 (data/*.json)'}</label>
-                    </div>
-                    
-                    <div class="mt-3 ms-2">
-                        <div class="form-check small mb-1">
-                            <input class="form-check-input" type="checkbox" id="check-java-all" checked onchange="document.querySelectorAll('.check-java-item').forEach(i=>i.checked=this.checked)">
-                            <label class="form-check-label fw-bold" for="check-java-all">${$t('panel_settings.backup_java') || 'Java 环境'}</label>
-                        </div>
-                        ${javaListHtml}
-                    </div>
-
-                    <div class="mt-3 ms-2">
-                        <div class="form-check small mb-1">
-                            <input class="form-check-input" type="checkbox" id="check-inst-all" checked onchange="document.querySelectorAll('.check-inst-item').forEach(i=>i.checked=this.checked)">
-                            <label class="form-check-label fw-bold" for="check-inst-all">${$t('panel_settings.backup_instances') || '游戏实例'}</label>
-                        </div>
-                        ${instanceListHtml}
-                    </div>
-                `,
-                callback: async () => {
-                    const note = document.getElementById('backup-note').value;
-                    const configs = document.getElementById('check-configs').checked;
-                    
-                    const javaItems = Array.from(document.querySelectorAll('.check-java-item:checked')).map(i => i.value);
-                    const instItems = Array.from(document.querySelectorAll('.check-inst-item:checked')).map(i => i.value);
-                    
-                    const options = {
-                        configs,
-                        java: javaItems,
-                        instances: instItems
-                    };
-
-                    try {
-                        showToast($t('common.processing') || '正在创建备份...', 'info');
-                        await api.post('/api/backups/global/create', { note, options });
-                        showToast($t('common.success'), 'success');
-                        loadGlobalBackups();
-                    } catch (e) {
-                        showToast(e.message, 'danger');
-                    }
-                }
-            });
-        };
-
-        const downloadGlobalBackup = (b) => {
-            window.open(`/api/backups/global/download?filename=${encodeURIComponent(b.name)}`, '_blank');
-        };
-
-        const askRestoreGlobalBackup = (b) => {
-            openModal({
-                title: $t('backups.restore') || '恢复备份',
-                message: $t('panel_settings.restore_global_confirm') || `确定要还原备份 ${b.name} 吗？这会覆盖当前所有配置和实例，完成后面板将重启。`,
-                callback: async () => {
-                    try {
-                        showToast($t('panel_settings.restoring') || '正在应用备份，面板即将重启...', 'info');
-                        await api.post('/api/backups/global/restore', { filename: b.name });
-                        setTimeout(() => window.location.reload(), 5000);
-                    } catch (e) {
-                        showToast(e.message, 'danger');
-                    }
-                }
-            });
-        };
-
-        const deleteGlobalBackup = (b) => {
-            openModal({
-                title: $t('common.delete'),
-                message: $t('backups.confirm_delete_msg', { name: b.name }),
-                callback: async () => {
-                    try {
-                        await api.post('/api/backups/global/delete', { filename: b.name });
-                        showToast($t('common.success'), 'success');
-                        loadGlobalBackups();
-                    } catch (e) {
-                        showToast(e.message, 'danger');
-                    }
-                }
-            });
-        };
 
         const loadConfig = async () => {
             try {
@@ -446,6 +518,14 @@ export default {
                 const res = await api.get('/api/panel/config');
                 Object.assign(config, res.data);
                 javaArgsText.value = (config.javaArgs || []).join('\n');
+
+                if (res.data.appearance) {
+                    appearance.sidebarOpacity = res.data.appearance.sidebarOpacity ?? 1;
+                    appearance.contentOpacity = res.data.appearance.contentOpacity ?? 1;
+                    appearance.cardOpacity = res.data.appearance.cardOpacity ?? 1;
+                    appearance.loginOpacity = res.data.appearance.loginOpacity ?? 1;
+                    appearance.instanceOpacity = res.data.appearance.instanceOpacity ?? 1;
+                }
 
                 const currentTheme = localStorage.getItem('theme');
                 const currentLang = localStorage.getItem('lang');
@@ -467,6 +547,13 @@ export default {
             try {
                 saving.value = true;
                 config.javaArgs = javaArgsText.value.split('\n').map(s => s.trim()).filter(s => s);
+                config.appearance = {
+                    sidebarOpacity: appearance.sidebarOpacity,
+                    contentOpacity: appearance.contentOpacity,
+                    cardOpacity: appearance.cardOpacity,
+                    loginOpacity: appearance.loginOpacity,
+                    instanceOpacity: appearance.instanceOpacity
+                };
                 const res = await api.post('/api/panel/config', config);
 
                 if (res.data.success) {
@@ -483,6 +570,14 @@ export default {
                     // Sync consoleInfoPosition to global store immediately
                     const { store } = await import('../store.js');
                     store.consoleInfoPosition = config.consoleInfoPosition;
+
+                    Object.assign(savedAppearance, {
+                        sidebarOpacity: appearance.sidebarOpacity,
+                        contentOpacity: appearance.contentOpacity,
+                        cardOpacity: appearance.cardOpacity,
+                        loginOpacity: appearance.loginOpacity,
+                        instanceOpacity: appearance.instanceOpacity
+                    });
 
                     showToast($t('panel_settings.save_success'), 'success');
 
@@ -582,18 +677,68 @@ export default {
         };
 
         onMounted(() => {
-            loadConfig();
+            loadConfigWithSave();
             loadJars();
-            loadGlobalBackups();
+
             loadInstances();
             loadJavaList();
+            loadAppearance();
+        });
+
+        const savedAppearance = reactive({
+            sidebarOpacity: 1,
+            contentOpacity: 1,
+            cardOpacity: 1,
+            loginOpacity: 1,
+            instanceOpacity: 1
+        });
+
+        const applyAppearanceLive = () => {
+            const root = document.documentElement;
+            root.style.setProperty('--app-sidebar-opacity', appearance.sidebarOpacity);
+            root.style.setProperty('--app-content-opacity', appearance.contentOpacity);
+            root.style.setProperty('--app-card-opacity', appearance.cardOpacity);
+            root.style.setProperty('--app-login-opacity', appearance.loginOpacity);
+            root.style.setProperty('--app-instance-opacity', appearance.instanceOpacity);
+        };
+
+        const restoreAppearance = () => {
+            const root = document.documentElement;
+            root.style.setProperty('--app-sidebar-opacity', savedAppearance.sidebarOpacity);
+            root.style.setProperty('--app-content-opacity', savedAppearance.contentOpacity);
+            root.style.setProperty('--app-card-opacity', savedAppearance.cardOpacity);
+            root.style.setProperty('--app-login-opacity', savedAppearance.loginOpacity);
+            root.style.setProperty('--app-instance-opacity', savedAppearance.instanceOpacity);
+        };
+
+        const stopWatch = watch(
+            () => [appearance.sidebarOpacity, appearance.contentOpacity, appearance.cardOpacity, appearance.loginOpacity, appearance.instanceOpacity],
+            () => { applyAppearanceLive(); }
+        );
+
+        const originalLoadConfig = loadConfig;
+        const loadConfigWithSave = async () => {
+            await originalLoadConfig();
+            Object.assign(savedAppearance, {
+                sidebarOpacity: appearance.sidebarOpacity,
+                contentOpacity: appearance.contentOpacity,
+                cardOpacity: appearance.cardOpacity,
+                loginOpacity: appearance.loginOpacity,
+                instanceOpacity: appearance.instanceOpacity
+            });
+        };
+
+        onUnmounted(() => {
+            stopWatch();
+            restoreAppearance();
         });
 
         return {
-            store, loading, saving, testingAI, globalBackups, config, javaArgsText, jars,
+            store, loading, saving, testingAI, config, javaArgsText, jars,
             saveConfig, testAI, reset2FA,
-            askCreateGlobalBackup, downloadGlobalBackup, askRestoreGlobalBackup, deleteGlobalBackup,
-            restoreInput, triggerRestoreImport, handleRestoreImport
+            appearance, activeAppearanceTab, appearanceTabs,
+            logoInput, bgInput, triggerLogoUpload, triggerBgUpload,
+            handleLogoUpload, handleBgUpload, removeLogo, removeBackground
         };
     }
 };

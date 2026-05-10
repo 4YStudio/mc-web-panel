@@ -63,7 +63,7 @@ const PROP_GROUPS = [
 export default {
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="page-header d-flex justify-content-between align-items-center">
             <h3 class="m-0 fw-bold">{{ $t('properties.title').split(' (')[0] }}</h3>
             <div class="btn-group" v-if="!notFound">
                 <button class="btn btn-outline-secondary" @click="toggleEditMode">
@@ -99,7 +99,7 @@ export default {
                         </div>
                     </div>
                     <div>
-                        <div class="mb-2 text-muted small">{{ $t('properties.icon_tips') }}</div>
+                        <div class="mb-2 hint-box">{{ $t('properties.icon_tips') }}</div>
                         <div class="btn-group">
                             <button class="btn btn-sm btn-primary" @click="$refs.iconInput.click()">
                                 <i class="fa-solid fa-upload me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.upload') }}</span>
@@ -129,9 +129,7 @@ export default {
                                     </div>
                                     
                                     <!-- Select -->
-                                    <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]">
-                                        <option v-for="opt in item.options" :value="opt">{{ opt }}</option>
-                                    </select>
+                                    <CustomSelect v-else-if="item.type === 'select'" v-model="formModel[item.key]" :options="item.options" size="sm" />
 
                                     <!-- Number/Text -->
                                     <input v-else :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]">
@@ -152,10 +150,7 @@ export default {
                         <div class="card-body p-3 d-flex flex-column">
                             <div class="mb-3 flex-grow-1">
                                 <label class="form-label small fw-bold text-muted mb-1">{{ $t('map_backup.strategy') }}</label>
-                                <select class="form-select border-0 bg-body-tertiary fw-bold" v-model="backupStrategy">
-                                    <option value="panel">{{ $t('map_backup.strategy_panel') }}</option>
-                                    <option value="mod">{{ $t('map_backup.strategy_mod') }}</option>
-                                </select>
+                                <CustomSelect v-model="backupStrategy" :options="[{value: 'panel', label: $t('map_backup.strategy_panel')}, {value: 'mod', label: $t('map_backup.strategy_mod')}]" />
                                 <div class="form-text small mt-2 opacity-75" style="font-size: 0.75rem;">
                                     <i class="fa-solid fa-circle-info me-1"></i>
                                     {{ backupStrategy === 'mod' ? $t('backups.tips') : $t('map_backup.panel_tips') }}
@@ -249,10 +244,7 @@ export default {
                                 <i class="fa-solid fa-gamepad me-1"></i>{{ $t('properties.target_mc') }}
                                 <span v-if="loadingMcVersions" class="spinner-border spinner-border-sm text-primary ms-1" role="status"></span>
                             </label>
-                            <select class="form-select" v-model="selectedMc" @change="fetchFabricLoaders" :disabled="loadingMcVersions">
-                                <option value="">{{ loadingMcVersions ? $t('common.loading') : $t('properties.choose_mc') }}</option>
-                                <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
-                            </select>
+                            <CustomSelect v-model="selectedMc" :options="mcVersions" :placeholder="loadingMcVersions ? $t('common.loading') : $t('properties.choose_mc')" :disabled="loadingMcVersions" searchable @change="fetchFabricLoaders" />
                         </div>
 
                         <div class="mb-3">
@@ -260,10 +252,7 @@ export default {
                                 <i class="fa-solid fa-gear me-1"></i>{{ $t('properties.target_loader') }}
                                 <span v-if="loadingLoaderVersions" class="spinner-border spinner-border-sm text-primary ms-1" role="status"></span>
                             </label>
-                            <select class="form-select" v-model="selectedLoader" :disabled="loadingLoaderVersions || !selectedMc">
-                                <option value="">{{ loadingLoaderVersions ? $t('common.loading') : $t('properties.choose_loader') }}</option>
-                                <option v-for="v in loaderVersions" :key="v" :value="v">{{ v }}</option>
-                            </select>
+                            <CustomSelect v-model="selectedLoader" :options="loaderVersions" :placeholder="loadingLoaderVersions ? $t('common.loading') : $t('properties.choose_loader')" :disabled="loadingLoaderVersions || !selectedMc" searchable />
                         </div>
 
                         <div v-if="store.isRunning" class="alert alert-warning small py-2 mb-0">

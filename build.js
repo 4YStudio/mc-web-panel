@@ -80,11 +80,41 @@ async function prepareBuildDir() {
 
     console.log('Copying project files...');
     const manifest = {
-        files: ['server.js', 'package.json'],
-        dirs: ['public', 'api']
+        files: ['server.js', 'plugin-loader.js', 'package.json', 'server-icon.png'],
+        dirs: ['public', 'plugins']
     };
-    manifest.files.forEach(f => { if (fs.existsSync(f)) fs.copyFileSync(f, path.join(BUILD_DIR, f)); });
-    manifest.dirs.forEach(d => { if (fs.existsSync(d)) fs.cpSync(d, path.join(BUILD_DIR, d), { recursive: true }); });
+    manifest.files.forEach(f => { 
+        if (fs.existsSync(f)) {
+            fs.copyFileSync(f, path.join(BUILD_DIR, f));
+        } else {
+            console.warn(`  Warning: File ${f} not found, skipping.`);
+        }
+    });
+    
+    manifest.dirs.forEach(d => { 
+        if (fs.existsSync(d)) {
+            console.log(`  Copying directory ${d}...`);
+            if (d === 'plugins') {
+                // Special handling for plugins: exclude temporary directories
+                const destPlugins = path.join(BUILD_DIR, 'plugins');
+                fs.mkdirSync(destPlugins, { recursive: true });
+                const items = fs.readdirSync('plugins');
+                items.forEach(item => {
+                    if (item === 'tmp' || item.startsWith('_tmp_analyze_')) {
+                        console.log(`    Skipping temporary plugin item: ${item}`);
+                        return;
+                    }
+                    const srcPath = path.join('plugins', item);
+                    const destPath = path.join(destPlugins, item);
+                    fs.cpSync(srcPath, destPath, { recursive: true });
+                });
+            } else {
+                fs.cpSync(d, path.join(BUILD_DIR, d), { recursive: true });
+            }
+        } else {
+            console.warn(`  Warning: Directory ${d} not found, skipping.`);
+        }
+    });
 
     console.log('Installing production dependencies...');
     const hasPnpm = fs.existsSync('node_modules/.pnpm') || fs.existsSync('pnpm-lock.yaml');

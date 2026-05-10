@@ -9,11 +9,16 @@ export default {
         <Transition name="fade" mode="out-in">
             <!-- 1. 文件列表视图 -->
             <div v-if="!editingFile" class="d-flex flex-column h-100" key="list">
+                <!-- 页面标题 -->
+                <div class="page-header d-flex justify-content-between align-items-center">
+                    <h3 class="m-0 fw-bold"><i class="fa-solid fa-folder-open me-2 text-primary"></i>{{ $t('sidebar.files') }}</h3>
+                </div>
+
                 <!-- 顶部导航栏 -->
-                <div class="row g-2 align-items-center mb-3">
+                <div class="row g-2 align-items-center mb-2">
                     <div class="col-12 col-md-auto flex-grow-1 overflow-hidden">
                         <nav aria-label="breadcrumb">
-                            <ol class="breadcrumb mb-0 p-2 bg-body-tertiary rounded flex-nowrap overflow-auto no-scrollbar" style="font-size: 0.9rem;">
+                            <ol class="breadcrumb mb-0 p-2 border-secondary rounded flex-nowrap overflow-auto no-scrollbar" style="font-size: 0.9rem; background-color: var(--c-surface) !important; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: row; align-items: center;">
                                 <li class="breadcrumb-item text-primary cursor-pointer" @click="changeDir('')">
                                     <i class="fa-solid fa-house"></i>
                                 </li>
@@ -28,8 +33,8 @@ export default {
                     </div>
                     <div class="col-12 col-md-auto">
                         <div class="input-group input-group-sm mb-0">
-                            <span class="input-group-text border-0 bg-body-tertiary"><i class="fa-solid fa-search"></i></span>
-                            <input type="text" class="form-control border-0 bg-body-tertiary px-2" v-model="searchQuery" :placeholder="$t('common.search') + '...'">
+                            <span class="input-group-text border-secondary border-end-0" style="backdrop-filter: none; background-color: var(--c-surface) !important;"><i class="fa-solid fa-search opacity-50"></i></span>
+                            <input type="text" class="form-control border-secondary border-start-0 px-2" style="backdrop-filter: none; color: inherit; background-color: var(--c-surface) !important;" v-model="searchQuery" :placeholder="$t('common.search') + '...'">
                         </div>
                     </div>
                 </div>
@@ -59,10 +64,10 @@ export default {
                 </div>
 
                 <!-- 文件列表表格 -->
-                <div class="card flex-grow-1 overflow-hidden border-0 shadow-sm" style="border-radius: 12px;">
+                <div class="card flex-grow-1 overflow-hidden" style="border-radius: 12px;">
                     <div class="table-responsive h-100 custom-scrollbar">
                         <table class="table table-hover table-sm mb-0 align-middle">
-                            <thead class="sticky-top bg-body" style="z-index: 5;">
+                            <thead>
                                 <tr class="small text-uppercase text-muted">
                                     <th style="width: 35px;" class="px-3"><input type="checkbox" v-model="selectAll" class="form-check-input"></th>
                                     <th>{{ $t('common.name') }}</th>
@@ -82,16 +87,18 @@ export default {
                                     <td @click.stop class="px-3"><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
                                     
                                     <!-- 点击名称：文件夹进入，文件尝试编辑 -->
-                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)" class="text-truncate" style="max-width: 200px;">
-                                        <i class="fa-solid me-2" :class="getIcon(f)"></i>
-                                        {{ f.name }}
-                                        <div class="d-sm-none x-small text-muted">{{ f.isDir ? '-' : formatSize(f.size) }}</div>
+                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)" class="py-2 pe-0">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fa-solid me-2 flex-shrink-0" :class="getIcon(f)" style="width: 1.2rem; text-align: center;"></i>
+                                            <span class="text-truncate flex-grow-1" style="max-width: calc(100vw - 180px);">{{ f.name }}</span>
+                                            <div class="d-sm-none small text-muted opacity-75 ms-auto me-2 flex-shrink-0 text-end" style="min-width: 60px;">{{ f.isDir ? '-' : formatSize(f.size) }}</div>
+                                        </div>
                                     </td>
                                     
                                     <td class="d-none d-sm-table-cell small">{{ f.isDir ? '-' : formatSize(f.size) }}</td>
                                     <td class="small text-muted d-none d-md-table-cell">{{ new Date(f.mtime).toLocaleString() }}</td>
                                     
-                                    <td class="text-end px-3">
+                                    <td class="text-end px-3 py-2">
                                         <!-- Desktop actions -->
                                         <div class="d-none d-md-flex justify-content-end gap-1">
                                             <button v-if="!f.isDir" class="btn btn-xs btn-link text-info p-1" @click.stop="editFile(f.name)" :title="$t('common.edit')">
@@ -109,7 +116,7 @@ export default {
                                         </div>
                                         <!-- Mobile actions dropdown -->
                                         <div class="d-md-none dropdown">
-                                            <button class="btn btn-link btn-xs text-secondary p-0" type="button" @click.stop="toggleActionMenu(f.name)">
+                                            <button class="btn btn-link btn-xs text-secondary p-1" type="button" @click.stop="toggleActionMenu(f.name)">
                                                 <i class="fa-solid fa-ellipsis-vertical"></i>
                                             </button>
                                             <Transition name="scale">
@@ -138,7 +145,7 @@ export default {
             
             <!-- 2. 编辑器视图 (全屏模式) -->
             <div v-else class="d-flex flex-column h-100" key="editor">
-                <div class="card h-100 border-0 shadow-sm d-flex flex-column" style="border-radius: 12px; overflow: hidden;">
+                <div class="card h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden;">
                     <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 px-3">
                         <div class="d-flex align-items-center overflow-hidden">
                             <i class="fa-solid fa-file-pen me-2 text-warning flex-shrink-0"></i>
@@ -322,10 +329,22 @@ export default {
             } catch (e) { showToast($t('common.error'), 'danger'); }
         };
 
-        const askCompress = () => openModal({
-            title: $t('files.modal_compress_title'), message: $t('files.modal_compress_name'), mode: 'input', placeholder: 'archive.zip',
-            callback: (name) => operateFiles('compress', selectedFiles.value, currentPath.value, { compressName: name.endsWith('.zip') ? name : name + '.zip' })
-        });
+        const askCompress = () => {
+            const defaultName = selectedFiles.value.length === 1 ? selectedFiles.value[0].split('.').shift() : 'archive';
+            openModal({
+                title: $t('files.modal_compress_title'), 
+                message: $t('files.modal_compress_name'), 
+                mode: 'input', 
+                inputValue: defaultName,
+                suffix: '.zip',
+                placeholder: 'archive',
+                callback: (name) => {
+                    if (!name) return;
+                    const finalName = name.endsWith('.zip') ? name : name + '.zip';
+                    operateFiles('compress', selectedFiles.value, currentPath.value, { compressName: finalName });
+                }
+            });
+        };
         const askDelete = (files) => openModal({ title: $t('common.delete'), message: $t('common.delete_confirm', { count: files.length }), callback: () => operateFiles('delete', files) });
 
         const askNewFolder = () => openModal({

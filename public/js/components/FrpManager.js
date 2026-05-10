@@ -7,7 +7,7 @@ export default {
     template: `
     <div class="h-100 d-flex flex-column animate-in overflow-hidden">
         <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 px-1 flex-shrink-0">
+        <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0">
             <div class="d-flex align-items-center overflow-hidden">
                 <button @click="store.view = 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
@@ -18,11 +18,11 @@ export default {
                 </h3>
             </div>
             <div class="d-flex gap-2 align-items-center">
-                <button v-if="status.installed" class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-3" @click="openReleasesModal" style="font-size: 0.75rem;">
-                    <i class="fa-solid fa-rotate me-1"></i>{{ $t('frp.switch_version') }}
+                <button v-if="status.installed" class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-2 px-md-3" @click="openReleasesModal" style="font-size: 0.75rem;">
+                    <i class="fa-solid fa-rotate"></i><span class="d-none d-md-inline ms-1">{{ $t('frp.switch_version') }}</span>
                 </button>
-                <button class="btn btn-sm btn-primary fw-bold rounded-pill px-3 shadow-sm" @click="createNewConfig" :disabled="!status.installed" style="font-size: 0.75rem;">
-                    <i class="fa-solid fa-plus me-1"></i>{{ $t('frp.new_config') }}
+                <button class="btn btn-sm btn-primary fw-bold rounded-pill px-2 px-md-3 shadow-sm" @click="createNewConfig" :disabled="!status.installed" style="font-size: 0.75rem;">
+                    <i class="fa-solid fa-plus"></i><span class="d-none d-md-inline ms-1">{{ $t('frp.new_config') }}</span>
                 </button>
             </div>
         </div>
@@ -30,7 +30,7 @@ export default {
         <div class="overflow-auto custom-scrollbar px-1 px-md-3 pb-4 flex-grow-1">
 
             <!-- 顶部状态横栏 -->
-            <div class="card border-0 shadow-sm mb-3 mb-md-4 overflow-hidden" style="border-radius: 16px;">
+            <div class="card mb-3 mb-md-4 overflow-hidden">
                 <div class="card-body p-0">
                     <div class="d-flex align-items-stretch flex-wrap">
                         <!-- 安装状态区 -->
@@ -98,13 +98,13 @@ export default {
             <!-- 配置网格 -->
             <div v-if="status.installed">
                 <!-- 空状态 -->
-                <div v-if="configs.length === 0" class="card border-0 shadow-sm text-center py-5" style="border-radius: 16px;">
+                <div v-if="configs.length === 0" class="card text-center py-5">
                     <div class="card-body">
                         <div class="rounded-circle bg-primary-subtle mx-auto d-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
                             <i class="fa-solid fa-route text-primary" style="font-size: 1.5rem;"></i>
                         </div>
                         <div class="fw-bold mb-1">{{ $t('frp.no_configs') }}</div>
-                        <div class="text-muted small mb-3">{{ $t('frp.no_configs_hint') }}</div>
+                        <div class="hint-box mb-3">{{ $t('frp.no_configs_hint') }}</div>
                         <button class="btn btn-primary fw-bold rounded-pill px-4 shadow-sm" @click="createNewConfig">
                             <i class="fa-solid fa-plus me-2"></i>{{ $t('frp.new_config') }}
                         </button>
@@ -114,7 +114,7 @@ export default {
                 <!-- 配置卡片列表 -->
                 <div v-else class="row g-3">
                     <div v-for="cfg in configs" :key="cfg.id" class="col-md-6 col-lg-4">
-                        <div class="card border-0 shadow-sm h-100 frp-config-card" style="border-radius: 16px; cursor: pointer;" @click="editConfig(cfg)">
+                        <div class="card h-100 frp-config-card" style="cursor: pointer;" @click="editConfig(cfg)">
                             <!-- 卡片顶部色带 -->
                             <div class="card-body p-3 p-md-4">
                                 <div class="d-flex align-items-start justify-content-between mb-3">
@@ -164,7 +164,7 @@ export default {
 
                 <!-- 日志面板 -->
                 <Transition name="fade">
-                    <div v-if="selectedLogConfigId" class="card border-0 shadow-sm mt-3 mt-md-4" style="border-radius: 16px;">
+                    <div v-if="selectedLogConfigId" class="card mt-3 mt-md-4">
                         <div class="card-header bg-body-tertiary border-0 fw-bold py-2 px-3 px-md-4 d-flex justify-content-between align-items-center" style="border-radius: 16px 16px 0 0;">
                             <span class="small text-uppercase text-muted">
                                 <i class="fa-solid fa-terminal me-2"></i>{{ $t('frp.logs') }}
@@ -310,10 +310,7 @@ export default {
                                             </div>
                                             <div class="col-md-2">
                                                 <label class="form-label small fw-bold text-muted mb-1">{{ $t('frp.tunnel_type') }}</label>
-                                                <select class="form-select form-select-sm" v-model="tunnel.type">
-                                                    <option value="tcp">TCP</option>
-                                                    <option value="udp">UDP</option>
-                                                </select>
+                                                <CustomSelect v-model="tunnel.type" :options="[{value: 'tcp', label: 'TCP'}, {value: 'udp', label: 'UDP'}]" size="sm" />
                                             </div>
                                             <div class="col-md-2">
                                                 <label class="form-label small fw-bold text-muted mb-1">{{ $t('frp.local_ip') }}</label>

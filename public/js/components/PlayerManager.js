@@ -8,7 +8,7 @@ export default {
     components: { Avatar },
     template: `
     <div>
-        <h3>{{ $t('players.title') }}</h3>
+        <div class="page-header"><h3 class="m-0">{{ $t('players.title') }}</h3></div>
         
         <div class="card mb-4 border-primary">
             <div class="card-header bg-primary-subtle fw-bold">{{ $t('players.online_players') }} ({{ store.onlinePlayers.length }})</div>

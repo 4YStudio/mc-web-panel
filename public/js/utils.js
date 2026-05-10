@@ -49,7 +49,7 @@ export const formatLog = (log) => {
 };
 
 // Global Modal State
-export const modalData = ref({ title: '', message: '', mode: 'confirm', inputValue: '', options: [], placeholder: '', callback: null });
+export const modalData = ref({ title: '', message: '', mode: 'confirm', inputValue: '', suffix: '', options: [], placeholder: '', callback: null });
 let modalInstance = null;
 
 export const initModal = () => {
@@ -68,6 +68,7 @@ export const openModal = (opts) => {
         message: opts.message || '',
         mode: opts.mode || 'confirm',
         inputValue: opts.inputValue || '',
+        suffix: opts.suffix || '',
         options: opts.options || [],
         placeholder: opts.placeholder || '',
         callback: opts.callback

@@ -5,7 +5,7 @@ import { showToast } from '../utils.js';
 export default {
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="page-header d-flex justify-content-between align-items-center">
             <h3>{{ $t('voice.title') }}</h3>
             <div class="btn-group">
                 <button class="btn btn-outline-secondary" @click="toggleEditMode">
@@ -33,9 +33,7 @@ export default {
                                         <input class="form-check-input" type="checkbox" v-model="formModel[item.key]">
                                     </div>
                                     
-                                    <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]">
-                                        <option v-for="opt in item.options" :value="opt">{{ opt }}</option>
-                                    </select>
+                                    <CustomSelect v-else-if="item.type === 'select'" v-model="formModel[item.key]" :options="item.options" size="sm" />
 
                                     <input v-else :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]">
                                     

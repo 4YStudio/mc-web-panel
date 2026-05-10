@@ -23,8 +23,9 @@ const AdmZip = require('adm-zip');
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
+const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '1.7.9';
+const APP_VERSION = '2.0.0';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -126,11 +127,13 @@ const GLOBAL_BACKUP_DIR = path.join(BASE_DIR, 'backups', 'global');
 const INSTANCES_FILE = path.join(DATA_DIR, 'instances.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
+const PLUGINS_DIR = path.join(BASE_DIR, 'plugins');
 
 // --- 多实例迁移与初始化 ---
 fs.ensureDirSync(DATA_DIR);
 fs.ensureDirSync(INSTANCES_DIR);
 fs.ensureDirSync(GLOBAL_BACKUP_DIR);
+fs.ensureDirSync(path.join(DATA_DIR, 'tmp_uploads'));
 
 const loadInstances = () => {
     try {
@@ -532,6 +535,8 @@ if (cluster.isPrimary) {
     const server = http.createServer(app);
     const io = new Server(server);
 
+
+
     const instancesState = new Map(); // Store runtime state for each instance
 
     const getOrCreateInstanceState = (instanceId) => {
@@ -625,6 +630,19 @@ if (cluster.isPrimary) {
         }
     };
 
+    // --- Plugin System ---
+    const pluginLoader = new PluginLoader(app, io, {
+        instancesDir: INSTANCES_DIR,
+        baseDir: BASE_DIR,
+        dataDir: DATA_DIR,
+        globalBackupDir: GLOBAL_BACKUP_DIR,
+        getConfig: () => appConfig,
+        instancesState,
+        appendLog,
+        pluginsDir: PLUGINS_DIR,
+        stateFile: path.join(DATA_DIR, 'plugin-state.json')
+    });
+
     app.use(express.static(path.join(__dirname, 'public')));
     app.use(bodyParser.json());
     app.use(session({
@@ -638,6 +656,8 @@ if (cluster.isPrimary) {
         if (req.session.authenticated) return next();
         res.status(401).json({ error: '未授权' });
     };
+
+    pluginLoader.requireAuth = requireAuth;
 
     io.on('connection', (socket) => {
         socket.on('req_history', (instanceId) => {
@@ -1250,447 +1270,137 @@ if (cluster.isPrimary) {
         ]);
     });
 
-    // --- FRP 内网穿透管理 API (多配置/多进程) ---
-    const FRP_DIR = path.join(DATA_DIR, 'frp');
-    const FRP_META_FILE = path.join(FRP_DIR, 'frp.json');
-    fs.ensureDirSync(FRP_DIR);
 
-    // { installed, version, installedAt, frpcPath, configs: [{ id, name, config, createdAt }] }
-    const readFrpMeta = () => {
+    // --- Plugin System API ---
+    app.get('/api/plugins/list', requireAuth, (req, res) => {
+        res.json(pluginLoader.getPluginList());
+    });
+
+    app.post('/api/plugins/enable', requireAuth, async (req, res) => {
         try {
-            const data = fs.readJsonSync(FRP_META_FILE);
-            if (!data.configs) data.configs = [];
-            return data;
-        } catch (e) { return { installed: false, configs: [] }; }
-    };
-    const writeFrpMeta = (data) => {
-        fs.writeJsonSync(FRP_META_FILE, data, { spaces: 2 });
-    };
-
-    const getFrpBinaryPath = () => {
-        return path.join(FRP_DIR, process.platform === 'win32' ? 'frpc.exe' : 'frpc');
-    };
-    const getConfigFilePath = (configId) => {
-        return path.join(FRP_DIR, `frpc-${configId}.toml`);
-    };
-
-    // Multi-process tracking: Map<configId, { process, logs[] }>
-    const frpInstances = new Map();
-    const MAX_FRP_LOGS = 500;
-
-    const appendFrpLog = (configId, line) => {
-        const entry = `[${new Date().toLocaleTimeString()}] ${line}`;
-        const inst = frpInstances.get(configId);
-        if (inst) {
-            inst.logs.push(entry);
-            if (inst.logs.length > MAX_FRP_LOGS) inst.logs.shift();
-        }
-        io.emit('frp_log', { configId, line: entry });
-    };
-
-    const startFrpProcess = (configId, configFilePath) => {
-        const frpcPath = getFrpBinaryPath();
-        const proc = spawn(frpcPath, ['-c', configFilePath], {
-            cwd: FRP_DIR,
-            env: { ...process.env }
-        });
-        const inst = { process: proc, logs: [] };
-        frpInstances.set(configId, inst);
-
-        appendFrpLog(configId, `frpc 进程已启动 (PID: ${proc.pid})`);
-        io.emit('frp_status', { configId, running: true });
-
-        proc.stdout.on('data', (data) => {
-            data.toString().split('\n').filter(l => l.trim()).forEach(l => appendFrpLog(configId, l));
-        });
-        proc.stderr.on('data', (data) => {
-            data.toString().split('\n').filter(l => l.trim()).forEach(l => appendFrpLog(configId, '[stderr] ' + l));
-        });
-        proc.on('error', (err) => {
-            appendFrpLog(configId, 'frpc 启动失败: ' + err.message);
-            frpInstances.delete(configId);
-            io.emit('frp_status', { configId, running: false });
-        });
-        proc.on('exit', (code, signal) => {
-            appendFrpLog(configId, `frpc 进程退出 (code: ${code}, signal: ${signal})`);
-            frpInstances.delete(configId);
-            io.emit('frp_status', { configId, running: false });
-        });
-        return proc;
-    };
-
-    const stopFrpProcess = async (configId) => {
-        const inst = frpInstances.get(configId);
-        if (!inst) return;
-        try { inst.process.kill('SIGTERM'); } catch (e) { }
-        appendFrpLog(configId, '正在停止 frpc...');
-        await new Promise(resolve => {
-            const check = setInterval(() => {
-                if (!frpInstances.has(configId)) { clearInterval(check); resolve(); }
-            }, 200);
-            setTimeout(() => { clearInterval(check); resolve(); }, 5000);
-        });
-    };
-
-    // GET /api/frp/status
-    app.get('/api/frp/status', requireAuth, (req, res) => {
-        const meta = readFrpMeta();
-        const frpcPath = getFrpBinaryPath();
-        const installed = meta.installed && fs.existsSync(frpcPath);
-        // Build running state for each config
-        const configs = (meta.configs || []).map(c => ({
-            ...c,
-            running: frpInstances.has(c.id),
-            config: undefined // Don't send full config in list
-        }));
-        res.json({
-            installed,
-            version: installed ? (meta.version || 'Unknown') : null,
-            installedAt: meta.installedAt || null,
-            configs
-        });
-    });
-
-    // GET /api/frp/releases — 从 GitHub 获取 frp 版本列表
-    app.get('/api/frp/releases', requireAuth, async (req, res) => {
-        try {
-            const arch = os.arch() === 'x64' ? 'amd64' : os.arch() === 'arm64' ? 'arm64' : os.arch();
-            const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'darwin' : 'windows';
-
-            const apiUrl = 'https://api.github.com/repos/fatedier/frp/releases';
-            const resp = await axios.get(apiUrl, {
-                timeout: 15000,
-                headers: { 'User-Agent': MODRINTH_UA, 'Accept': 'application/vnd.github.v3+json' },
-                params: { per_page: 15 }
-            });
-
-            const releases = resp.data
-                .filter(r => !r.prerelease && !r.draft)
-                .map(r => {
-                    const suffix = osType === 'windows' ? `${osType}_${arch}.zip` : `${osType}_${arch}.tar.gz`;
-                    const asset = r.assets.find(a => a.name.includes(suffix));
-                    return asset ? {
-                        version: r.tag_name.replace(/^v/, ''),
-                        tagName: r.tag_name,
-                        releaseName: r.name,
-                        publishedAt: r.published_at,
-                        downloadUrl: asset.browser_download_url,
-                        size: asset.size,
-                        fileName: asset.name
-                    } : null;
-                })
-                .filter(r => r !== null);
-
-            const meta = readFrpMeta();
-            res.json({ releases, installedVersion: meta.installed ? meta.version : null });
-        } catch (e) {
-            console.error('[FRP] Failed to fetch releases:', e.message);
-            res.status(500).json({ error: '获取版本列表失败: ' + e.message });
-        }
-    });
-
-    // POST /api/frp/install — 下载安装 frpc
-    app.post('/api/frp/install', requireAuth, async (req, res) => {
-        const { version, downloadUrl } = req.body;
-        if (!downloadUrl || !version) return res.status(400).json({ error: '参数不完整' });
-
-        // Stop all running frpc processes
-        for (const [cid] of frpInstances) {
-            await stopFrpProcess(cid);
-        }
-
-        res.json({ success: true, message: '开始下载...' });
-
-        const controller = new AbortController();
-        activeDownloads.set('frp-install', controller);
-
-        try {
-            const isZip = downloadUrl.endsWith('.zip');
-            const tmpFile = path.join(FRP_DIR, isZip ? 'frp-tmp.zip' : 'frp-tmp.tar.gz');
-
-            io.emit('frp_install_progress', { step: 'downloading', percent: 0, message: '正在下载...' });
-
-            const proxiedUrl = applyGithubProxy(downloadUrl);
-            const response = await axios({
-                method: 'get',
-                url: proxiedUrl,
-                responseType: 'stream',
-                timeout: 600000,
-                signal: controller.signal
-            });
-
-            const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-            let downloadedBytes = 0;
-            const writer = fs.createWriteStream(tmpFile);
-            let lastUpdateTime = Date.now();
-            let lastDownloadedBytes = 0;
-
-            response.data.on('data', (chunk) => {
-                downloadedBytes += chunk.length;
-                const now = Date.now();
-                if (now - lastUpdateTime >= 1000) {
-                    const speed = (downloadedBytes - lastDownloadedBytes) / ((now - lastUpdateTime) / 1000);
-                    lastUpdateTime = now;
-                    lastDownloadedBytes = downloadedBytes;
-                    if (totalBytes > 0) {
-                        const percent = Math.round((downloadedBytes / totalBytes) * 80);
-                        io.emit('frp_install_progress', {
-                            step: 'downloading', percent,
-                            message: `下载中... ${(downloadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalBytes / 1024 / 1024).toFixed(1)}MB`,
-                            speed
-                        });
-                    }
-                }
-            });
-
-            await pipeline(response.data, writer, { signal: controller.signal });
-
-            io.emit('frp_install_progress', { step: 'extracting', percent: 85, message: '正在解压...' });
-
-            const { execSync } = require('child_process');
-            const extractDir = path.join(FRP_DIR, 'extract-tmp');
-            fs.ensureDirSync(extractDir);
-
-            if (isZip) {
-                const zip = new AdmZip(tmpFile);
-                zip.extractAllTo(extractDir, true);
-            } else {
-                execSync(`tar -xzf "${tmpFile}" -C "${extractDir}"`, { timeout: 120000 });
-            }
-
-            const frpcName = process.platform === 'win32' ? 'frpc.exe' : 'frpc';
-            let frpcSource = null;
-            const findFrpc = (dir) => {
-                const entries = fs.readdirSync(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                    const fullPath = path.join(dir, entry.name);
-                    if (entry.isFile() && entry.name === frpcName) { frpcSource = fullPath; return; }
-                    if (entry.isDirectory()) findFrpc(fullPath);
-                    if (frpcSource) return;
-                }
-            };
-            findFrpc(extractDir);
-
-            if (!frpcSource) throw new Error('在下载的包中未找到 frpc 二进制文件');
-
-            const frpcDest = getFrpBinaryPath();
-            await fs.copy(frpcSource, frpcDest, { overwrite: true });
-
-            if (process.platform !== 'win32') {
-                try { execSync(`chmod +x "${frpcDest}"`); } catch (e) { }
-            }
-
-            await fs.remove(tmpFile);
-            await fs.remove(extractDir);
-
-            let detectedVer = version;
-            try {
-                const verOutput = execSync(`"${frpcDest}" --version`, { encoding: 'utf8', timeout: 5000 }).trim();
-                if (verOutput) detectedVer = verOutput;
-            } catch (e) { }
-
-            const meta = readFrpMeta();
-            meta.installed = true;
-            meta.version = detectedVer;
-            meta.installedAt = new Date().toISOString();
-            meta.frpcPath = frpcDest;
-            writeFrpMeta(meta);
-
-            io.emit('frp_install_progress', { step: 'done', percent: 100, message: `安装完成! (${detectedVer})` });
-        } catch (e) {
-            if (e.name === 'AbortError' || e.code === 'ERR_CANCELED' || (controller && controller.signal.aborted)) {
-                io.emit('frp_install_progress', { step: 'error', percent: 0, message: '已取消' });
-            } else {
-                console.error('[FRP Install Error]', e);
-                io.emit('frp_install_progress', { step: 'error', percent: 0, message: '安装失败: ' + e.message });
-            }
-            try { await fs.remove(path.join(FRP_DIR, 'frp-tmp.tar.gz')); } catch (e2) { }
-            try { await fs.remove(path.join(FRP_DIR, 'frp-tmp.zip')); } catch (e2) { }
-            try { await fs.remove(path.join(FRP_DIR, 'extract-tmp')); } catch (e2) { }
-        } finally {
-            activeDownloads.delete('frp-install');
-        }
-    });
-
-    // POST /api/frp/install/cancel
-    app.post('/api/frp/install/cancel', requireAuth, (req, res) => {
-        if (activeDownloads.has('frp-install')) {
-            activeDownloads.get('frp-install').abort();
-            activeDownloads.delete('frp-install');
-            res.json({ success: true, message: '已取消' });
-        } else {
-            res.status(404).json({ error: '没有正在进行的安装' });
-        }
-    });
-
-    // POST /api/frp/uninstall
-    app.post('/api/frp/uninstall', requireAuth, async (req, res) => {
-        for (const [cid] of frpInstances) {
-            await stopFrpProcess(cid);
-        }
-        const frpcPath = getFrpBinaryPath();
-        try { await fs.remove(frpcPath); } catch (e) { }
-        const meta = readFrpMeta();
-        meta.installed = false;
-        meta.version = null;
-        writeFrpMeta(meta);
-        res.json({ success: true });
-    });
-
-    // --- 多配置 CRUD ---
-
-    // GET /api/frp/configs — 获取所有配置
-    app.get('/api/frp/configs', requireAuth, (req, res) => {
-        const meta = readFrpMeta();
-        const configs = (meta.configs || []).map(c => ({
-            ...c,
-            running: frpInstances.has(c.id)
-        }));
-        res.json(configs);
-    });
-
-    // GET /api/frp/configs/:id — 获取单个配置详情
-    app.get('/api/frp/configs/:id', requireAuth, (req, res) => {
-        const meta = readFrpMeta();
-        const cfg = (meta.configs || []).find(c => c.id === req.params.id);
-        if (!cfg) return res.status(404).json({ error: '配置不存在' });
-        res.json({ ...cfg, running: frpInstances.has(cfg.id) });
-    });
-
-    // POST /api/frp/configs — 创建或更新配置
-    app.post('/api/frp/configs', requireAuth, (req, res) => {
-        const { id, name, config } = req.body;
-        if (!name) return res.status(400).json({ error: '名称不能为空' });
-        if (config === undefined) return res.status(400).json({ error: '缺少配置内容' });
-
-        const meta = readFrpMeta();
-        if (!meta.configs) meta.configs = [];
-
-        if (id) {
-            // Update existing
-            const idx = meta.configs.findIndex(c => c.id === id);
-            if (idx === -1) return res.status(404).json({ error: '配置不存在' });
-            meta.configs[idx].name = name;
-            meta.configs[idx].config = config;
-            // Write config file
-            fs.writeFileSync(getConfigFilePath(id), config, 'utf8');
-            writeFrpMeta(meta);
-            res.json({ success: true, id });
-        } else {
-            // Create new
-            const newId = 'frp-' + Date.now();
-            const newCfg = {
-                id: newId,
-                name,
-                config,
-                createdAt: new Date().toISOString()
-            };
-            meta.configs.push(newCfg);
-            fs.writeFileSync(getConfigFilePath(newId), config, 'utf8');
-            writeFrpMeta(meta);
-            res.json({ success: true, id: newId });
-        }
-    });
-
-    // POST /api/frp/configs/delete — 删除配置
-    app.post('/api/frp/configs/delete', requireAuth, async (req, res) => {
-        const { id } = req.body;
-        if (!id) return res.status(400).json({ error: '缺少配置 ID' });
-
-        // Stop if running
-        if (frpInstances.has(id)) {
-            await stopFrpProcess(id);
-        }
-
-        const meta = readFrpMeta();
-        const idx = (meta.configs || []).findIndex(c => c.id === id);
-        if (idx === -1) return res.status(404).json({ error: '配置不存在' });
-        meta.configs.splice(idx, 1);
-        writeFrpMeta(meta);
-
-        // Remove config file
-        try { await fs.remove(getConfigFilePath(id)); } catch (e) { }
-        res.json({ success: true });
-    });
-
-    // --- 进程控制 (按配置 ID) ---
-
-    // POST /api/frp/start
-    app.post('/api/frp/start', requireAuth, (req, res) => {
-        const { configId } = req.body;
-        if (!configId) return res.status(400).json({ error: '缺少配置 ID' });
-        if (frpInstances.has(configId)) return res.status(400).json({ error: '该配置已在运行中' });
-
-        const meta = readFrpMeta();
-        const frpcPath = getFrpBinaryPath();
-        if (!meta.installed || !fs.existsSync(frpcPath)) {
-            return res.status(400).json({ error: 'FRP 客户端未安装' });
-        }
-        const cfg = (meta.configs || []).find(c => c.id === configId);
-        if (!cfg) return res.status(404).json({ error: '配置不存在' });
-
-        const configFilePath = getConfigFilePath(configId);
-        // Ensure file exists
-        if (!fs.existsSync(configFilePath)) {
-            fs.writeFileSync(configFilePath, cfg.config || '', 'utf8');
-        }
-
-        try {
-            const proc = startFrpProcess(configId, configFilePath);
-            res.json({ success: true, pid: proc.pid });
-        } catch (e) {
-            res.status(500).json({ error: '启动失败: ' + e.message });
-        }
-    });
-
-    // POST /api/frp/stop
-    app.post('/api/frp/stop', requireAuth, async (req, res) => {
-        const { configId } = req.body;
-        if (!configId) return res.status(400).json({ error: '缺少配置 ID' });
-        if (!frpInstances.has(configId)) return res.status(400).json({ error: '该配置未在运行' });
-        try {
-            await stopFrpProcess(configId);
+            const { pluginId } = req.body;
+            if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
+            await pluginLoader.enable(pluginId);
             res.json({ success: true });
         } catch (e) {
-            res.status(500).json({ error: '停止失败: ' + e.message });
+            res.status(500).json({ error: e.message });
         }
     });
 
-    // POST /api/frp/restart
-    app.post('/api/frp/restart', requireAuth, async (req, res) => {
-        const { configId } = req.body;
-        if (!configId) return res.status(400).json({ error: '缺少配置 ID' });
-
-        if (frpInstances.has(configId)) {
-            await stopFrpProcess(configId);
+    app.post('/api/plugins/disable', requireAuth, async (req, res) => {
+        try {
+            const { pluginId } = req.body;
+            if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
+            await pluginLoader.disable(pluginId);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
         }
+    });
 
-        const meta = readFrpMeta();
-        const frpcPath = getFrpBinaryPath();
-        if (!meta.installed || !fs.existsSync(frpcPath)) {
-            return res.status(400).json({ error: 'FRP 客户端未安装' });
+    const pluginUpload = multer({ dest: path.join(DATA_DIR, 'tmp_uploads') });
+    app.post('/api/plugins/upload', requireAuth, pluginUpload.single('plugin'), async (req, res) => {
+        try {
+            if (!req.file) return res.status(400).json({ error: '未收到文件' });
+            const analysis = await pluginLoader.analyzePlugin(req.file.path);
+
+            // Cleanup the original upload file, we keep the tempDir from analysis if it exists
+            try { await fs.remove(req.file.path); } catch (e) { }
+
+            res.json({
+                success: true,
+                analysis: {
+                    manifest: analysis.manifest,
+                    existing: analysis.existing,
+                    isUpdate: analysis.isUpdate,
+                    tempDir: analysis.tempDir,
+                    finalDir: analysis.finalDir
+                }
+            });
+        } catch (e) {
+            if (req.file) try { await fs.remove(req.file.path); } catch (e2) { }
+            res.status(500).json({ error: e.message });
         }
-        const cfg = (meta.configs || []).find(c => c.id === configId);
-        if (!cfg) return res.status(404).json({ error: '配置不存在' });
+    });
 
-        const configFilePath = getConfigFilePath(configId);
-        if (!fs.existsSync(configFilePath)) {
-            fs.writeFileSync(configFilePath, cfg.config || '', 'utf8');
+    app.post('/api/plugins/install-confirm', requireAuth, async (req, res) => {
+        try {
+            const { tempDir, finalDir } = req.body;
+            if (!tempDir || !finalDir) return res.status(400).json({ error: '缺少安装信息' });
+
+            // Complete the installation
+            const manifest = await pluginLoader.install(finalDir);
+
+            // Cleanup the tempDir
+            if (tempDir && fs.existsSync(tempDir)) {
+                try { await fs.remove(tempDir); } catch (e) { }
+            }
+
+            res.json({ success: true, plugin: manifest });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/plugins/uninstall', requireAuth, async (req, res) => {
+        try {
+            const { pluginId } = req.body;
+            if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
+            await pluginLoader.uninstall(pluginId);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/plugins/export/:pluginId', requireAuth, async (req, res) => {
+        const { pluginId } = req.params;
+        const pluginPath = path.join(PLUGINS_DIR, pluginId);
+        if (!fs.existsSync(pluginPath)) {
+            return res.status(404).json({ error: '插件不存在' });
         }
 
         try {
-            const proc = startFrpProcess(configId, configFilePath);
-            res.json({ success: true, pid: proc.pid });
+            res.attachment(`${pluginId}.zip`);
+            const archive = archiver('zip', { zlib: { level: 9 } });
+            archive.on('error', (err) => {
+                console.error('Archive error:', err);
+                if (!res.headersSent) res.status(500).send(err.message);
+            });
+            archive.pipe(res);
+            archive.directory(pluginPath, false);
+            await archive.finalize();
         } catch (e) {
-            res.status(500).json({ error: '重启失败: ' + e.message });
+            console.error('Export error:', e);
+            if (!res.headersSent) res.status(500).json({ error: e.message });
         }
     });
 
-    // GET /api/frp/logs/:configId
-    app.get('/api/frp/logs/:configId', requireAuth, (req, res) => {
-        const inst = frpInstances.get(req.params.configId);
-        res.json({ logs: inst ? inst.logs : [] });
+    app.get('/api/plugins/:pluginId/manifest', requireAuth, (req, res) => {
+        const manifest = pluginLoader.getPluginManifest(req.params.pluginId);
+        if (!manifest) return res.status(404).json({ error: '插件不存在' });
+        res.json(manifest);
     });
+
+    app.get('/api/plugins/:pluginId/component/:componentName', requireAuth, (req, res) => {
+        const components = pluginLoader.getComponents();
+        const comp = components[req.params.componentName];
+        if (!comp || comp.pluginId !== req.params.pluginId) {
+            return res.status(404).json({ error: '组件不存在' });
+        }
+        res.setHeader('Content-Type', 'application/javascript');
+        res.sendFile(comp.path);
+    });
+
+    app.get('/api/plugins/sidebar-items', requireAuth, (req, res) => {
+        res.json(pluginLoader.getSidebarItems());
+    });
+
+    app.get('/api/plugins/components', requireAuth, (req, res) => {
+        res.json(pluginLoader.getComponents());
+    });
+
+
 
     // --- EasyAuth 管理 API (sqlite3 兼容版 - 修复表名) ---
 
@@ -2159,73 +1869,7 @@ if (cluster.isPrimary) {
         });
     };
 
-    const createGlobalBackup = async (options = { configs: true, java: [], instances: [] }, note = '') => {
-        await fs.ensureDir(GLOBAL_BACKUP_DIR);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `global_backup_${timestamp}.zip`;
-        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
 
-        // Notify all consoles
-        instanceConfig.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份开始: ${filename}...\n`));
-
-        return new Promise((resolve, reject) => {
-            const output = fs.createWriteStream(zipPath);
-            const archive = archiver('zip', { zlib: { level: 5 } });
-
-            output.on('close', async () => {
-                const metaPath = zipPath + '.meta.json';
-                await fs.writeJson(metaPath, { note, options, createdAt: new Date() }, { spaces: 2 });
-                instanceConfig.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份完成！大小: ${(archive.pointer() / 1024 / 1024).toFixed(1)} MB\n`));
-                resolve({ filename, size: archive.pointer() });
-            });
-
-            archive.on('error', (err) => {
-                instanceConfig.instances.forEach(inst => appendLog(inst.id, `[错误] 全局备份失败: ${err.message}\n`));
-                reject(err);
-            });
-
-            archive.pipe(output);
-
-            if (options.configs) {
-                // Only backup specific files in data/ to avoid recursive backups or large logs
-                const files = fs.readdirSync(DATA_DIR);
-                for (const file of files) {
-                    const fullPath = path.join(DATA_DIR, file);
-                    if (fs.statSync(fullPath).isFile() && (file.endsWith('.json') || file === 'executable_path.txt')) {
-                        archive.file(fullPath, { name: `data/${file}` });
-                    }
-                }
-            }
-
-            // Backup selected Java versions (IDs)
-            if (Array.isArray(options.java)) {
-                for (const javaId of options.java) {
-                    const javaPath = path.join(DATA_DIR, 'java', javaId);
-                    if (fs.existsSync(javaPath)) {
-                        archive.directory(javaPath, `data/java/${javaId}`);
-                    }
-                }
-            } else if (options.java === true) {
-                const javaDir = path.join(DATA_DIR, 'java');
-                if (fs.existsSync(javaDir)) archive.directory(javaDir, 'data/java');
-            }
-
-            // Backup selected Instances (IDs)
-            if (Array.isArray(options.instances)) {
-                for (const instId of options.instances) {
-                    const instPath = path.join(INSTANCES_DIR, instId);
-                    if (fs.existsSync(instPath)) {
-                        archive.directory(instPath, `instances/${instId}`);
-                    }
-                }
-            } else if (options.instances === true) {
-                // Backup all instances
-                archive.directory(INSTANCES_DIR, 'instances');
-            }
-
-            archive.finalize();
-        });
-    };
 
     app.get('/api/backups/panel/list', requireAuth, withInstance, async (req, res) => {
         const BACKUP_PANEL_DIR = path.join(req.instDir, 'backups', 'panel');
@@ -2399,7 +2043,7 @@ if (cluster.isPrimary) {
                 const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
                 if (!fs.existsSync(chunkFile)) {
                     writeStream.close();
-                    await fs.remove(finalPath).catch(() => {});
+                    await fs.remove(finalPath).catch(() => { });
                     return res.status(400).json({ error: `Chunk ${i} missing` });
                 }
                 const data = fs.readFileSync(chunkFile);
@@ -2416,209 +2060,11 @@ if (cluster.isPrimary) {
             res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
-            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) {}
+            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) { }
         }
     });
 
-    // --- Global Backup APIs ---
-    app.get('/api/backups/global/list', async (req, res) => {
-        // Allow unauthenticated access if not setup yet (for setup wizard)
-        if (!appConfig.isSetup || req.session.authenticated) {
-            try {
-                const backups = [];
-                if (fs.existsSync(GLOBAL_BACKUP_DIR)) {
-                    const files = await fs.readdir(GLOBAL_BACKUP_DIR);
-                    for (const file of files) {
-                        if (file.endsWith('.zip')) {
-                            const filePath = path.join(GLOBAL_BACKUP_DIR, file);
-                            const stat = await fs.stat(filePath);
-                            const metaPath = filePath + '.meta.json';
-                            let meta = { note: '', options: {} };
-                            if (fs.existsSync(metaPath)) {
-                                try { meta = await fs.readJson(metaPath); } catch (e) { }
-                            }
-                            backups.push({
-                                name: file,
-                                size: stat.size,
-                                mtime: stat.mtime,
-                                note: meta.note || '',
-                                options: meta.options || {}
-                            });
-                        }
-                    }
-                }
-                backups.sort((a, b) => b.mtime - a.mtime);
-                res.json(backups);
-            } catch (e) { res.status(500).json({ error: e.message }); }
-        } else {
-            res.status(401).json({ error: 'Unauthorized' });
-        }
-    });
 
-    app.post('/api/backups/global/create', requireAuth, async (req, res) => {
-        const { options, note } = req.body;
-        try {
-            const result = await createGlobalBackup(options, note);
-            res.json({ success: true, ...result });
-        } catch (e) { res.status(500).json({ error: e.message }); }
-    });
-
-    app.post('/api/backups/global/delete', requireAuth, async (req, res) => {
-        const { filename } = req.body;
-        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
-        try {
-            if (fs.existsSync(zipPath)) {
-                await fs.remove(zipPath);
-                const metaPath = zipPath + '.meta.json';
-                if (fs.existsSync(metaPath)) await fs.remove(metaPath).catch(() => { });
-                res.json({ success: true });
-            } else {
-                res.status(404).json({ error: 'File not found' });
-            }
-        } catch (e) { res.status(500).json({ error: e.message }); }
-    });
-
-    app.get('/api/backups/global/download', requireAuth, (req, res) => {
-        const { filename } = req.query;
-        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
-        if (!fs.existsSync(zipPath)) return res.status(404).send('Not Found');
-        res.download(zipPath);
-    });
-
-    app.post('/api/backups/global/import', upload.single('backup'), async (req, res) => {
-        // Allow unauthenticated access if not setup yet (for setup wizard)
-        if (!appConfig.isSetup || req.session.authenticated) {
-            if (!req.file) return res.status(400).json({ error: 'No file' });
-            const targetPath = path.join(GLOBAL_BACKUP_DIR, fixFileName(req.file.originalname));
-            try {
-                await fs.move(req.file.path, targetPath, { overwrite: true });
-                const metaPath = targetPath + '.meta.json';
-                await fs.writeJson(metaPath, { note: 'Imported Global Backup', createdAt: new Date() }, { spaces: 2 });
-                res.json({ success: true, filename: path.basename(targetPath) });
-            } catch (e) { res.status(500).json({ error: e.message }); }
-        } else {
-            res.status(401).json({ error: 'Unauthorized' });
-        }
-    });
-
-    app.post('/api/backups/global/import-chunk/init', async (req, res) => {
-        if (!(appConfig.isSetup ? req.session.authenticated : true)) return res.status(401).json({ error: 'Unauthorized' });
-        const { fileName, fileSize, totalChunks } = req.body;
-        const uploadId = crypto.randomBytes(16).toString('hex');
-        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
-        await fs.ensureDir(chunkDir);
-        await fs.writeJson(path.join(chunkDir, '.meta'), {
-            type: 'global-backup',
-            fileName: fixFileName(fileName),
-            fileSize,
-            totalChunks,
-            createdAt: Date.now()
-        });
-        res.json({ uploadId });
-    });
-
-    app.post('/api/backups/global/import-chunk/complete', async (req, res) => {
-        if (!(appConfig.isSetup ? req.session.authenticated : true)) return res.status(401).json({ error: 'Unauthorized' });
-        const { uploadId } = req.body;
-        if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
-        const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
-        const metaPath = path.join(chunkDir, '.meta');
-        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: 'Upload session not found' });
-
-        try {
-            const meta = await fs.readJson(metaPath);
-            const { fileName, totalChunks } = meta;
-            const finalPath = path.join(GLOBAL_BACKUP_DIR, fileName);
-            await fs.ensureDir(GLOBAL_BACKUP_DIR);
-
-            const writeStream = fs.createWriteStream(finalPath);
-            for (let i = 0; i < totalChunks; i++) {
-                const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
-                if (!fs.existsSync(chunkFile)) {
-                    writeStream.close();
-                    await fs.remove(finalPath).catch(() => {});
-                    return res.status(400).json({ error: `Chunk ${i} missing` });
-                }
-                const data = fs.readFileSync(chunkFile);
-                writeStream.write(data);
-            }
-            await new Promise((resolve, reject) => {
-                writeStream.end(resolve);
-                writeStream.on('error', reject);
-            });
-
-            const metaJsonPath = finalPath + '.meta.json';
-            await fs.writeJson(metaJsonPath, { note: 'Imported Global Backup', createdAt: new Date() }, { spaces: 2 });
-            await fs.remove(chunkDir);
-            res.json({ success: true, filename: path.basename(finalPath) });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) {}
-        }
-    });
-
-    app.post('/api/backups/global/restore', async (req, res) => {
-        // Allow unauthenticated access if not setup yet (for setup wizard)
-        if (appConfig.isSetup && !req.session.authenticated) return res.status(401).json({ error: 'Unauthorized' });
-
-        const { filename } = req.body;
-        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
-        if (!fs.existsSync(zipPath)) return res.status(404).json({ error: 'Backup not found' });
-
-        try {
-            // 1. Stop all MC servers
-            for (const [id, state] of instancesState) {
-                if (state.process) {
-                    appendLog(id, '[系统] 全局还原中，正在停止服务器...\n');
-                    state.process.kill();
-                }
-            }
-
-            // 2. Extract backup to a temporary location
-            const tempExtractDir = path.join(os.tmpdir(), `panel-restore-${Date.now()}`);
-            await fs.ensureDir(tempExtractDir);
-
-            const zip = new AdmZip(zipPath);
-            zip.extractAllTo(tempExtractDir, true);
-
-            // 3. Apply changes (move files from temp back to BASE_DIR)
-            // We use a separate async function to do this then restart the master
-            const applyAndRestart = async () => {
-                try {
-                    // Restore data (configs)
-                    const dataRestoreDir = path.join(tempExtractDir, 'data');
-                    if (fs.existsSync(dataRestoreDir)) {
-                        const files = fs.readdirSync(dataRestoreDir);
-                        for (const file of files) {
-                            await fs.copy(path.join(dataRestoreDir, file), path.join(DATA_DIR, file), { overwrite: true });
-                        }
-                    }
-
-                    // Restore instances
-                    const instancesRestoreDir = path.join(tempExtractDir, 'instances');
-                    if (fs.existsSync(instancesRestoreDir)) {
-                        await fs.copy(instancesRestoreDir, INSTANCES_DIR, { overwrite: true });
-                    }
-
-                    // Clean up temp
-                    await fs.remove(tempExtractDir).catch(() => { });
-
-                    // Exit with 100 to signal master to restart this worker
-                    process.exit(100);
-                } catch (e) {
-                    console.error('Failed to apply backup:', e);
-                }
-            };
-
-            res.json({ success: true, message: 'Restore started, panel will restart.' });
-
-            // Execute after response
-            setTimeout(applyAndRestart, 1000);
-
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
 
     app.get('/api/backups/panel/download', requireAuth, withInstance, (req, res) => {
         const { filename } = req.query;
@@ -3145,7 +2591,7 @@ if (cluster.isPrimary) {
     // 2. 保存面板配置
     app.post('/api/panel/config', requireAuth, async (req, res) => {
         try {
-            const { port, defaultLang, theme, consoleInfoPosition, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy } = req.body;
+            const { port, defaultLang, theme, consoleInfoPosition, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance } = req.body;
 
             // 验证配置
             if (port && (port < 1024 || port > 65535)) {
@@ -3188,6 +2634,16 @@ if (cluster.isPrimary) {
             if (aiModel !== undefined) appConfig.aiModel = aiModel;
             if (githubProxy !== undefined) appConfig.githubProxy = githubProxy;
             if (consoleInfoPosition !== undefined) appConfig.consoleInfoPosition = consoleInfoPosition;
+            if (appearance !== undefined) {
+                if (!appConfig.appearance) appConfig.appearance = {};
+                if (appearance.logo !== undefined) appConfig.appearance.logo = appearance.logo;
+                if (appearance.backgroundImage !== undefined) appConfig.appearance.backgroundImage = appearance.backgroundImage;
+                if (appearance.sidebarOpacity !== undefined) appConfig.appearance.sidebarOpacity = Math.max(0, Math.min(1, Number(appearance.sidebarOpacity)));
+                if (appearance.contentOpacity !== undefined) appConfig.appearance.contentOpacity = Math.max(0, Math.min(1, Number(appearance.contentOpacity)));
+                if (appearance.cardOpacity !== undefined) appConfig.appearance.cardOpacity = Math.max(0, Math.min(1, Number(appearance.cardOpacity)));
+                if (appearance.loginOpacity !== undefined) appConfig.appearance.loginOpacity = Math.max(0, Math.min(1, Number(appearance.loginOpacity)));
+                if (appearance.instanceOpacity !== undefined) appConfig.appearance.instanceOpacity = Math.max(0, Math.min(1, Number(appearance.instanceOpacity)));
+            }
 
             // 保存到文件
             await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
@@ -3307,6 +2763,53 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    const APPEARANCE_DIR = path.join(DATA_DIR, 'appearance');
+    fs.ensureDirSync(APPEARANCE_DIR);
+
+    app.post('/api/appearance/upload', requireAuth, upload.single('file'), async (req, res) => {
+        try {
+            if (!req.file) return res.status(400).json({ error: 'No file' });
+            const { type } = req.body;
+            if (!['logo', 'background'].includes(type)) {
+                await fs.remove(req.file.path);
+                return res.status(400).json({ error: 'Invalid type' });
+            }
+            const ext = path.extname(req.file.originalname) || '.png';
+            const filename = `${type}${ext}`;
+            await fs.move(req.file.path, path.join(APPEARANCE_DIR, filename), { overwrite: true });
+            res.json({ success: true, filename });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.delete('/api/appearance/upload', requireAuth, async (req, res) => {
+        try {
+            const { type } = req.body;
+            if (!['logo', 'background'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+            const files = await fs.readdir(APPEARANCE_DIR);
+            for (const f of files) {
+                if (f.startsWith(type + '.')) await fs.remove(path.join(APPEARANCE_DIR, f));
+            }
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.get('/api/appearance/config', (req, res) => {
+        try {
+            const appearance = appConfig.appearance || {};
+            res.json(appearance);
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.get('/api/appearance/:type', (req, res) => {
+        const { type } = req.params;
+        if (!['logo', 'background'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+        try {
+            const files = fs.readdirSync(APPEARANCE_DIR);
+            const match = files.find(f => f.startsWith(type + '.'));
+            if (!match) return res.status(404).json({ error: 'Not found' });
+            res.sendFile(path.join(APPEARANCE_DIR, match));
+        } catch (e) { res.status(404).json({ error: 'Not found' }); }
+    });
 
     app.post('/api/server/start', requireAuth, withInstance, async (req, res) => {
         const { instState, instDir, instanceId } = req;
@@ -3485,7 +2988,7 @@ if (cluster.isPrimary) {
                 const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
                 if (!fs.existsSync(chunkFile)) {
                     writeStream.close();
-                    await fs.remove(finalPath).catch(() => {});
+                    await fs.remove(finalPath).catch(() => { });
                     return res.status(400).json({ error: `Chunk ${i} missing` });
                 }
                 const data = fs.readFileSync(chunkFile);
@@ -3500,7 +3003,7 @@ if (cluster.isPrimary) {
             res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
-            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) {}
+            try { await fs.remove(path.join(CHUNK_TEMP_DIR, uploadId)); } catch (_) { }
         }
     });
 
@@ -3525,7 +3028,7 @@ if (cluster.isPrimary) {
                     if (now - meta.createdAt > 3600000) fs.removeSync(path.join(CHUNK_TEMP_DIR, d));
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     }, 1800000);
 
     app.post('/api/files/operate', requireAuth, withInstance, async (req, res) => {
@@ -3860,6 +3363,22 @@ if (cluster.isPrimary) {
     app.get('/api/system/version', (req, res) => {
         res.json({ version: APP_VERSION });
     });
+
+    // --- Initialize Plugins ---
+    (async () => {
+        try {
+            await pluginLoader.discover();
+            const results = await pluginLoader.loadAll();
+            for (const r of results) {
+                if (r.status === 'error') {
+                    console.error(`[Plugin] Failed to load ${r.id}: ${r.error}`);
+                }
+            }
+            console.log(`[Plugin] ${results.filter(r => r.status === 'loaded').length} plugin(s) loaded, ${results.filter(r => r.status === 'disabled').length} disabled`);
+        } catch (e) {
+            console.error('[Plugin] Initialization failed:', e.message);
+        }
+    })();
 
     server.listen(appConfig.port, () => console.log(`MC Panel v${APP_VERSION} running on http://localhost:${appConfig.port}`));
 }

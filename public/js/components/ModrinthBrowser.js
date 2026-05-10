@@ -6,7 +6,7 @@ import { showToast, t } from '../utils.js';
 export default {
     template: `
     <div class="h-100 d-flex flex-column">
-        <div class="d-flex justify-content-between align-items-center mb-3 px-1 animate-in flex-wrap gap-2">
+        <div class="page-header d-flex justify-content-between align-items-center animate-in flex-wrap gap-2">
             <h3 class="m-0 d-flex align-items-center">
                 <i class="fa-solid fa-cloud-arrow-down me-2 me-md-3 text-primary"></i>
                 <span class="d-none d-sm-inline">{{ $t('sidebar.modrinth') }}</span>
@@ -17,9 +17,7 @@ export default {
                 <button class="btn btn-sm btn-outline-primary d-md-none fw-bold" @click="showMobileFilters = true">
                     <i class="fa-solid fa-filter"></i><span class="d-none d-sm-inline ms-1">{{ $t('common.filter') }}</span>
                 </button>
-                <select class="form-select form-select-sm border-0 bg-body shadow-sm fw-bold" style="width: 120px; md-width: 140px; color: inherit;" v-model="sortBy" @change="searchModrinth(true)">
-                    <option v-for="(v, k) in SORT_OPTIONS" :key="k" :value="k">{{ $t('mods.modrinth.sorting.'+k) }}</option>
-                </select>
+                <CustomSelect v-model="sortBy" :options="Object.entries(SORT_OPTIONS).map(([k]) => ({value: k, label: $t('mods.modrinth.sorting.'+k)}))" size="sm" width="140px" @change="searchModrinth(true)" />
             </div>
         </div>
 
@@ -110,7 +108,7 @@ export default {
 
                 <div v-else class="row g-3 g-md-4">
                     <div v-for="mod in modrinthResults" :key="mod.project_id" class="col-12 col-xl-6">
-                        <div class="card border-0 shadow-sm modrinth-result-card h-100 bg-body-tertiary hover-grow transition-all cursor-pointer" @click="fetchModDetails(mod.project_id)">
+                        <div class="card modrinth-result-card h-100 hover-grow transition-all cursor-pointer" @click="fetchModDetails(mod.project_id)">
                             <div class="card-body d-flex flex-column flex-md-row gap-3 gap-md-4 p-3 p-md-4">
                                 <div class="flex-shrink-0 d-flex justify-content-center">
                                     <div class="position-relative">
@@ -249,7 +247,7 @@ export default {
             <Transition name="scale">
                 <div v-if="selectedMod" class="modal show d-block" @click.self="selectedMod = null" style="z-index: 2070;">
                     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-                    <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden bg-body h-100" style="max-height: 90vh;">
+                    <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden h-100" style="max-height: 90vh; background-color: var(--c-surface) !important;">
                         <div class="modal-header border-0 bg-primary text-white py-3 shadow-sm flex-shrink-0">
                             <h5 class="modal-title fw-bold d-flex align-items-center">
                                 [{{ $t('mods.modrinth.types.' + selectedMod.project.project_type) }}] {{ selectedMod.project.title }}
@@ -258,27 +256,23 @@ export default {
                         </div>
                         
                         <!-- Sticky Filter Header -->
-                        <div class="bg-body-tertiary border-bottom px-3 px-md-4 py-2 d-flex gap-2 gap-md-3 align-items-center flex-shrink-0 overflow-auto no-scrollbar">
+                        <div class="border-bottom px-3 px-md-4 py-2 d-flex gap-2 gap-md-3 align-items-center flex-shrink-0 overflow-auto no-scrollbar" style="background-color: rgba(var(--c-bg-base-rgb), 0.3) !important;">
                             <div class="d-flex align-items-center gap-2">
                                 <label class="small fw-bold text-muted text-uppercase mb-0 text-nowrap"><i class="fa-solid fa-gamepad me-1"></i>{{ $t('mods.game_version') }}</label>
-                                <select class="form-select form-select-sm border-2 fw-bold" style="width: 100px; md-width: 120px;" v-model="filterGameVersion">
-                                    <option v-for="v in availableGameVersions" :key="v" :value="v">{{ v }}</option>
-                                </select>
+                                <CustomSelect v-model="filterGameVersion" :options="availableGameVersions" size="sm" width="120px" searchable />
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <label class="small fw-bold text-muted text-uppercase mb-0 text-nowrap"><i class="fa-solid fa-microchip me-1"></i>{{ $t('mods.loader') }}</label>
-                                <select class="form-select form-select-sm border-2 fw-bold" style="width: 100px; md-width: 120px;" v-model="filterLoader">
-                                    <option v-for="l in availableLoaders" :key="l" :value="l">{{ l }}</option>
-                                </select>
+                                <CustomSelect v-model="filterLoader" :options="availableLoaders" size="sm" width="120px" />
                             </div>
                             <div class="ms-auto small text-muted fw-bold d-none d-sm-block text-nowrap">
                                 {{ $t('mods.modrinth.found_versions', { count: filteredVersions.length }) }}
                             </div>
                         </div>
 
-                        <div class="modal-body p-0 overflow-hidden d-flex flex-column flex-md-row">
+                        <div class="modal-body p-0 d-flex flex-column flex-md-row overflow-md-hidden overflow-auto">
                             <!-- Left: Mod Info & Introduction -->
-                            <div class="col-12 col-md-7 border-end overflow-auto p-3 p-md-4 custom-scrollbar bg-body">
+                            <div class="col-12 col-md-7 border-end overflow-auto p-3 p-md-4 custom-scrollbar" style="background-color: var(--c-surface) !important;">
                                 <div class="d-flex gap-3 gap-md-4 mb-3 mb-md-4">
                                     <img :src="selectedMod.project.icon_url" class="rounded-4 border shadow-sm bg-white" width="64" height="64" style="object-fit: contain; width: 64px; height: 64px; md-width: 100px; md-height: 100px;">
                                     <div class="flex-grow-1 min-width-0">
@@ -310,13 +304,14 @@ export default {
                                             {{ translatingBody ? $t('mods.translating') : (bodyTranslations[selectedMod.project.id] ? $t('common.close') : $t('mods.translate')) }}
                                         </button>
                                     </div>
-                                    <div class="mod-description-container bg-body-tertiary p-3 rounded-4 small text-body" 
+                                    <div class="mod-description-container p-3 rounded-4 small text-body" 
+                                         style="background-color: rgba(var(--c-bg-base-rgb), 0.2) !important; border: 1px solid rgba(255,255,255,0.05);"
                                          v-html="renderMarkdown(bodyTranslations[selectedMod.project.id] || selectedMod.project.body)"></div>
                                 </div>
                             </div>
 
                             <!-- Right: File List -->
-                            <div class="col-12 col-md-5 bg-body-tertiary overflow-auto p-3 p-md-4 custom-scrollbar">
+                            <div class="col-12 col-md-5 overflow-auto p-3 p-md-4 custom-scrollbar" style="background-color: rgba(var(--c-bg-base-rgb), 0.15) !important;">
                                 <label class="form-label fw-bold text-uppercase text-muted mb-3 d-flex align-items-center">
                                     <i class="fa-solid fa-download me-2 text-primary"></i>{{ $t('mods.select_version') }}
                                 </label>

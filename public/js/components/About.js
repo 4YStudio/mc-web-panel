@@ -6,7 +6,7 @@ import { showToast } from '../utils.js';
 export default {
     template: `
     <div class="h-100 d-flex flex-column overflow-hidden">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-shrink-0">
+        <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0">
             <div class="d-flex align-items-center">
                 <button @click="store.view = 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>

@@ -15,7 +15,7 @@ const CONFIG_GROUPS = [
 export default {
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4">
+        <div class="page-header d-flex justify-content-between align-items-center">
             <h3 class="m-0 fw-bold">{{ store.stats.backupStrategy === 'mod' ? $t('sidebar.backups') : $t('map_backup.title') }}</h3>
             <div class="d-flex align-items-center gap-2">
                 <button v-if="currentTab === 'config'" class="btn btn-sm btn-outline-secondary rounded-pill px-2 px-md-3 fw-bold" @click="toggleEditMode">
@@ -49,11 +49,11 @@ export default {
 
         <Transition name="fade" mode="out-in">
             <div v-if="currentTab === 'list'" key="list">
-                <div class="alert alert-info py-2 px-3 small border-0 shadow-sm mb-3" style="border-radius: 12px;">
+                <div class="alert alert-info py-2 px-3 small mb-3">
                     <i class="fa-solid fa-circle-info me-2"></i>
                     {{ store.stats.backupStrategy === 'mod' ? $t('backups.tips') : $t('map_backup.panel_tips') }}
                 </div>
-                <div class="card shadow-sm border-0 overflow-hidden" style="border-radius: 16px;">
+                <div class="card overflow-hidden">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-body-tertiary">
@@ -127,7 +127,7 @@ export default {
                     <div v-if="editMode === 'gui'" class="row g-3 g-md-4 overflow-auto custom-scrollbar pb-5" key="gui">
                         <template v-if="store.stats.backupStrategy === 'mod'">
                             <div class="col-md-6" v-for="(group, idx) in CONFIG_GROUPS" :key="idx">
-                                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px;">
+                                <div class="card h-100">
                                     <div class="card-header bg-body-tertiary fw-bold border-0 py-2 px-3 small text-uppercase text-muted">{{ $t(group.titleKey) }}</div>
                                     <div class="card-body p-3">
                                         <div v-for="item in group.items" :key="item.key" class="mb-3">
@@ -137,9 +137,7 @@ export default {
                                             </div>
                                             <div v-else-if="item.type === 'select'">
                                                 <label class="form-label small fw-bold text-muted mb-1">{{ $t(item.labelKey) }}</label>
-                                                <select class="form-select form-select-sm border-0 bg-body-tertiary" v-model="formModel[item.key]">
-                                                    <option v-for="opt in item.options" :value="opt">{{ opt }}</option>
-                                                </select>
+                                                <CustomSelect v-model="formModel[item.key]" :options="item.options" size="sm" />
                                             </div>
                                             <div v-else-if="item.type === 'range'">
                                                 <label class="form-label small fw-bold text-muted mb-1 d-flex justify-content-between">
@@ -159,7 +157,7 @@ export default {
                         </template>
                         <template v-else>
                             <div class="col-md-8 mx-auto">
-                                <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                                <div class="card">
                                     <div class="card-header bg-body-tertiary fw-bold border-0 py-2 px-3 small text-uppercase text-muted">{{ $t('map_backup.title') }} - {{ $t('backups.config') }}</div>
                                     <div class="card-body p-4">
                                         <div class="form-check form-switch mb-4 d-flex justify-content-between p-0">

@@ -6,7 +6,7 @@ import { createI18n } from '../i18n.js';
 
 export default {
     template: `
-    <div class="card border-0 shadow-sm animate-in">
+    <div class="card animate-in">
         <div class="card-body p-5">
             <div class="text-center mb-5">
                 <div class="mb-3"><img src="/logo.png" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;"></div>
@@ -22,10 +22,7 @@ export default {
                             {{ $t('setup.select_mc') }}
                             <span v-if="loadingMc" class="spinner-border spinner-border-sm text-primary ms-2" role="status"></span>
                         </label>
-                        <select class="form-select form-select-lg" v-model="selectedMc" @change="fetchLoaders" :disabled="loadingMc">
-                            <option value="">{{ loadingMc ? $t('common.loading') : $t('setup.choose') }}</option>
-                            <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
-                        </select>
+                        <CustomSelect v-model="selectedMc" :options="mcVersions" :placeholder="loadingMc ? $t('common.loading') : $t('setup.choose')" :disabled="loadingMc" size="lg" searchable @change="fetchLoaders" />
                     </div>
 
                      <!-- Step 2: Loader Version -->
@@ -34,10 +31,7 @@ export default {
                             {{ $t('setup.select_loader') }}
                             <span v-if="loadingLoaders" class="spinner-border spinner-border-sm text-primary ms-2" role="status"></span>
                         </label>
-                        <select class="form-select form-select-lg" v-model="selectedLoader" :disabled="loadingLoaders">
-                            <option value="">{{ loadingLoaders ? $t('common.loading') : $t('setup.choose') }}</option>
-                            <option v-for="v in loaderVersions" :key="v" :value="v">{{ v }}</option>
-                        </select>
+                        <CustomSelect v-model="selectedLoader" :options="loaderVersions" :placeholder="loadingLoaders ? $t('common.loading') : $t('setup.choose')" :disabled="loadingLoaders" size="lg" searchable />
                     </div>
 
                     <!-- Step 3: Install -->

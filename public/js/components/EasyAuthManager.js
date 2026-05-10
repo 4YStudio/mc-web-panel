@@ -33,7 +33,7 @@ export default {
     components: { Avatar },
     template: `
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="page-header d-flex justify-content-between align-items-center">
             <h3>EasyAuth</h3>
             <div v-if="currentTab === 'config'" class="btn-group">
                 <button v-if="currentSchema" class="btn btn-outline-secondary" @click="toggleEditMode"><i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i> <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? $t('common.text_mode') : $t('common.gui_mode') }}</span></button>
@@ -41,10 +41,12 @@ export default {
             </div>
         </div>
 
-        <ul class="nav nav-tabs mb-3">
-            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='users'}" @click="currentTab='users'">{{ $t('easyauth.users') }}</a></li>
-            <li class="nav-item"><a class="nav-link" :class="{active: currentTab==='config'}" @click="currentTab='config'">{{ $t('easyauth.config') }}</a></li>
-        </ul>
+        <div class="card bg-body-tertiary border-secondary mb-3 p-1 rounded-3" style="background-color: var(--c-surface) !important;">
+            <ul class="nav nav-pills nav-fill">
+                <li class="nav-item"><a class="nav-link cursor-pointer px-4" :class="{active: currentTab==='users'}" @click="currentTab='users'">{{ $t('easyauth.users') }}</a></li>
+                <li class="nav-item"><a class="nav-link cursor-pointer px-4" :class="{active: currentTab==='config'}" @click="currentTab='config'">{{ $t('easyauth.config') }}</a></li>
+            </ul>
+        </div>
 
         <!-- 1. 用户列表 -->
         <div v-if="currentTab === 'users'">
@@ -85,28 +87,33 @@ export default {
         <!-- 2. 配置管理 -->
         <div v-if="currentTab === 'config'" class="row g-3 config-layout">
             <div class="col-md-3 config-sidebar">
-                <div class="list-group overflow-auto shadow-sm config-list">
-                    <button v-for="file in configFiles" class="list-group-item list-group-item-action" :class="{active: currentFile===file}" @click="loadFile(file)"><i class="fa-regular fa-file-code me-2"></i>{{ file }}</button>
+                <div class="list-group overflow-auto shadow-sm config-list border border-secondary rounded-3" style="background-color: var(--c-surface) !important;">
+                    <button v-for="file in configFiles" class="list-group-item list-group-item-action border-0 mb-1 rounded-2" 
+                            style="background: transparent; color: inherit;"
+                            :class="{active: currentFile===file, 'bg-primary text-white': currentFile===file}" 
+                            @click="loadFile(file)">
+                        <i class="fa-regular fa-file-code me-2"></i>{{ file }}
+                    </button>
                 </div>
             </div>
             <div class="col-md-9 config-content">
                 <Transition name="fade" mode="out-in">
-                    <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm border-secondary-subtle" key="text">
-                        <div class="card-header bg-body-tertiary small text-muted">{{ currentFile || 'Select File' }}</div>
-                        <textarea v-if="currentFile" class="form-control border-0 rounded-0 bg-body text-body h-100" style="font-family: monospace; resize: none;" v-model="fileContent" spellcheck="false"></textarea>
+                    <div v-if="editMode === 'text' || !currentSchema" class="card h-100 shadow-sm border-secondary" style="background-color: var(--c-surface) !important;" key="text">
+                        <div class="card-header border-bottom border-secondary small text-muted" style="background: rgba(255,255,255,0.03)">{{ currentFile || 'Select File' }}</div>
+                        <textarea v-if="currentFile" class="form-control border-0 rounded-0 text-body h-100" style="font-family: monospace; resize: none; background: transparent;" v-model="fileContent" spellcheck="false"></textarea>
                     </div>
                     <div v-else class="h-100 overflow-auto pr-2 custom-scrollbar" key="gui">
                         <div class="row g-3">
                             <div class="col-md-12" v-for="(group, idx) in currentSchema" :key="idx">
-                                <div class="card border-secondary-subtle">
-                                    <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
+                                <div class="card border-secondary" style="background-color: var(--c-surface) !important;">
+                                    <div class="card-header border-bottom border-secondary fw-bold" style="background: rgba(255,255,255,0.03)">{{ $t(group.titleKey) }}</div>
                                     <div class="card-body">
                                         <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
                                             <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
                                             <div class="col-sm-7">
                                                 <div v-if="item.type === 'boolean'" class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="formModel[item.key]"></div>
                                                 <input v-else-if="item.type === 'number'" type="number" class="form-control form-control-sm" v-model="formModel[item.key]">
-                                                <select v-else-if="item.type === 'select'" class="form-select form-select-sm" v-model="formModel[item.key]"><option v-for="opt in item.options" :value="opt">{{ opt }}</option></select>
+                                                <CustomSelect v-else-if="item.type === 'select'" v-model="formModel[item.key]" :options="item.options" size="sm" />
                                                 <input v-else type="text" class="form-control form-control-sm" v-model="formModel[item.key]">
                                             </div>
                                         </div>

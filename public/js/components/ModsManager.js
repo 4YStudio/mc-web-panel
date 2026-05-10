@@ -104,10 +104,10 @@ export default {
         </div>
 
         <template v-else>
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="page-header d-flex justify-content-between align-items-center">
                 <h3 class="m-0 fw-bold">{{ $t('mods.title') }}</h3>
-                <button class="btn btn-sm btn-outline-primary rounded-pill px-3" @click="store.view = 'modrinth'">
-                    <i class="fa-solid fa-globe me-1"></i>{{ $t('mods.browse_modrinth') }}
+                <button class="btn btn-sm btn-outline-primary rounded-pill px-2 px-md-3" @click="store.view = 'modrinth'">
+                    <i class="fa-solid fa-globe"></i><span class="d-none d-md-inline ms-1">{{ $t('mods.browse_modrinth') }}</span>
                 </button>
             </div>
             
@@ -139,7 +139,7 @@ export default {
                 <div class="card-body p-0 overflow-hidden d-flex flex-column" style="flex: 1; min-height: 0;">
                     <div class="table-responsive h-100 custom-scrollbar">
                         <table class="table table-hover align-middle mb-0">
-                            <thead class="sticky-top bg-body" style="z-index: 5;">
+                            <thead>
                                 <tr class="small text-uppercase text-muted fw-bold">
                                     <th style="width: 40px;" class="px-3"><input class="form-check-input" type="checkbox" v-model="selectAll"></th>
                                     <th>{{ $t('common.name') }}</th>

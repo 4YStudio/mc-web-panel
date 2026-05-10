@@ -27,6 +27,7 @@ node-*
 logo.ico
 
 # Runtime Data & Configuration
+plugins/
 data/
 mc_server/
 backups/
