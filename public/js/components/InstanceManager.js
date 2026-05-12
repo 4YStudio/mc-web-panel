@@ -114,6 +114,15 @@ export default {
                         </button>
                     </div>
                 </div>
+ 
+                <!-- Dashboard Cards (Plugins) -->
+                <div v-if="store.dashboardCards.length > 0" class="dashboard-cards-container row g-3 g-md-4 mb-4 mb-md-5 mt-2 transition-container">
+                    <template v-for="card in store.dashboardCards" :key="card.name">
+                        <div v-if="card" class="col-12 col-md-6 col-xl-4 animate-in">
+                            <component :is="store.pluginComponents[card.component] || card.component"></component>
+                        </div>
+                    </template>
+                </div>
 
         <div class="row g-3 g-md-4 transition-container">
             <div v-for="(inst, idx) in filteredInstances" :key="inst.id" class="col-md-6 col-lg-4 col-xl-3 animate-in" :style="{'animation-delay': (idx * 0.05) + 's'}">
@@ -314,9 +323,10 @@ export default {
             try {
                 await api.post('/api/instances/select', { id: inst.id });
                 store.currentInstanceId = inst.id;
-                store.logs = []; // Clear old logs
-                socket.emit('req_history'); // Request new history
-                store.view = 'dashboard';
+                store.logs = [];
+                socket.emit('req_history');
+                const { getFirstVisibleView } = await import('/js/components/Sidebar.js');
+                store.view = getFirstVisibleView(inst.id);
             } catch (e) {
                 showToast(t('instance_manager.select_fail'));
             }

@@ -9,7 +9,7 @@ export default {
         PluginDevGuide
     },
     template: `
-    <div class="animate-in">
+    <div class="animate-fade">
         <div class="page-header d-flex justify-content-between align-items-center mb-4">
             <div class="d-flex align-items-center">
                 <button @click="showGuide ? showGuide = false : (store.view = store.prevView || 'instance-manager')" class="btn-back me-3">
@@ -47,45 +47,47 @@ export default {
             </div>
             <div v-else>
                 <div v-if="plugins.length > 0" class="row g-3">
-                    <div v-for="(plugin, idx) in plugins" :key="plugin.id" class="col-md-6 col-lg-4 stagger-item" :style="{'animation-delay': (idx * 0.05) + 's'}">
-                        <div class="card h-100 plugin-card border-secondary shadow-sm" style="border-radius: 16px; transition: all 0.3s ease; background-color: var(--c-surface) !important;">
-                            <div class="card-body p-3 p-md-4">
-                                <div class="d-flex align-items-start justify-content-between mb-3">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                                             :style="{background: plugin.color + '18', color: plugin.color, width: '44px', height: '44px', borderRadius: '12px'}">
-                                            <i class="fa-solid" :class="plugin.icon" style="font-size: 1.1rem;"></i>
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold text-truncate" style="max-width: 140px;">{{ plugin.name }}</div>
-                                            <div class="text-muted" style="font-size: 0.72rem;">v{{ plugin.version }} · {{ plugin.author }}</div>
+                    <template v-for="(plugin, idx) in plugins" :key="plugin.id">
+                        <div v-if="plugin" class="col-md-6 col-lg-4 stagger-item" :style="{'animation-delay': (idx * 0.05) + 's'}">
+                            <div class="card h-100 plugin-card border-secondary shadow-sm" style="border-radius: 16px; transition: all 0.3s ease; background-color: var(--c-surface) !important;">
+                                <div class="card-body p-3 p-md-4">
+                                    <div class="d-flex align-items-start justify-content-between mb-3">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                                 :style="{background: plugin.color + '18', color: plugin.color, width: '44px', height: '44px', borderRadius: '12px'}">
+                                                <i class="fa-solid" :class="plugin.icon" style="font-size: 1.1rem;"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-truncate" style="max-width: 140px;">{{ plugin.name }}</div>
+                                                <div class="text-muted" style="font-size: 0.72rem;">v{{ plugin.version }} · {{ plugin.author }}</div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <p class="text-muted small mb-3" style="line-height: 1.5; height: 3em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">{{ plugin.description }}</p>
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="status-indicator" :class="plugin.enabled && plugin.loaded ? 'bg-success' : 'bg-secondary'" style="width: 6px; height: 6px;"></span>
-                                        <span class="small" :class="plugin.enabled && plugin.loaded ? 'text-success' : 'text-muted'">
-                                            {{ plugin.enabled && plugin.loaded ? $t('plugins.running') : $t('plugins.stopped') }}
-                                        </span>
-                                    </div>
-                                    <div class="d-flex gap-2 align-items-center">
-                                        <div class="form-check form-switch m-0 me-1">
-                                            <input class="form-check-input" type="checkbox" :checked="plugin.enabled"
-                                                @change="togglePlugin(plugin)" :disabled="toggling === plugin.id">
+                                    <p class="text-muted small mb-3" style="line-height: 1.5; height: 3em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">{{ plugin.description }}</p>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="status-indicator" :class="plugin.enabled && plugin.loaded ? 'bg-success' : 'bg-secondary'" style="width: 6px; height: 6px;"></span>
+                                            <span class="small" :class="plugin.enabled && plugin.loaded ? 'text-success' : 'text-muted'">
+                                                {{ plugin.enabled && plugin.loaded ? $t('plugins.running') : $t('plugins.stopped') }}
+                                            </span>
                                         </div>
-                                        <button class="btn btn-sm btn-outline-secondary px-2 py-0" @click="exportPlugin(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.export')">
-                                            <i class="fa-solid fa-download"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger px-2 py-0" @click="askUninstall(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.delete')">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <div class="form-check form-switch m-0 me-1">
+                                                <input class="form-check-input" type="checkbox" :checked="plugin.enabled"
+                                                    @change="togglePlugin(plugin)" :disabled="toggling === plugin.id">
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-secondary px-2 py-0" @click="exportPlugin(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.export')">
+                                                <i class="fa-solid fa-download"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger px-2 py-0" @click="askUninstall(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.delete')">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </template>
                 </div>
                 <div v-else class="text-center py-5">
                     <i class="fa-solid fa-puzzle-piece d-block mb-3 opacity-25" style="font-size: 3rem;"></i>
@@ -108,10 +110,10 @@ export default {
                                         {{ $t('plugins.uninstall_title') }}
                                     </span>
                                     <span v-else-if="analysisResult">
-                                        {{ analysisResult.isUpdate ? $t('plugins.update_title', {name: analysisResult.manifest.name}) : $t('plugins.install_confirm_title') }}
+                                        {{ analysisResult.isUpdate ? $t('plugins.update_title', {name: localize(analysisResult.manifest?.name)}) : $t('plugins.install_confirm_title') }}
                                     </span>
                                     <span v-else>
-                                        {{ updatingPlugin ? $t('plugins.update_title', {name: updatingPlugin.name}) : $t('plugins.install_title') }}
+                                        {{ updatingPlugin ? $t('plugins.update_title', {name: updatingPlugin?.name}) : $t('plugins.install_title') }}
                                     </span>
                                 </h5>
                                 <button type="button" class="btn-close" @click="closeInstallModal"></button>
@@ -152,17 +154,26 @@ export default {
                                             </div>
                                             <div class="flex-grow-1">
                                                 <div class="d-flex align-items-center gap-2 mb-1">
-                                                    <h5 class="fw-bold mb-0">{{ analysisResult.manifest.name }}</h5>
+                                                    <h5 class="fw-bold mb-0">{{ localize(analysisResult.manifest?.name) }}</h5>
                                                     <span class="badge rounded-pill" :class="analysisResult.isUpdate ? 'bg-info' : 'bg-primary'">
                                                         {{ analysisResult.isUpdate ? $t('plugins.update_badge') : $t('plugins.new_badge') }}
                                                     </span>
                                                 </div>
-                                                <p class="text-muted small mb-2">{{ analysisResult.manifest.description }}</p>
+                                                <p class="text-muted small mb-2">{{ localize(analysisResult.manifest?.description) }}</p>
                                                 <div class="d-flex flex-wrap gap-3 small">
-                                                    <span><i class="fa-solid fa-code-branch me-1 text-muted"></i>{{ analysisResult.manifest.version }}</span>
-                                                    <span><i class="fa-solid fa-user me-1 text-muted"></i>{{ analysisResult.manifest.author }}</span>
+                                                    <span><i class="fa-solid fa-code-branch me-1 text-muted"></i>{{ analysisResult.manifest?.version }}</span>
+                                                    <span><i class="fa-solid fa-user me-1 text-muted"></i>{{ analysisResult.manifest?.author }}</span>
                                                 </div>
                                             </div>
+                                        </div>
+                                        <div v-if="analysisResult.manifest?.dependencies" class="mt-4 p-3 bg-warning bg-opacity-10 rounded-4 border border-warning border-opacity-25">
+                                            <h6 class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-box-open me-1"></i>检测到依赖项</h6>
+                                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                                <span v-for="(ver, name) in analysisResult.manifest.dependencies" :key="name" class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2" style="font-size: 0.7rem;">
+                                                    <i class="fa-brands fa-npm me-1"></i>{{ name }}@{{ ver }}
+                                                </span>
+                                            </div>
+                                            <p class="text-muted m-0" style="font-size: 0.7rem; line-height: 1.4;">系统将在安装过程中自动通过 NPM 下载这些依赖包。由于需要连接外部镜像源，安装时间可能会稍有延长。</p>
                                         </div>
                                         
                                         <div v-if="analysisResult.isUpdate && analysisResult.existing" class="mt-4 p-3 bg-white bg-opacity-50 rounded-3 border border-white">
@@ -177,10 +188,10 @@ export default {
                                                 </div>
                                                 <div class="col-5">
                                                     <div class="small text-muted">{{ $t('plugins.new_version') }}</div>
-                                                    <div class="fw-bold text-success">{{ analysisResult.manifest.version }}</div>
+                                                    <div class="fw-bold text-success">{{ analysisResult.manifest?.version }}</div>
                                                 </div>
                                             </div>
-                                            <div v-if="compareVersions(analysisResult.manifest.version, analysisResult.existing.version) < 0" class="mt-2 text-center text-warning small fw-bold">
+                                            <div v-if="analysisResult.manifest?.version && compareVersions(analysisResult.manifest.version, analysisResult.existing.version) < 0" class="mt-2 text-center text-warning small fw-bold">
                                                 <i class="fa-solid fa-triangle-exclamation me-1"></i>{{ $t('plugins.downgrade_warning') }}
                                             </div>
                                         </div>
@@ -241,6 +252,15 @@ export default {
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
 
+        const localize = (field) => {
+            if (!field) return '';
+            if (typeof field === 'string') return field;
+            if (typeof field === 'object') {
+                return field[store.lang] || field['en'] || field['zh'] || Object.values(field)[0] || '';
+            }
+            return String(field);
+        };
+
         const plugins = ref([]);
         const loading = ref(false);
         const toggling = ref(null);
@@ -261,7 +281,7 @@ export default {
         const refreshPlugins = async () => {
             loading.value = true;
             try {
-                const res = await api.get('/api/plugins/list');
+                const res = await api.get('/api/plugins/list?lang=' + (store.lang || 'zh'));
                 plugins.value = res.data;
             } catch (e) {
                 showToast(e.response?.data?.error || e.message, 'danger');
@@ -275,8 +295,9 @@ export default {
             try {
                 const action = plugin.enabled ? 'disable' : 'enable';
                 await api.post(`/api/plugins/${action}`, { pluginId: plugin.id });
-                showToast($t(`plugins.${action}d_success`, { name: plugin.name }), 'success');
+                showToast($t(`plugins.${action}d_success`, { name: plugin.name }) + ' (若未生效请尝试重启面板)', 'success');
                 await refreshPlugins();
+                if (window.loadPlugins) await window.loadPlugins();
             } catch (e) {
                 showToast(e.response?.data?.error || e.message, 'danger');
             } finally {
@@ -335,9 +356,9 @@ export default {
                 const res = await api.post('/api/plugins/upload', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
-                analysisResult.value = res.data;
+                analysisResult.value = res.data.analysis;
                 // If it's an update, skip disclaimer
-                if (analysisResult.value.isUpdate) {
+                if (analysisResult.value?.isUpdate) {
                     disclaimerAccepted.value = true;
                 }
             } catch (e) {
@@ -352,13 +373,15 @@ export default {
             installing.value = true;
             try {
                 await api.post('/api/plugins/install-confirm', { 
-                    pluginPath: analysisResult.value.tempDir,
+                    tempDir: analysisResult.value.tempDir,
+                    finalDir: analysisResult.value.finalDir,
                     isUpdate: analysisResult.value.isUpdate
                 });
-                showToast(analysisResult.value.isUpdate ? $t('plugins.update_success') : $t('plugins.install_success'), 'success');
+                showToast((analysisResult.value.isUpdate ? $t('plugins.update_success') : $t('plugins.install_success')) + ' (部分功能可能需要重启面板)', 'success');
                 showInstallModal.value = false;
                 analysisResult.value = null;
                 await refreshPlugins();
+                if (window.loadPlugins) await window.loadPlugins();
             } catch (e) {
                 showToast(e.response?.data?.error || e.message, 'danger');
             } finally {
@@ -381,6 +404,7 @@ export default {
                 showToast($t('plugins.uninstalled_success', { name: pluginToUninstall.value.name }), 'success');
                 showInstallModal.value = false;
                 await refreshPlugins();
+                if (window.loadPlugins) await window.loadPlugins();
             } catch (e) {
                 showToast(e.response?.data?.error || e.message, 'danger');
             } finally {
@@ -405,7 +429,7 @@ export default {
         });
 
         return {
-            store, plugins, loading, toggling,
+            store, plugins, loading, toggling, localize,
             showInstallModal, disclaimerAccepted, disclaimerChecked, installPath, installing, installFileInput,
             refreshPlugins, togglePlugin, exportPlugin, askUninstall, confirmUninstall, startUpload, confirmInstall, openInstallModal, openUpdateModal, closeInstallModal,
             updatingPlugin, analysisResult, hasFile, handleFileChange, compareVersions,

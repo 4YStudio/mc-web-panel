@@ -41,8 +41,6 @@ export default {
                              {{ installing ? $t('setup.installing') : $t('setup.install') }}
                         </button>
                     </div>
-
-                    </div>
                 </div>
             </div>
         </div>

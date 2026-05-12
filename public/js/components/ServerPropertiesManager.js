@@ -145,15 +145,17 @@ export default {
                 <div class="col-md-6">
                     <div class="card h-100 border-primary-subtle shadow-sm overflow-hidden" style="border-radius: 12px;">
                         <div class="card-header bg-primary-subtle text-primary fw-bold border-0 py-2 px-3 small text-uppercase">
-                            <i class="fa-solid fa-clock-rotate-left me-2"></i>{{ $t('map_backup.strategy') }}
+                            <i class="fa-solid fa-clock-rotate-left me-2"></i>{{ $t('properties.map_backup.strategy') }}
                         </div>
                         <div class="card-body p-3 d-flex flex-column">
                             <div class="mb-3 flex-grow-1">
-                                <label class="form-label small fw-bold text-muted mb-1">{{ $t('map_backup.strategy') }}</label>
-                                <CustomSelect v-model="backupStrategy" :options="[{value: 'panel', label: $t('map_backup.strategy_panel')}, {value: 'mod', label: $t('map_backup.strategy_mod')}]" />
+                                <div class="form-check form-switch d-flex justify-content-between p-0 mb-3">
+                                    <label class="form-check-label fw-bold text-muted">{{ $t('properties.map_backup.strategy_panel') }}</label>
+                                    <input class="form-check-input ms-0" type="checkbox" :checked="backupStrategy === 'panel'" @change="backupStrategy = $event.target.checked ? 'panel' : 'mod'">
+                                </div>
                                 <div class="form-text small mt-2 opacity-75" style="font-size: 0.75rem;">
                                     <i class="fa-solid fa-circle-info me-1"></i>
-                                    {{ backupStrategy === 'mod' ? $t('backups.tips') : $t('map_backup.panel_tips') }}
+                                    {{ $t('properties.map_backup.panel_tips') }}
                                 </div>
                             </div>
                             <button class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm mt-auto" @click="saveBackupStrategy">

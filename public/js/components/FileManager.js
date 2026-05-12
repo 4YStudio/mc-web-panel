@@ -8,7 +8,8 @@ export default {
     <div class="h-100 d-flex flex-column">
         <Transition name="fade" mode="out-in">
             <!-- 1. 文件列表视图 -->
-            <div v-if="!editingFile" class="d-flex flex-column h-100" key="list">
+            <div v-if="!editingFile" class="d-flex flex-column h-100" key="list"
+                @dragenter.prevent="dragCounter++; isDragging = true" @dragleave.prevent="dragCounter--; if (dragCounter <= 0) { isDragging = false; dragCounter = 0; }" @dragover.prevent @drop.prevent="dragCounter = 0; isDragging = false; handleDrop($event)">
                 <!-- 页面标题 -->
                 <div class="page-header d-flex justify-content-between align-items-center">
                     <h3 class="m-0 fw-bold"><i class="fa-solid fa-folder-open me-2 text-primary"></i>{{ $t('sidebar.files') }}</h3>
@@ -43,8 +44,10 @@ export default {
                 <div class="card mb-3 bg-body-tertiary border-secondary flex-shrink-0">
                     <div class="card-body p-2 d-flex flex-wrap gap-2 align-items-center">
                         <div class="btn-group">
+                            <button v-if="currentPath !== ''" class="btn btn-sm btn-outline-secondary" @click="goUp()" :title="$t('files.go_up')"><i class="fa-solid fa-turn-up"></i></button>
                             <button class="btn btn-sm btn-outline-secondary" @click="refreshFiles" :title="$t('common.refresh')"><i class="fa-solid fa-rotate"></i></button>
                             <button class="btn btn-sm btn-outline-secondary" @click="askCompress" :disabled="!selectedFiles.length" :title="$t('files.compress')"><i class="fa-solid fa-file-zipper"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" @click="extractSelected" :disabled="!selectedArchiveFiles.length" :title="$t('files.extract')"><i class="fa-solid fa-box-open"></i></button>
                             <button class="btn btn-sm btn-outline-danger" @click="askDelete(selectedFiles)" :disabled="!selectedFiles.length" :title="$t('common.delete')"><i class="fa-solid fa-trash"></i></button>
                         </div>
                         <div class="btn-group">
@@ -54,17 +57,25 @@ export default {
                         </div>
                         <div class="btn-group">
                             <button class="btn btn-sm btn-outline-primary" @click="$refs.fileUp.click()" :title="$t('files.upload_file')"><i class="fa-solid fa-file-upload"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" @click="$refs.folderUp.click()" :title="$t('files.upload_folder')"><i class="fa-solid fa-upload"></i></button>
                             <button class="btn btn-sm btn-outline-success" @click="askNewFile" :title="$t('files.new_file')"><i class="fa-solid fa-file-circle-plus"></i></button>
                             <button class="btn btn-sm btn-outline-success" @click="askNewFolder" :title="$t('files.new_folder')"><i class="fa-solid fa-folder-plus"></i></button>
                         </div>
                         <input type="file" ref="fileUp" multiple class="d-none" @change="(e)=>uploadFiles(e)">
+                        <input type="file" ref="folderUp" webkitdirectory class="d-none" @change="(e)=>uploadFiles(e)">
                         <div class="ms-auto d-flex gap-2">
                         </div>
                     </div>
                 </div>
 
                 <!-- 文件列表表格 -->
-                <div class="card flex-grow-1 overflow-hidden" style="border-radius: 12px;">
+                <div class="card flex-grow-1 overflow-hidden position-relative" style="border-radius: 12px;">
+                    <div v-if="isDragging" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="z-index: 10; background: rgba(var(--bs-primary-rgb), 0.15); backdrop-filter: blur(2px); border-radius: 12px; border: 3px dashed var(--bs-primary);">
+                        <div class="text-center text-primary">
+                            <i class="fa-solid fa-cloud-arrow-up fa-3x mb-2"></i>
+                            <h5 class="fw-bold">{{ $t('files.drop_to_upload') }}</h5>
+                        </div>
+                    </div>
                     <div class="table-responsive h-100 custom-scrollbar">
                         <table class="table table-hover table-sm mb-0 align-middle">
                             <thead>
@@ -79,15 +90,11 @@ export default {
                                 </tr>
                             </thead>
                             <TransitionGroup tag="tbody" name="list">
-                                <tr v-if="currentPath !== ''" class="file-row" @click="goUp()" key="..">
-                                    <td class="px-3"></td>
-                                    <td colspan="4" class="py-2"><i class="fa-solid fa-turn-up text-primary ms-2 me-2"></i> ..</td>
-                                </tr>
                                 <tr v-for="f in filteredFiles" :key="f.name" class="file-row" :class="{selected: selectedFiles.includes(f.name)}">
                                     <td @click.stop class="px-3"><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
                                     
                                     <!-- 点击名称：文件夹进入，文件尝试编辑 -->
-                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)" class="py-2 pe-0">
+                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)" class="py-2 pe-0 cursor-pointer">
                                         <div class="d-flex align-items-center">
                                             <i class="fa-solid me-2 flex-shrink-0" :class="getIcon(f)" style="width: 1.2rem; text-align: center;"></i>
                                             <span class="text-truncate flex-grow-1" style="max-width: calc(100vw - 180px);">{{ f.name }}</span>
@@ -101,6 +108,9 @@ export default {
                                     <td class="text-end px-3 py-2">
                                         <!-- Desktop actions -->
                                         <div class="d-none d-md-flex justify-content-end gap-1">
+                                            <button v-if="isArchive(f.name)" class="btn btn-xs btn-link text-warning p-1" @click.stop="extractFile(f.name)" :title="$t('files.extract')">
+                                                <i class="fa-solid fa-file-zipper"></i>
+                                            </button>
                                             <button v-if="!f.isDir" class="btn btn-xs btn-link text-info p-1" @click.stop="editFile(f.name)" :title="$t('common.edit')">
                                                 <i class="fa-solid fa-file-pen"></i>
                                             </button>
@@ -121,6 +131,7 @@ export default {
                                             </button>
                                             <Transition name="scale">
                                                 <ul v-if="activeActionMenu === f.name" class="dropdown-menu dropdown-menu-end shadow border-0 p-1 d-block" style="border-radius: 12px; z-index: 1060; min-width: 120px; position: absolute; right: 0;">
+                                                    <li v-if="isArchive(f.name)"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="extractFile(f.name); activeActionMenu=null"><i class="fa-solid fa-file-zipper me-2 text-warning"></i>{{ $t('files.extract') }}</button></li>
                                                     <li v-if="!f.isDir"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="editFile(f.name); activeActionMenu=null"><i class="fa-solid fa-file-pen me-2 text-info"></i>{{ $t('common.edit') }}</button></li>
                                                     <li><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="askRename(f); activeActionMenu=null"><i class="fa-solid fa-pen me-2 text-primary"></i>{{ $t('common.edit') }}</button></li>
                                                     <li v-if="!f.isDir"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="downloadFile(f.name); activeActionMenu=null"><i class="fa-solid fa-download me-2 text-secondary"></i>{{ $t('common.download') }}</button></li>
@@ -193,6 +204,8 @@ export default {
         const clipboard = ref({ action: '', files: [], sourcePath: '' });
         const fileUp = ref(null);
         const folderUp = ref(null);
+        const isDragging = ref(false);
+        const dragCounter = ref(0);
 
         // ... computed ...
         const pathParts = computed(() => currentPath.value ? currentPath.value.split('/') : []);
@@ -201,9 +214,106 @@ export default {
         const changeDir = (path) => { currentPath.value = path; loadFiles(); };
         const loadFiles = async () => { try { const res = await api.get(`/api/files/list?path=${currentPath.value}`); fileList.value = res.data.sort((a, b) => { if (a.isDir !== b.isDir) return b.isDir - a.isDir; return a.name.localeCompare(b.name); }); selectedFiles.value = []; selectAll.value = false; } catch (e) { showToast($t('common.error'), 'danger'); } };
         const filteredFiles = computed(() => fileList.value.filter(f => f.name.toLowerCase().includes(searchQuery.value.toLowerCase())));
+        const selectedArchiveFiles = computed(() => selectedFiles.value.filter(f => isArchive(f)));
         watch(selectAll, (v) => selectedFiles.value = v ? filteredFiles.value.map(f => f.name) : []);
         const getIcon = (f) => { if (f.isDir) return 'fa-folder text-warning'; if (f.name.endsWith('.jar')) return 'fa-cube text-success'; if (/\.(json|toml|yaml|yml|conf|properties)$/.test(f.name)) return 'fa-file-code text-info'; if (/\.(log|txt|md)$/.test(f.name)) return 'fa-file-lines text-secondary'; if (/\.(zip|tar|gz)$/.test(f.name)) return 'fa-file-zipper text-danger'; return 'fa-file text-muted'; };
         const formatSize = (bytes) => { if (bytes === 0) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]; };
+        const isArchive = (name) => /\.(zip|tar\.gz|tgz|tar|gz)$/i.test(name);
+        const extractFile = (name) => operateFiles('extract', [name]);
+        const extractSelected = () => { selectedArchiveFiles.value.forEach(f => extractFile(f)); selectedFiles.value = selectedFiles.value.filter(f => !isArchive(f)); };
+
+        const handleDrop = async (e) => {
+            isDragging.value = false;
+            const items = e.dataTransfer.items;
+            const files = [];
+            if (items) {
+                for (let i = 0; i < items.length; i++) {
+                    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                    if (entry) {
+                        await collectFilesFromEntry(entry, '', files);
+                    } else if (items[i].kind === 'file') {
+                        const f = items[i].getAsFile();
+                        if (f) files.push({ file: f, relativePath: f.name });
+                    }
+                }
+            } else {
+                for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                    const f = e.dataTransfer.files[i];
+                    files.push({ file: f, relativePath: f.webkitRelativePath || f.name });
+                }
+            }
+            if (!files.length) return;
+            await uploadDroppedFiles(files);
+        };
+
+        const collectFilesFromEntry = async (entry, basePath, files) => {
+            if (entry.isFile) {
+                const file = await new Promise((resolve) => entry.file(resolve));
+                files.push({ file, relativePath: basePath + file.name });
+            } else if (entry.isDirectory) {
+                const reader = entry.createReader();
+                const entries = await new Promise((resolve) => {
+                    const results = [];
+                    const readBatch = () => {
+                        reader.readEntries((batch) => {
+                            if (!batch.length) resolve(results);
+                            else { results.push(...batch); readBatch(); }
+                        });
+                    };
+                    readBatch();
+                });
+                for (const e of entries) {
+                    await collectFilesFromEntry(e, basePath + entry.name + '/', files);
+                }
+            }
+        };
+
+        const uploadDroppedFiles = async (fileEntries) => {
+            store.task.visible = true; store.task.title = $t('common.upload'); store.task.percent = 0;
+            const allFiles = fileEntries.map(e => e.file);
+            let totalSize = allFiles.reduce((s, f) => s + f.size, 0);
+            let uploadedSize = 0;
+
+            try {
+                const smallFiles = fileEntries.filter(e => !isLargeFile(e.file));
+                const largeFiles = fileEntries.filter(e => isLargeFile(e.file));
+
+                if (smallFiles.length) {
+                    const fd = new FormData();
+                    for (const e of smallFiles) fd.append('files', e.file, e.relativePath);
+                    fd.append('path', currentPath.value);
+                    const smallTotal = smallFiles.reduce((s, e) => s + e.file.size, 0);
+                    await api.post('/api/files/upload', fd, {
+                        onUploadProgress: (p) => {
+                            if (p.total) {
+                                const currentUploaded = uploadedSize + p.loaded;
+                                store.task.percent = Math.round((currentUploaded * 100) / totalSize);
+                                store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                            }
+                        }
+                    });
+                    uploadedSize += smallTotal;
+                }
+
+                for (const entry of largeFiles) {
+                    await uploadFileWithChunk(entry.file, {
+                        initUrl: '/api/files/chunk/init',
+                        completeUrl: '/api/files/chunk/complete',
+                        extraInitData: { targetPath: currentPath.value },
+                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
+                            const currentUploaded = uploadedSize + bytesDone;
+                            store.task.percent = Math.round((currentUploaded * 100) / totalSize);
+                            store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
+                        }
+                    });
+                    uploadedSize += entry.file.size;
+                }
+
+                showToast($t('common.success')); loadFiles();
+            } catch (e) { showToast($t('common.error'), 'danger'); }
+            finally { setTimeout(() => store.task.visible = false, 500); }
+        };
 
         // --- 文件编辑逻辑 (增强版) ---
         const EDITABLE_EXTS = ['txt', 'log', 'json', 'yml', 'yaml', 'properties', 'conf', 'toml', 'cfg', 'ini', 'sh', 'bat', 'js', 'md', 'xml'];
@@ -391,8 +501,8 @@ export default {
 
         return {
             currentPath, pathParts, fileList, filteredFiles, selectedFiles, selectAll, searchQuery,
-            editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp,
-            changeDir, goUp, joinPath, getIcon, formatSize,
+            editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp, isDragging, dragCounter,
+            changeDir, goUp, joinPath, getIcon, formatSize, isArchive, extractFile, extractSelected, selectedArchiveFiles, handleDrop,
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
             editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder,
             toggleActionMenu, activeActionMenu

@@ -36,5 +36,6 @@ export const store = reactive({
 
     // --- 插件系统 ---
     pluginSidebarItems: [],
-    pluginComponents: {}
+    pluginComponents: {},
+    dashboardCards: []
 });

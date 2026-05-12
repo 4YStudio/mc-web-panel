@@ -189,7 +189,7 @@ export default {
             <Transition name="scale">
                 <div v-if="selectedMod" class="modal show d-block" @click.self="selectedMod = null" style="z-index: 2070;">
                     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-                    <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden bg-body h-100" style="max-height: 90vh;">
+                    <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden h-100" style="max-height: 90vh; background: var(--c-surface);">
                         <div class="modal-header border-0 bg-primary text-white py-3 shadow-sm flex-shrink-0">
                             <h5 class="modal-title fw-bold d-flex align-items-center">
                                 <template v-if="selectedMod.project">
@@ -200,9 +200,9 @@ export default {
                             <button type="button" class="btn-close btn-close-white" @click="selectedMod = null"></button>
                         </div>
                         
-                        <div class="modal-body p-0 overflow-hidden d-flex flex-column flex-md-row">
+                        <div class="modal-body p-0 overflow-hidden d-flex flex-column flex-md-row" style="background: var(--c-surface);">
                             <!-- Mod Info & Introduction -->
-                            <div class="col-12 overflow-auto p-3 p-md-4 custom-scrollbar bg-body">
+                            <div class="col-12 overflow-auto p-3 p-md-4 custom-scrollbar" style="background: var(--c-surface);">
                                 <div class="d-flex flex-column flex-sm-row gap-3 gap-md-4 mb-4" v-if="selectedMod.project">
                                     <img :src="selectedMod.project.icon_url" class="rounded-4 border shadow-sm bg-white mx-auto mx-sm-0" width="100" height="100" style="object-fit: contain;">
                                     <div class="flex-grow-1 min-width-0 text-center text-sm-start">

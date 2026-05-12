@@ -20,12 +20,10 @@ const si = require('systeminformation');
 const PropertiesReader = require('properties-reader');
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
-const bcrypt = require('bcryptjs');
-const sqlite3 = require('sqlite3').verbose();
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -630,18 +628,6 @@ if (cluster.isPrimary) {
         }
     };
 
-    // --- Plugin System ---
-    const pluginLoader = new PluginLoader(app, io, {
-        instancesDir: INSTANCES_DIR,
-        baseDir: BASE_DIR,
-        dataDir: DATA_DIR,
-        globalBackupDir: GLOBAL_BACKUP_DIR,
-        getConfig: () => appConfig,
-        instancesState,
-        appendLog,
-        pluginsDir: PLUGINS_DIR,
-        stateFile: path.join(DATA_DIR, 'plugin-state.json')
-    });
 
     app.use(express.static(path.join(__dirname, 'public')));
     app.use(bodyParser.json());
@@ -657,7 +643,28 @@ if (cluster.isPrimary) {
         res.status(401).json({ error: '未授权' });
     };
 
+    // --- Plugin System ---
+    const pluginLoader = new PluginLoader(app, io, {
+        instancesDir: INSTANCES_DIR,
+        baseDir: BASE_DIR,
+        dataDir: DATA_DIR,
+        globalBackupDir: GLOBAL_BACKUP_DIR,
+        getConfig: () => appConfig,
+        instancesState,
+        appendLog,
+        pluginsDir: PLUGINS_DIR,
+        stateFile: path.join(DATA_DIR, 'plugin-state.json')
+    });
+
     pluginLoader.requireAuth = requireAuth;
+    pluginLoader.registerMiddleware();
+
+    // Initial discovery and load
+    (async () => {
+        await pluginLoader.discover();
+        await pluginLoader.loadAll();
+        console.log('[PluginLoader] All plugins initialized');
+    })();
 
     io.on('connection', (socket) => {
         socket.on('req_history', (instanceId) => {
@@ -1273,7 +1280,13 @@ if (cluster.isPrimary) {
 
     // --- Plugin System API ---
     app.get('/api/plugins/list', requireAuth, (req, res) => {
-        res.json(pluginLoader.getPluginList());
+        const lang = req.query.lang || 'zh';
+        const list = pluginLoader.getPluginList().map(p => ({
+            ...p,
+            name: PluginLoader.getLocalizedValue(p.name, lang),
+            description: PluginLoader.getLocalizedValue(p.description, lang)
+        }));
+        res.json(list);
     });
 
     app.post('/api/plugins/enable', requireAuth, async (req, res) => {
@@ -1400,199 +1413,16 @@ if (cluster.isPrimary) {
         res.json(pluginLoader.getComponents());
     });
 
-
-
-    // --- EasyAuth 管理 API (sqlite3 兼容版 - 修复表名) ---
-
-    const dbHelper = {
-        open: (path, mode) => {
-            return new Promise((resolve, reject) => {
-                const db = new sqlite3.Database(path, mode, (err) => {
-                    if (err) reject(err);
-                    else resolve(db);
-                });
-            });
-        },
-        all: (db, sql, params = []) => {
-            return new Promise((resolve, reject) => {
-                db.all(sql, params, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                });
-            });
-        },
-        run: (db, sql, params = []) => {
-            return new Promise((resolve, reject) => {
-                db.run(sql, params, function (err) {
-                    if (err) reject(err);
-                    else resolve({ changes: this.changes });
-                });
-            });
-        },
-        close: (db) => {
-            return new Promise((resolve, reject) => {
-                db.close((err) => {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            });
-        }
-    };
-
-    // 1. 获取玩家列表 (智能适配版)
-    app.get('/api/easyauth/users', requireAuth, withInstance, async (req, res) => {
-        const { instDir } = req;
-        const EASYAUTH_DB = path.join(instDir, 'config', 'EasyAuth', 'players.db');
-        if (!fs.existsSync(EASYAUTH_DB)) return res.json([]);
-
-        let db;
-        try {
-            db = await dbHelper.open(EASYAUTH_DB, sqlite3.OPEN_READONLY);
-
-            // 1. 确定表名
-            const tables = await dbHelper.all(db, "SELECT name FROM sqlite_master WHERE type='table'");
-            const tableNames = tables.map(t => t.name);
-
-            let tableName = '';
-            if (tableNames.includes('easyauth')) tableName = 'easyauth';
-            else if (tableNames.includes('users')) tableName = 'users';
-            else if (tableNames.includes('auth_users')) tableName = 'auth_users';
-            else throw new Error(`未找到已知表. 现有: [${tableNames.join(', ')}]`);
-
-            // 2. 探测列结构 (PRAGMA table_info)
-            const columnsData = await dbHelper.all(db, `PRAGMA table_info(${tableName})`);
-            const columns = columnsData.map(c => c.name);
-            console.log(`[EasyAuth Debug] 表名: ${tableName}, 列: [${columns.join(', ')}]`);
-
-            // 3. 动态构建查询字段
-            // 适配 name/username
-            const nameCol = columns.includes('username') ? 'username' : (columns.includes('name') ? 'name' : null);
-            // 适配 id/uuid
-            const idCol = columns.includes('id') ? 'id' : (columns.includes('uuid') ? 'uuid' : null);
-            // 适配 is_registered (如果没有这列，则手动返回 1)
-            const regCol = columns.includes('is_registered') ? 'is_registered' : '1 as is_registered';
-
-            if (!nameCol) throw new Error(`无法识别用户名字段，现有列: ${columns.join(', ')}`);
-
-            // 构造 SQL: SELECT id, username as username, is_registered FROM table
-            // 使用 'as username' 确保前端收到的 JSON key 始终是 username
-            const sql = `SELECT ${idCol || "'' as id"}, ${nameCol} as username, ${regCol} FROM ${tableName}`;
-
-            const users = await dbHelper.all(db, sql);
-            res.json(users);
-
-        } catch (e) {
-            console.error('[EasyAuth Error]', e);
-            res.status(500).json({ error: 'DB读取失败: ' + e.message });
-        } finally {
-            if (db) await dbHelper.close(db);
-        }
+    app.get('/api/plugins/dashboard-cards', requireAuth, (req, res) => {
+        res.json(pluginLoader.getDashboardCards());
+    });
+    
+    app.get('/api/plugins/translations', requireAuth, (req, res) => {
+        res.json(pluginLoader.getTranslations());
     });
 
-    // 2. 删除玩家 (注销 - 智能适配版)
-    app.post('/api/easyauth/delete', requireAuth, withInstance, async (req, res) => {
-        const { instDir, instState, instanceId } = req;
-        const EASYAUTH_DB = path.join(instDir, 'config', 'EasyAuth', 'players.db');
-        const { username } = req.body;
-        if (!fs.existsSync(EASYAUTH_DB)) return res.status(404).json({ error: '数据库不存在' });
 
-        let db;
-        try {
-            db = await dbHelper.open(EASYAUTH_DB, sqlite3.OPEN_READWRITE);
 
-            // 1. 确定表名
-            const tables = await dbHelper.all(db, "SELECT name FROM sqlite_master WHERE type='table'");
-            const tableNames = tables.map(t => t.name);
-            let tableName = '';
-            if (tableNames.includes('easyauth')) tableName = 'easyauth';
-            else if (tableNames.includes('users')) tableName = 'users';
-            else if (tableNames.includes('auth_users')) tableName = 'auth_users';
-            else throw new Error('未找到用户表');
-
-            // 2. 探测列名 (确定是 username 还是 name)
-            const columnsData = await dbHelper.all(db, `PRAGMA table_info(${tableName})`);
-            const columns = columnsData.map(c => c.name);
-            const nameCol = columns.includes('username') ? 'username' : (columns.includes('name') ? 'name' : null);
-
-            if (!nameCol) throw new Error('无法识别用户名字段');
-
-            // 3. 执行删除 (使用检测到的列名)
-            const result = await dbHelper.run(db, `DELETE FROM ${tableName} WHERE ${nameCol} = ?`, [username]);
-
-            if (result.changes > 0) {
-                if (instState.process) instState.process.stdin.write(`kick ${username} 您的认证已被重置\n`);
-                appendLog(instanceId, `[EasyAuth] 管理员注销了玩家: ${username}\n`);
-                res.json({ success: true });
-            } else {
-                res.json({ success: false, message: '玩家不存在' });
-            }
-        } catch (e) {
-            console.error('[EasyAuth Delete Error]', e);
-            res.status(500).json({ error: '操作失败: ' + e.message });
-        } finally {
-            if (db) await dbHelper.close(db);
-        }
-    });
-
-    // 3. 获取配置文件列表 (保持不变)
-    app.get('/api/easyauth/configs', requireAuth, withInstance, async (req, res) => {
-        const EASYAUTH_CONFIG_DIR = path.join(req.instDir, 'config', 'EasyAuth');
-        try {
-            if (!fs.existsSync(EASYAUTH_CONFIG_DIR)) return res.json([]);
-            const files = await fs.readdir(EASYAUTH_CONFIG_DIR);
-            const confFiles = files.filter(f => f.endsWith('.conf') || f.endsWith('.json'));
-            res.json(confFiles);
-        } catch (e) { res.status(500).json({ error: e.message }); }
-    });
-    // 4. 修改玩家密码 (新增)
-    app.post('/api/easyauth/password', requireAuth, withInstance, async (req, res) => {
-        const { instDir } = req;
-        const EASYAUTH_DB = path.join(instDir, 'config', 'EasyAuth', 'players.db');
-        const { username, password } = req.body;
-        if (!password || password.length < 3) return res.status(400).json({ error: '密码太短' });
-        if (!fs.existsSync(EASYAUTH_DB)) return res.status(404).json({ error: '数据库不存在' });
-
-        let db;
-        try {
-            db = await dbHelper.open(EASYAUTH_DB, sqlite3.OPEN_READWRITE);
-
-            // 1. 再次检测表名 (确保兼容性)
-            const tables = await dbHelper.all(db, "SELECT name FROM sqlite_master WHERE type='table'");
-            const tableNames = tables.map(t => t.name);
-
-            let tableName = '';
-            if (tableNames.includes('easyauth')) tableName = 'easyauth';
-            else if (tableNames.includes('users')) tableName = 'users';
-            else if (tableNames.includes('auth_users')) tableName = 'auth_users';
-            else throw new Error('未找到用户表');
-
-            // 2. 探测列名 (适配 username 或 name)
-            const columnsData = await dbHelper.all(db, `PRAGMA table_info(${tableName})`);
-            const columns = columnsData.map(c => c.name);
-            const nameCol = columns.includes('username') ? 'username' : (columns.includes('name') ? 'name' : null);
-            if (!nameCol) throw new Error('无法识别用户名字段');
-
-            // 3. 生成 BCrypt 哈希密码
-            // Salt rounds 默认为 10，这是 EasyAuth 的标准
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            // 4. 更新数据库
-            const result = await dbHelper.run(db, `UPDATE ${tableName} SET password = ? WHERE ${nameCol} = ?`, [hashedPassword, username]);
-
-            if (result.changes > 0) {
-                if (instState.process) instState.process.stdin.write(`kick ${username} 管理员修改了您的密码，请使用新密码重新登录\n`);
-                appendLog(instanceId, `[EasyAuth] 管理员修改了玩家 ${username} 的密码\n`);
-                res.json({ success: true });
-            } else {
-                res.json({ success: false, message: '玩家不存在或未更新' });
-            }
-        } catch (e) {
-            console.error('[EasyAuth Password Error]', e);
-            res.status(500).json({ error: '修改失败: ' + e.message });
-        } finally {
-            if (db) await dbHelper.close(db);
-        }
-    });
     // 5. Voicechat Config API
     app.get('/api/voicechat/config', requireAuth, withInstance, async (req, res) => {
         const VOICECHAT_DIR = path.join(req.instDir, 'config', 'voicechat');
@@ -2925,7 +2755,14 @@ if (cluster.isPrimary) {
         const targetDir = req.body.path ? path.join(instDir, req.body.path) : instDir;
         if (!targetDir.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
         try {
-            for (const file of req.files) await fs.move(file.path, path.join(targetDir, fixFileName(file.originalname)), { overwrite: true });
+            for (const file of req.files) {
+                const originalName = fixFileName(file.originalname);
+                const destPath = path.join(targetDir, originalName);
+                const destDir = path.dirname(destPath);
+                if (!destDir.startsWith(instDir)) continue;
+                await fs.ensureDir(destDir);
+                await fs.move(file.path, destPath, { overwrite: true });
+            }
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -3068,6 +2905,18 @@ if (cluster.isPrimary) {
                     else archive.file(srcPath, { name: path.basename(srcPath) });
                 }
                 await archive.finalize();
+            }
+            else if (action === 'extract') {
+                for (const src of sources) {
+                    const srcPath = path.join(instDir, src);
+                    if (!srcPath.startsWith(instDir)) continue;
+                    const ext = src.toLowerCase();
+                    const zip = new AdmZip(srcPath);
+                    const extractDir = ext.endsWith('.tar.gz') || ext.endsWith('.tgz')
+                        ? srcPath.replace(/\.(tar\.gz|tgz)$/i, '')
+                        : srcPath.replace(/\.(zip|tar|gz)$/i, '');
+                    zip.extractAllTo(extractDir, true);
+                }
             }
             else if (action === 'disable') {
                 for (const src of sources) {
@@ -3364,21 +3213,6 @@ if (cluster.isPrimary) {
         res.json({ version: APP_VERSION });
     });
 
-    // --- Initialize Plugins ---
-    (async () => {
-        try {
-            await pluginLoader.discover();
-            const results = await pluginLoader.loadAll();
-            for (const r of results) {
-                if (r.status === 'error') {
-                    console.error(`[Plugin] Failed to load ${r.id}: ${r.error}`);
-                }
-            }
-            console.log(`[Plugin] ${results.filter(r => r.status === 'loaded').length} plugin(s) loaded, ${results.filter(r => r.status === 'disabled').length} disabled`);
-        } catch (e) {
-            console.error('[Plugin] Initialization failed:', e.message);
-        }
-    })();
 
     server.listen(appConfig.port, () => console.log(`MC Panel v${APP_VERSION} running on http://localhost:${appConfig.port}`));
 }

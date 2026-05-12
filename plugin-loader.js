@@ -1,7 +1,15 @@
 const fs = require('fs-extra');
 const path = require('path');
+const { exec } = require('child_process');
 
 const DEFAULT_PLUGINS_DIR = path.join(__dirname, 'plugins');
+
+const getDisplayName = (name) => {
+    if (!name) return 'Unknown';
+    if (typeof name === 'string') return name;
+    if (typeof name === 'object') return name.en || name.zh || Object.values(name)[0] || 'Unknown';
+    return String(name);
+};
 
 class PluginLoader {
     constructor(app, io, options = {}) {
@@ -15,9 +23,100 @@ class PluginLoader {
         this._stateFile = options.stateFile || path.join(__dirname, 'data', 'plugin-state.json');
         this._loadState();
         
+        this._sidebarItems = [];
+        this._components = {};
+        this._dashboardCards = [];
+        this.pluginRouters = new Map(); // Map<pluginId, Map<prefix, router>>
+        this.publicPluginRouters = new Map(); // Map<pluginId, Map<prefix, router>>
+        
         // Clean temp files on startup and then every 1 hour
         setTimeout(() => this.cleanTempFiles(), 1000); 
         setInterval(() => this.cleanTempFiles(), 3600000);
+    }
+
+    registerMiddleware() {
+        // Dynamic routing middleware for plugins (Authenticated)
+        this.app.use('/api/plugins/:pluginId', (req, res, next) => {
+            const pluginId = req.params.pluginId;
+            const routers = this.pluginRouters.get(pluginId);
+            if (!routers) return next();
+
+            let matchedPrefix = null;
+            let matchedRouter = null;
+
+            for (const [prefix, router] of routers) {
+                const isRoot = prefix === '/';
+                const matchPrefix = isRoot ? '/' : (prefix.endsWith('/') ? prefix : prefix + '/');
+                
+                if (req.path === prefix || req.path.startsWith(matchPrefix)) {
+                    if (!matchedPrefix || prefix.length > matchedPrefix.length) {
+                        matchedPrefix = prefix;
+                        matchedRouter = router;
+                    }
+                }
+            }
+
+            if (matchedRouter) {
+                const originalUrl = req.url;
+                const originalBaseUrl = req.baseUrl;
+                
+                // Correctly handle the URL path for the sub-router
+                let subPath = req.url.substring(matchedPrefix.length);
+                if (!subPath.startsWith('/')) subPath = '/' + subPath;
+                req.url = subPath;
+                
+                req.baseUrl = req.baseUrl + matchedPrefix;
+
+                return this.requireAuth(req, res, () => {
+                    matchedRouter(req, res, (err) => {
+                        req.url = originalUrl;
+                        req.baseUrl = originalBaseUrl;
+                        next(err);
+                    });
+                });
+            }
+            next();
+        });
+
+        // Dynamic routing middleware for plugins (Public/External)
+        this.app.use('/api/public/plugins/:pluginId', (req, res, next) => {
+            const pluginId = req.params.pluginId;
+            const routers = this.publicPluginRouters.get(pluginId);
+            if (!routers) return next();
+
+            let matchedPrefix = null;
+            let matchedRouter = null;
+
+            for (const [prefix, router] of routers) {
+                const isRoot = prefix === '/';
+                const matchPrefix = isRoot ? '/' : (prefix.endsWith('/') ? prefix : prefix + '/');
+                
+                if (req.path === prefix || req.path.startsWith(matchPrefix)) {
+                    if (!matchedPrefix || prefix.length > matchedPrefix.length) {
+                        matchedPrefix = prefix;
+                        matchedRouter = router;
+                    }
+                }
+            }
+
+            if (matchedRouter) {
+                const originalUrl = req.url;
+                const originalBaseUrl = req.baseUrl;
+                
+                let subPath = req.url.substring(matchedPrefix.length);
+                if (!subPath.startsWith('/')) subPath = '/' + subPath;
+                req.url = subPath;
+                
+                req.baseUrl = req.baseUrl + matchedPrefix;
+
+                return matchedRouter(req, res, (err) => {
+                    req.url = originalUrl;
+                    req.baseUrl = originalBaseUrl;
+                    next(err);
+                });
+            }
+            next();
+        });
     }
 
     set requireAuth(fn) {
@@ -107,8 +206,12 @@ class PluginLoader {
 
             try {
                 const manifest = fs.readJsonSync(manifestPath);
-                if (!manifest.id || !manifest.name || !manifest.version) {
-                    console.warn(`[PluginLoader] Invalid manifest in ${entry.name}: missing id/name/version`);
+                if (!manifest.id || !manifest.version) {
+                    console.warn(`[PluginLoader] Invalid manifest in ${entry.name}: missing id/version`);
+                    continue;
+                }
+                if (!manifest.name) {
+                    console.warn(`[PluginLoader] Invalid manifest in ${entry.name}: missing name`);
                     continue;
                 }
 
@@ -152,7 +255,7 @@ class PluginLoader {
     async load(pluginId) {
         const plugin = this.plugins.get(pluginId);
         if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
-        if (plugin.loaded) throw new Error(`Plugin already loaded: ${pluginId}`);
+        if (plugin.loaded) return plugin.instance;
 
         const manifest = plugin.manifest;
         const mainFile = path.join(manifest._dir, manifest.main || 'index.js');
@@ -161,22 +264,35 @@ class PluginLoader {
             throw new Error(`Main file not found: ${mainFile}`);
         }
 
-        const pluginModule = require(mainFile);
+        try {
+            const { createRequire } = require('module');
+            const pluginRequire = createRequire(mainFile);
+            
+            // Clear cache to ensure fresh load
+            try {
+                const resolvedPath = require.resolve(mainFile);
+                delete require.cache[resolvedPath];
+            } catch (e) {}
 
-        if (typeof pluginModule !== 'function' && typeof pluginModule.default !== 'function') {
-            throw new Error(`Plugin must export a function (got ${typeof pluginModule})`);
+            const pluginModule = pluginRequire(mainFile);
+            const pluginFactory = typeof pluginModule === 'function' ? pluginModule : pluginModule.default;
+
+            if (typeof pluginFactory !== 'function') {
+                throw new Error(`Plugin must export a function (got ${typeof pluginFactory})`);
+            }
+
+            const api = this._createPluginAPI(manifest);
+            const instance = await pluginFactory(api);
+            
+            plugin.instance = instance;
+            plugin.loaded = true;
+
+            console.log(`[PluginLoader] Successfully loaded plugin: ${getDisplayName(manifest.name)} v${manifest.version}`);
+            return instance;
+        } catch (e) {
+            console.error(`[PluginLoader] Error loading plugin ${pluginId}:`, e);
+            throw e;
         }
-
-        const pluginFactory = typeof pluginModule === 'function' ? pluginModule : pluginModule.default;
-
-        const api = this._createPluginAPI(manifest);
-
-        const instance = await pluginFactory(api);
-        plugin.instance = instance;
-        plugin.loaded = true;
-
-        console.log(`[PluginLoader] Loaded plugin: ${manifest.name} v${manifest.version}`);
-        return instance;
     }
 
     async unload(pluginId) {
@@ -192,10 +308,25 @@ class PluginLoader {
         const resolvedPath = require.resolve(mainFile);
         delete require.cache[resolvedPath];
 
+        // Cleanup metadata
+        this._sidebarItems = this._sidebarItems.filter(item => item.pluginId !== pluginId);
+        
+        for (const key in this._components) {
+            if (this._components[key].pluginId === pluginId) {
+                delete this._components[key];
+            }
+        }
+        
+        this._dashboardCards = this._dashboardCards.filter(card => card.pluginId !== pluginId);
+
+        // Cleanup routes
+        this.pluginRouters.delete(pluginId);
+        this.publicPluginRouters.delete(pluginId);
+
         plugin.instance = null;
         plugin.loaded = false;
 
-        console.log(`[PluginLoader] Unloaded plugin: ${plugin.manifest.name}`);
+        console.log(`[PluginLoader] Unloaded plugin: ${getDisplayName(plugin.manifest.name)}`);
     }
 
     async enable(pluginId) {
@@ -340,6 +471,14 @@ class PluginLoader {
 
         fs.copySync(sourceDir, targetDir);
         
+        // --- Dependency Installation ---
+        try {
+            await this._installDependencies(targetDir, manifest);
+        } catch (e) {
+            console.error(`[PluginLoader] Failed to install dependencies for ${manifest.id}:`, e.message);
+        }
+        // ------------------------------
+
         // Cleanup the entire temp root if we created one
         if (tmpToCleanup) {
             fs.removeSync(tmpToCleanup);
@@ -378,6 +517,61 @@ class PluginLoader {
         this.plugins.delete(pluginId);
     }
 
+    async _installDependencies(targetDir, manifest) {
+        if (!manifest.dependencies || typeof manifest.dependencies !== 'object' || Object.keys(manifest.dependencies).length === 0) {
+            return;
+        }
+
+        console.log(`[PluginLoader] Installing dependencies for ${getDisplayName(manifest.name)}...`);
+        
+        // Create a temporary package.json if it doesn't exist
+        const pkgPath = path.join(targetDir, 'package.json');
+        if (!fs.existsSync(pkgPath)) {
+            const pkg = {
+                name: manifest.id,
+                version: manifest.version,
+                private: true,
+                dependencies: manifest.dependencies
+            };
+            fs.writeJsonSync(pkgPath, pkg, { spaces: 2 });
+        }
+
+        const util = require('util');
+        const execAsync = util.promisify(require('child_process').exec);
+
+        // Try pnpm first
+        try {
+            await execAsync('pnpm --version');
+            console.log('[PluginLoader] Using pnpm for installation');
+            await execAsync('pnpm install --production', { cwd: targetDir });
+            console.log(`[PluginLoader] Dependencies installed via pnpm for ${getDisplayName(manifest.name)}`);
+            return;
+        } catch (e) {
+            // fallback to npm
+        }
+
+        const registries = [
+            'https://registry.npmmirror.com',       // Aliyun/Taobao (Fastest in China)
+            'https://mirrors.cloud.tencent.com/npm/', // Tencent
+            'https://registry.npmjs.org'            // Official (Global fallback)
+        ];
+
+        let lastError = '';
+        for (const registry of registries) {
+            try {
+                console.log(`[PluginLoader] Trying npm registry: ${registry}`);
+                await execAsync(`npm install --no-package-lock --no-save --production --registry=${registry}`, { cwd: targetDir });
+                console.log(`[PluginLoader] Successfully installed dependencies for ${getDisplayName(manifest.name)} via ${registry}`);
+                return;
+            } catch (e) {
+                console.warn(`[PluginLoader] Failed to install via ${registry}:`, e.message);
+                lastError = e.message;
+            }
+        }
+
+        throw new Error(`All registries failed. Last error: ${lastError}`);
+    }
+
     _createPluginAPI(manifest) {
         const self = this;
         const pluginId = manifest.id;
@@ -389,14 +583,28 @@ class PluginLoader {
             context: self.options,
 
             registerRoutes(prefix, setupFn) {
-                // 如果 setupFn 是一个无参函数，则调用它获取 router；否则直接使用 setupFn 作为 router
                 const router = (typeof setupFn === 'function' && setupFn.length === 0) ? setupFn() : setupFn;
-                const fullPath = `/api/plugins/${pluginId}${prefix.startsWith('/') ? prefix : '/' + prefix}`;
-                self.app.use(fullPath, self.requireAuth, router);
+                const normalizedPrefix = prefix.startsWith('/') ? prefix : '/' + prefix;
+                
+                if (!self.pluginRouters.has(pluginId)) {
+                    self.pluginRouters.set(pluginId, new Map());
+                }
+                self.pluginRouters.get(pluginId).set(normalizedPrefix, router);
+            },
+
+            registerPublicRoutes(prefix, setupFn) {
+                const router = (typeof setupFn === 'function' && setupFn.length === 0) ? setupFn() : setupFn;
+                const normalizedPrefix = prefix.startsWith('/') ? prefix : '/' + prefix;
+                
+                if (!self.publicPluginRouters.has(pluginId)) {
+                    self.publicPluginRouters.set(pluginId, new Map());
+                }
+                self.publicPluginRouters.get(pluginId).set(normalizedPrefix, router);
             },
 
             registerSocket(namespace, handlers) {
                 const ns = self.io.of(`/plugin/${pluginId}${namespace}`);
+                ns.removeAllListeners('connection'); // Prevent accumulation on reload
                 for (const [event, handler] of Object.entries(handlers)) {
                     ns.on('connection', (socket) => {
                         socket.on(event, (...args) => handler(socket, ...args));
@@ -406,18 +614,24 @@ class PluginLoader {
             },
 
             registerSidebarItem(item) {
-                if (!self._sidebarItems) self._sidebarItems = [];
                 // 默认位置为 instance，保持兼容性
                 const location = item.location || 'instance';
                 self._sidebarItems.push({ ...item, pluginId, location });
             },
 
             registerComponent(name, componentPath) {
-                if (!self._components) self._components = {};
                 self._components[name] = {
                     pluginId,
                     path: path.join(manifest._dir, componentPath)
                 };
+            },
+
+            registerDashboardCard(name, componentName) {
+                self._dashboardCards.push({
+                    name,
+                    component: componentName,
+                    pluginId
+                });
             },
 
             getDataDir() {
@@ -438,14 +652,37 @@ class PluginLoader {
                 return self.options.baseDir;
             },
 
+            getActiveInstanceId() {
+                const instancesFile = path.join(self.options.baseDir, 'data', 'instances.json');
+                try {
+                    if (fs.existsSync(instancesFile)) {
+                        const config = fs.readJsonSync(instancesFile);
+                        return config.activeInstanceId || 'default';
+                    }
+                } catch (e) { }
+                return 'default';
+            },
+
+            getInstanceDir(instanceId) {
+                const instancesFile = path.join(self.options.baseDir, 'data', 'instances.json');
+                try {
+                    if (fs.existsSync(instancesFile)) {
+                        const config = fs.readJsonSync(instancesFile);
+                        const inst = config.instances.find(i => i.id === (instanceId || this.getActiveInstanceId()));
+                        if (inst) return path.join(self.options.baseDir, inst.dir);
+                    }
+                } catch (e) { }
+                return path.join(self.options.instancesDir, instanceId || 'default');
+            },
+
             getConfig() {
                 return self.options.getConfig ? self.options.getConfig() : {};
             },
 
             logger: {
-                info: (...args) => console.log(`[Plugin:${manifest.name}]`, ...args),
-                warn: (...args) => console.warn(`[Plugin:${manifest.name}]`, ...args),
-                error: (...args) => console.error(`[Plugin:${manifest.name}]`, ...args),
+                info: (...args) => console.log(`[Plugin:${getDisplayName(manifest.name)}]`, ...args),
+                warn: (...args) => console.warn(`[Plugin:${getDisplayName(manifest.name)}]`, ...args),
+                error: (...args) => console.error(`[Plugin:${getDisplayName(manifest.name)}]`, ...args),
             }
         };
     }
@@ -474,6 +711,15 @@ class PluginLoader {
         return list;
     }
 
+    static getLocalizedValue(field, lang) {
+        if (!field) return '';
+        if (typeof field === 'string') return field;
+        if (typeof field === 'object') {
+            return field[lang] || field['en'] || field['zh'] || Object.values(field)[0] || '';
+        }
+        return String(field);
+    }
+
     getSidebarItems() {
         const items = this._sidebarItems || [];
         const components = this._components || {};
@@ -495,6 +741,10 @@ class PluginLoader {
         return this._components || {};
     }
 
+    getDashboardCards() {
+        return this._dashboardCards || [];
+    }
+
     getPluginManifest(pluginId) {
         const plugin = this.plugins.get(pluginId);
         return plugin ? plugin.manifest : null;
@@ -503,6 +753,31 @@ class PluginLoader {
     isPluginEnabled(pluginId) {
         const plugin = this.plugins.get(pluginId);
         return plugin ? plugin.manifest._enabled : false;
+    }
+
+    getTranslations() {
+        const translations = { zh: { plugins: {} }, en: { plugins: {} } };
+        for (const plugin of this.plugins.values()) {
+            if (!plugin.manifest._enabled) continue;
+            
+            const localesDir = path.join(plugin.manifest._dir, 'locales');
+            if (fs.existsSync(localesDir)) {
+                const files = fs.readdirSync(localesDir);
+                files.forEach(file => {
+                    if (file.endsWith('.json')) {
+                        const lang = path.basename(file, '.json');
+                        try {
+                            const data = fs.readJsonSync(path.join(localesDir, file));
+                            if (!translations[lang]) translations[lang] = { plugins: {} };
+                            translations[lang].plugins[plugin.manifest.id] = data;
+                        } catch (e) {
+                            console.warn(`[PluginLoader] Failed to read locale ${file} for ${plugin.manifest.id}:`, e.message);
+                        }
+                    }
+                });
+            }
+        }
+        return translations;
     }
 }
 

@@ -1,4 +1,4 @@
-import { createApp, watch, onMounted, ref, computed } from '/js/vue.esm-browser.js';
+import { createApp, watch, onMounted, ref, computed, markRaw } from '/js/vue.esm-browser.js';
 import { store } from './store.js';
 import { api } from './api.js';
 import { toasts, removeToast, modalData, confirmModalAction, initModal, showToast } from './utils.js';
@@ -11,20 +11,18 @@ import ModsManager from './components/ModsManager.js';
 import FileManager from './components/FileManager.js';
 import PlayerManager from './components/PlayerManager.js';
 import BackupManager from './components/BackupManager.js';
+import PluginManager from './components/PluginManager.js';
 import ProgressModal from './components/ProgressModal.js';
-import EasyAuthManager from './components/EasyAuthManager.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
-import VoicechatManager from './components/VoicechatManager.js';
 import PanelSettings from './components/PanelSettings.js';
 import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
 import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
-import PluginManager from './components/PluginManager.js';
 import PluginDevGuide from './components/PluginDevGuide.js';
 import CustomSelect from './components/CustomSelect.js';
-import { createI18n } from './i18n.js?v=1.5.0';
+import { createI18n, messages } from './i18n.js?v=1.5.0';
 import { socket } from './socket.js';
 
 const app = createApp({
@@ -38,17 +36,16 @@ const app = createApp({
         PlayerManager,
         BackupManager,
         ProgressModal,
-        EasyAuthManager,
         ServerPropertiesManager,
         Avatar,
-        VoicechatManager,
         PanelSettings,
         ModrinthBrowser,
         About,
         JavaManager,
         InstanceManager,
         PluginManager,
-        PluginDevGuide
+        PluginDevGuide,
+        CustomSelect
     },
     setup() {
         const sidebarOpen = ref(false);
@@ -102,22 +99,40 @@ const app = createApp({
 
         const loadPlugins = async () => {
             try {
-                const [sidebarRes, componentsRes] = await Promise.all([
+                const [sidebarRes, componentsRes, dashboardCardsRes, translationsRes] = await Promise.all([
                     api.get('/api/plugins/sidebar-items'),
-                    api.get('/api/plugins/components')
+                    api.get('/api/plugins/components'),
+                    api.get('/api/plugins/dashboard-cards'),
+                    api.get('/api/plugins/translations')
                 ]);
+
+                if (translationsRes.data) {
+                    // Merge plugin translations into global messages
+                    for (const [lang, data] of Object.entries(translationsRes.data)) {
+                        if (messages[lang]) {
+                            if (!messages[lang].plugins) messages[lang].plugins = {};
+                            Object.assign(messages[lang].plugins, data.plugins);
+                        }
+                    }
+                }
 
                 if (sidebarRes.data) {
                     store.pluginSidebarItems = sidebarRes.data;
                 }
 
+                if (dashboardCardsRes.data) {
+                    store.dashboardCards = dashboardCardsRes.data;
+                }
+
                 if (componentsRes.data) {
                     for (const [compName, compInfo] of Object.entries(componentsRes.data)) {
                         try {
-                            const module = await import(`/api/plugins/${compInfo.pluginId}/component/${compName}`);
+                            // Use a cache-busting timestamp for hot-reloading components
+                            const module = await import(`/api/plugins/${compInfo.pluginId}/component/${compName}?t=${Date.now()}`);
                             if (module.default) {
-                                app.component(compName, module.default);
-                                store.pluginComponents[compName] = compInfo.pluginId;
+                                // Store the actual component object in the store
+                                // Use markRaw to avoid Vue performance warnings about reactive components
+                                store.pluginComponents[compName] = markRaw(module.default);
                             }
                         } catch (e) {
                             console.error(`Failed to load plugin component ${compName}:`, e);
@@ -128,6 +143,8 @@ const app = createApp({
                 console.error('Failed to load plugins:', e);
             }
         };
+
+        window.loadPlugins = loadPlugins;
 
         const applyAppearance = (appearance) => {
             const root = document.documentElement;
@@ -342,7 +359,9 @@ const app = createApp({
 
         const pluginViewComponent = computed(() => {
             const item = store.pluginSidebarItems.find(item => item.view === store.view);
-            return item ? item.component : null;
+            if (!item) return null;
+            // Return the component object from our store
+            return store.pluginComponents[item.view] || item.view;
         });
 
         return {

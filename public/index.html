@@ -118,9 +118,6 @@
                             <modrinth-browser v-else-if="store.view === 'modrinth'" key="modrinth"></modrinth-browser>
                             <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
                             <backup-manager v-else-if="store.view === 'backups'" key="backups"></backup-manager>
-                            <easy-auth-manager v-else-if="store.view === 'easyauth'" key="easyauth"></easy-auth-manager>
-                            <voicechat-manager v-else-if="store.view === 'voicechat'"
-                                key="voicechat"></voicechat-manager>
                             <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
                             <about v-else-if="store.view === 'about'" key="about"></about>
                             <div v-else-if="isPluginView" :key="'plugin-' + store.view" class="animate-in">
