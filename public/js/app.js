@@ -20,7 +20,6 @@ import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
 import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
-import PluginDevGuide from './components/PluginDevGuide.js';
 import CustomSelect from './components/CustomSelect.js';
 import { createI18n, messages } from './i18n.js?v=1.5.0';
 import { socket } from './socket.js';
@@ -44,7 +43,6 @@ const app = createApp({
         JavaManager,
         InstanceManager,
         PluginManager,
-        PluginDevGuide,
         CustomSelect
     },
     setup() {

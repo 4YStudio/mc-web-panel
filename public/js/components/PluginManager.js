@@ -2,45 +2,34 @@ import { ref, reactive, onMounted, computed, getCurrentInstance } from '/js/vue.
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
-import PluginDevGuide from './PluginDevGuide.js';
 
 export default {
-    components: {
-        PluginDevGuide
-    },
     template: `
     <div class="animate-fade">
         <div class="page-header d-flex justify-content-between align-items-center mb-4">
             <div class="d-flex align-items-center">
-                <button @click="showGuide ? showGuide = false : (store.view = store.prevView || 'instance-manager')" class="btn-back me-3">
+                <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
                 <div>
                     <h3 class="m-0 fw-bold d-flex align-items-center">
                         <i class="fa-solid fa-puzzle-piece me-2 me-md-3 text-primary"></i>
-                        <span>{{ showGuide ? $t('plugins.guide_title') : $t('plugins.title') }}</span>
+                        <span>{{ $t('plugins.title') }}</span>
                     </h3>
-                    <p class="text-muted mb-0 mt-1 small d-none d-md-block">{{ showGuide ? $t('plugins.guide_desc') : $t('plugins.description') }}</p>
+                    <p class="text-muted mb-0 mt-1 small d-none d-md-block">{{ $t('plugins.description') }}</p>
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <template v-if="!showGuide">
-                    <button class="btn btn-outline-primary rounded-pill px-3 px-md-4" @click="showGuide = true">
-                        <i class="fa-solid fa-book"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.guide_button') }}</span>
-                    </button>
-                    <button class="btn btn-primary rounded-pill px-3 px-md-4 fw-bold shadow-sm" @click="openInstallModal">
-                        <i class="fa-solid fa-plus-circle"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.install') }}</span>
-                    </button>
-                </template>
-                <template v-else>
-                </template>
+                <a href="https://4ystudio.github.io/mc-web-panel/dev-guide/" target="_blank" class="btn btn-outline-primary rounded-pill px-3 px-md-4">
+                    <i class="fa-solid fa-book"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.guide_button') }}</span>
+                </a>
+                <button class="btn btn-primary rounded-pill px-3 px-md-4 fw-bold shadow-sm" @click="openInstallModal">
+                    <i class="fa-solid fa-plus-circle"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.install') }}</span>
+                </button>
             </div>
         </div>
 
-        <div v-if="showGuide">
-            <plugin-dev-guide ref="devGuide" @close="showGuide = false"></plugin-dev-guide>
-        </div>
-        <div v-else class="plugin-list-view">
+        <div class="plugin-list-view">
             <div v-if="loading" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status"></div>
                 <div class="text-muted mt-2 small">{{ $t('common.loading') }}</div>
@@ -276,7 +265,6 @@ export default {
         const showUninstallConfirm = ref(false);
         const pluginToUninstall = ref(null);
         const uninstallConfirmName = ref('');
-        const showGuide = ref(false);
 
         const refreshPlugins = async () => {
             loading.value = true;
@@ -433,8 +421,7 @@ export default {
             showInstallModal, disclaimerAccepted, disclaimerChecked, installPath, installing, installFileInput,
             refreshPlugins, togglePlugin, exportPlugin, askUninstall, confirmUninstall, startUpload, confirmInstall, openInstallModal, openUpdateModal, closeInstallModal,
             updatingPlugin, analysisResult, hasFile, handleFileChange, compareVersions,
-            showUninstallConfirm, pluginToUninstall, uninstallConfirmName,
-            showGuide
+            showUninstallConfirm, pluginToUninstall, uninstallConfirmName
         };
     }
 };
