@@ -1,0 +1,214 @@
+:root {
+    --bs-body-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --c-bg-base: #f4f9f4;
+    --c-surface: #ffffff;
+    --c-surface-elevated: #f8faf8;
+    --c-border: #d8ead8;
+    --c-text-primary: #1b2e1b;
+    --c-text-secondary: #5c7a5c;
+    --c-text-tertiary: #8faa8f;
+    --c-primary: #4caf50;
+    --c-primary-hover: #43a047;
+    --c-primary-glow: rgba(76, 175, 80, 0.1);
+    --sidebar-width: 280px;
+    --card-radius: 16px;
+    --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-bs-theme="dark"] {
+    --c-bg-base: #080c18;
+    --c-surface: #0f1629;
+    --c-surface-elevated: #151d33;
+    --c-border: #1c2842;
+    --c-text-primary: #e8edf5;
+    --c-text-secondary: #7b8ba5;
+    --c-text-tertiary: #4a5a74;
+    --c-primary: #4d8ef7;
+    --c-primary-hover: #5c96f8;
+    --c-primary-glow: rgba(77, 142, 247, 0.12);
+}
+
+body {
+    font-family: var(--bs-body-font-family);
+    background-color: var(--c-bg-base);
+    color: var(--c-text-primary);
+    line-height: 1.6;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#app {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--c-surface);
+    border-right: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: var(--c-text-secondary);
+    text-decoration: none;
+    border-radius: 10px;
+    margin-bottom: 4px;
+    transition: all var(--transition-base);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.nav-link:hover {
+    background: var(--c-primary-glow);
+    color: var(--c-primary);
+}
+
+.nav-link.active {
+    background: var(--c-primary-glow);
+    color: var(--c-primary);
+    font-weight: 600;
+}
+
+.nav-link i {
+    width: 20px;
+    text-align: center;
+    margin-right: 12px;
+    font-size: 1rem;
+}
+
+/* Main Content */
+.main-container {
+    flex: 1;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    position: relative;
+}
+
+.content-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+}
+
+.doc-section {
+    padding-top: 1rem;
+    margin-bottom: 4rem;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
+}
+
+.section-icon-box {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* Tables */
+.dev-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+}
+
+.dev-table th {
+    background: rgba(0,0,0,0.02);
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+[data-bs-theme="dark"] .dev-table th {
+    background: rgba(255,255,255,0.02);
+}
+
+.dev-table td {
+    padding: 1rem;
+    border-top: 1px solid var(--c-border);
+}
+
+/* Code Blocks */
+.code-block-wrapper {
+    background: var(--c-surface-elevated);
+    border: 1px solid var(--c-border);
+    margin: 1.5rem 0;
+}
+
+.code-header {
+    background: rgba(0,0,0,0.03);
+    padding: 0.5rem 1rem;
+    font-family: monospace;
+}
+
+[data-bs-theme="dark"] .code-header {
+    background: rgba(255,255,255,0.03);
+}
+
+pre {
+    margin: 0;
+    padding: 1.25rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+}
+
+/* Utils */
+.rounded-4 { border-radius: 1rem !important; }
+.tracking-tight { letter-spacing: -0.03em; }
+
+/* Language Switcher */
+.lang-switch {
+    position: fixed;
+    top: 1.5rem;
+    right: 2rem;
+    z-index: 1001;
+}
+
+/* Mobile */
+@media (max-width: 992px) {
+    .sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        bottom: 0;
+        transition: left 0.3s ease;
+    }
+    .sidebar.show {
+        left: 0;
+    }
+    .mobile-header {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        background: var(--c-surface);
+        border-bottom: 1px solid var(--c-border);
+    }
+}
+
+@media (min-width: 993px) {
+    .mobile-header {
+        display: none;
+    }
+}
