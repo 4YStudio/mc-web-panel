@@ -3,7 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 const NODE_VERSION = 'v24.11.1';
-const BUILD_DIR = 'dist_build';
+const DIST_ROOT = path.join(__dirname, 'dist');
+const BUILD_DIR = path.join(DIST_ROOT, 'temp');
+const OUTPUT_DIR = path.join(DIST_ROOT, 'releases');
+const CACHE_DIR = path.join(DIST_ROOT, 'cache');
 
 const TARGETS = [
     { name: 'linux-x64', nodeArch: 'linux-x64', ext: '' },
@@ -21,8 +24,11 @@ const downloadFile = (url, dest) => {
 
 async function prepareBuildDir() {
     console.log('Preparing clean build directory...');
-    if (fs.existsSync(BUILD_DIR)) fs.rmSync(BUILD_DIR, { recursive: true, force: true });
-    fs.mkdirSync(BUILD_DIR);
+    if (fs.existsSync(DIST_ROOT)) fs.rmSync(DIST_ROOT, { recursive: true, force: true });
+    fs.mkdirSync(DIST_ROOT, { recursive: true });
+    fs.mkdirSync(BUILD_DIR, { recursive: true });
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
 
     console.log('Copying project files...');
     const manifest = {
@@ -80,24 +86,26 @@ async function buildTarget(target) {
     const ext = isWin ? '.zip' : '.tar.xz';
     const distName = `node-${NODE_VERSION}-${target.nodeArch}`;
     const fileName = `${distName}${ext}`;
+    const filePath = path.join(CACHE_DIR, fileName);
     const url = `https://nodejs.org/dist/${NODE_VERSION}/${fileName}`;
     const nodeBinName = isWin ? 'node.exe' : 'node';
     const localNodeBin = path.join(BUILD_DIR, nodeBinName);
 
-    if (fs.existsSync(fileName)) console.log(`Using cached ${fileName}`);
-    else downloadFile(url, fileName);
+    if (fs.existsSync(filePath)) console.log(`Using cached ${fileName}`);
+    else downloadFile(url, filePath);
 
     console.log('Extracting Node.js...');
     try {
         if (isWin) {
-            if (fs.existsSync(distName)) fs.rmSync(distName, { recursive: true, force: true });
-            execSync(`unzip -q ${fileName}`);
-            fs.copyFileSync(path.join(distName, 'node.exe'), localNodeBin);
-            fs.rmSync(distName, { recursive: true, force: true });
+            const extractDir = path.join(CACHE_DIR, distName);
+            if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true, force: true });
+            execSync(`unzip -q "${filePath}" -d "${CACHE_DIR}"`);
+            fs.copyFileSync(path.join(extractDir, 'node.exe'), localNodeBin);
+            fs.rmSync(extractDir, { recursive: true, force: true });
         } else {
-            execSync(`tar -xf ${fileName}`);
-            fs.copyFileSync(path.join(distName, 'bin', 'node'), localNodeBin);
-            fs.rmSync(distName, { recursive: true, force: true });
+            execSync(`tar -xf "${filePath}" -C "${CACHE_DIR}"`);
+            fs.copyFileSync(path.join(CACHE_DIR, distName, 'bin', 'node'), localNodeBin);
+            fs.rmSync(path.join(CACHE_DIR, distName), { recursive: true, force: true });
         }
         fs.chmodSync(localNodeBin, '755');
     } catch (e) {
@@ -107,6 +115,7 @@ async function buildTarget(target) {
 
     const pkg = require('./package.json');
     const outputName = `MWP-${pkg.version.replace(/\./g, '')}-${target.name}${target.ext}`;
+    const outputPath = path.join(OUTPUT_DIR, outputName);
     console.log(`Packaging to ${outputName}...`);
 
     const stubMap = {
@@ -118,7 +127,8 @@ async function buildTarget(target) {
         'macos-arm64': 'stub--darwin--arm64'
     };
     const stubName = stubMap[target.name];
-    const stubPath = path.join(__dirname, 'node_modules', 'caxa', 'stubs', stubName);
+    const caxaPkgPath = path.join(path.dirname(require.resolve('caxa')), '..');
+    const stubPath = path.join(caxaPkgPath, 'stubs', stubName);
 
     if (!fs.existsSync(stubPath)) {
         console.error(`Stub not found for ${target.name}: ${stubPath}`);
@@ -127,9 +137,9 @@ async function buildTarget(target) {
 
     try {
         const caxaPath = path.join(__dirname, 'node_modules', '.bin', 'caxa');
-        execSync(`"${caxaPath}" --no-dedupe --stub "${stubPath}" --input "${BUILD_DIR}" --output "${outputName}" -- "{{caxa}}/${nodeBinName}" "{{caxa}}/server.js"`, { stdio: 'inherit' });
+        execSync(`"${caxaPath}" --no-dedupe --stub "${stubPath}" --input "${BUILD_DIR}" --output "${outputPath}" -- "{{caxa}}/${nodeBinName}" "{{caxa}}/server.js"`, { stdio: 'inherit' });
 
-        console.log(`Success: ${outputName}`);
+        console.log(`Success: ${outputPath}`);
     } catch (e) {
         console.error(`Build failed for ${target.name}`, e);
     }
@@ -139,8 +149,10 @@ async function main() {
     await prepareBuildDir();
     for (const target of TARGETS) await buildTarget(target);
     console.log('\nAll builds finished.');
+    console.log(`Outputs available in: ${OUTPUT_DIR}`);
 
-    console.log('Cleaning up temporary build files...');
+    // Optional: Keep temp dir for debugging, or remove it
+    // if (fs.existsSync(BUILD_DIR)) fs.rmSync(BUILD_DIR, { recursive: true, force: true });
 }
 
 main();
