@@ -107,9 +107,11 @@ export default {
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.jar_name') }}</label>
-                            <div class="input-group">
-                                <CustomSelect v-model="form.jarName" :options="jars.length ? jars : (form.jarName ? [form.jarName] : [])" :placeholder="$t('panel_settings.jar_name')" />
-                                <button class="btn btn-outline-secondary" @click="fetchJars"><i class="fa-solid fa-rotate"></i></button>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div style="flex:1;min-width:0">
+                                    <CustomSelect v-model="form.jarName" :options="jars.length ? jars : (form.jarName ? [form.jarName] : [])" :placeholder="$t('panel_settings.jar_name')" />
+                                </div>
+                                <button class="btn btn-outline-secondary flex-shrink-0" @click="fetchJars"><i class="fa-solid fa-rotate"></i></button>
                             </div>
                         </div>
                         <div class="mb-0">
@@ -174,9 +176,7 @@ export default {
                     id: store.currentInstanceId,
                     ...form.value
                 };
-                if (payload.javaArgs) {
-                    payload.javaArgs = payload.javaArgs.split('\n').map(a => a.trim()).filter(a => a);
-                }
+                payload.javaArgs = (payload.javaArgs || '').split('\n').map(a => a.trim()).filter(a => a);
                 await api.post('/api/instances/update', payload);
                 showToast('instance_manager.update_success');
                 startupModal.value.hide();

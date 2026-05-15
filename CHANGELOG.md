@@ -4,6 +4,21 @@
 
 ---
 
+## [2.1.4] - 2026-05-15
+
+### 🐛 Bug 修复
+
+- **实例设置对话框布局**：修复了实例详情页右上角设置按钮弹出的对话框中，"服务器启动文件"下拉框和"刷新"按钮换行显示的问题，改为同一行并排显示
+  - 将 `input-group` 布局改为 `d-flex gap-2 align-items-center` 布局
+  - `CustomSelect` 组件包裹在 `flex:1; min-width:0` 的 div 中自动填充剩余空间
+  - 刷新按钮添加 `flex-shrink-0` 防止被压缩
+- **JVM 参数修改不生效**：修复了在实例设置对话框中修改 JVM 参数后对服务器运行没有影响的问题
+  - **后端**：`/api/instances/update` 中 `javaArgs`/`jarName`/`javaPath` 的更新条件从 truthy 检查改为 `!== undefined`，确保空数组/空字符串也能正确保存
+  - **后端**：`/api/server/start` 和新建实例逻辑中，`javaArgs` 回退条件从 `instConf.javaArgs || appConfig.javaArgs` 改为 `(instConf.javaArgs && instConf.javaArgs.length) ? ... : ...`，确保空数组时能正确回退到全局默认值
+  - **前端**：Dashboard 的 `saveStartupSettings` 中，移除了 `if (payload.javaArgs)` 判断，改为始终将字符串按行分割并过滤为空数组，确保后端始终接收到数组而非字符串
+
+---
+
 ## [2.1.3] - 2026-05-15
 
 ### 🐛 Bug 修复

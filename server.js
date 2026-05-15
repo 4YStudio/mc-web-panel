@@ -25,7 +25,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.1.3';
+const APP_VERSION = '2.1.4';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -857,7 +857,7 @@ if (cluster.isPrimary) {
             instanceConfig.instances.push({
                 id, name, dir,
                 jarName: jarName || appConfig.jarName,
-                javaArgs: javaArgs || appConfig.javaArgs,
+                javaArgs: (javaArgs && javaArgs.length) ? javaArgs : appConfig.javaArgs,
                 javaPath: javaPath || appConfig.javaPath,
                 backupStrategy: 'panel', // Default to panel for new instances
                 autoBackupEnabled: false,
@@ -881,9 +881,9 @@ if (cluster.isPrimary) {
         if (!inst) return res.status(404).json({ error: '实例不存在' });
 
         if (name) inst.name = name;
-        if (jarName) inst.jarName = jarName;
-        if (javaArgs) inst.javaArgs = javaArgs;
-        if (javaPath) inst.javaPath = javaPath;
+        if (jarName !== undefined) inst.jarName = jarName;
+        if (javaArgs !== undefined) inst.javaArgs = javaArgs;
+        if (javaPath !== undefined) inst.javaPath = javaPath;
         if (backupStrategy) inst.backupStrategy = backupStrategy;
         if (autoBackupEnabled !== undefined) inst.autoBackupEnabled = autoBackupEnabled;
         if (autoBackupInterval !== undefined) inst.autoBackupInterval = autoBackupInterval;
@@ -2900,7 +2900,7 @@ if (cluster.isPrimary) {
         const instConf = instanceConfig.instances.find(i => i.id === instanceId);
         const rawJavaPath = instConf.javaPath || appConfig.javaPath;
         const javaPath = resolveJavaPath(rawJavaPath);
-        const javaArgs = instConf.javaArgs || appConfig.javaArgs;
+        const javaArgs = (instConf.javaArgs && instConf.javaArgs.length) ? instConf.javaArgs : appConfig.javaArgs;
         const jarName = instConf.jarName || appConfig.jarName;
 
         const javaVer = await checkJavaVersion(javaPath);
