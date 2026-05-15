@@ -1,10 +1,12 @@
 /**
  * server.js - v6.0 (Advanced Backups Support)
  */
-const axios = require('axios'); // 新增 axios
+const axios = require('axios');
 const cluster = require('cluster');
-const express = require('express');
+const https = require('https');
 const http = require('http');
+const { URL } = require('url');
+const express = require('express');
 const { Server } = require('socket.io');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -23,7 +25,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.3';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -173,6 +175,45 @@ if (!appConfig.sessionSecret) {
 if (!fs.existsSync(CONFIG_FILE)) {
     fs.ensureDirSync(DATA_DIR);
     fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+}
+
+function nativeHttpGet(urlStr, options = {}) {
+    return new Promise((resolve, reject) => {
+        const parsed = new URL(urlStr);
+        const mod = parsed.protocol === 'https:' ? https : http;
+        const reqOptions = {
+            hostname: parsed.hostname,
+            port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+            path: parsed.pathname + parsed.search,
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            timeout: options.connectTimeout || 15000,
+        };
+        const req = mod.request(reqOptions, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                const redirectUrl = new URL(res.headers.location, urlStr).href;
+                if (options.maxRedirects > 0) {
+                    nativeHttpGet(redirectUrl, { ...options, maxRedirects: (options.maxRedirects || 10) - 1 })
+                        .then(resolve).catch(reject);
+                } else {
+                    reject(new Error(`Too many redirects, last status: ${res.statusCode}`));
+                }
+                return;
+            }
+            if (res.statusCode >= 400) {
+                res.resume();
+                reject(new Error(`HTTP ${res.statusCode} from ${urlStr}`));
+                return;
+            }
+            resolve(res);
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error(`连接超时: ${urlStr}`)); });
+        if (options.signal) {
+            options.signal.addEventListener('abort', () => { req.destroy(); reject(new Error('Aborted')); });
+        }
+        req.end();
+    });
 }
 
 // GitHub 代理加速
@@ -948,25 +989,26 @@ if (cluster.isPrimary) {
      * 将官方下载地址映射为国内加速或镜像源地址
      */
     const resolveJavaMirrorUrl = (originalUrl, source, featureVersion, arch, osType) => {
-        if (!originalUrl || source === 'adoptium') return originalUrl;
+        if (!originalUrl || source === 'adoptium') return { url: originalUrl, mirrorUrl: null };
 
-        // 方案 A: 使用 GitHub 代理 (最可靠)
         if (source === 'ghproxy') {
-            return applyGithubProxy(originalUrl);
+            return { url: applyGithubProxy(originalUrl), mirrorUrl: null };
         }
 
-        // 方案 B: 映射已知镜像站路径
         if (source === 'tuna' && ADOPTIUM_SOURCES.tuna) {
             try {
                 const filename = path.basename(originalUrl);
                 const imageType = originalUrl.includes('-jdk_') ? 'jdk' : 'jre';
                 const mirrorBase = ADOPTIUM_SOURCES.tuna;
-                return `${mirrorBase}/${featureVersion}/${imageType}/${arch}/${osType}/${filename}`;
-            } catch (e) { }
+                const mirrorUrl = `${mirrorBase}/${featureVersion}/${imageType}/${arch}/${osType}/${filename}`;
+                console.log(`[Java] Mirror URL for v${featureVersion} (${source}): ${mirrorUrl}`);
+                return { url: mirrorUrl, mirrorUrl: null };
+            } catch (e) {
+                console.warn(`[Java] Failed to construct mirror URL: ${e.message}`);
+            }
         }
 
-        // 默认回退到 GitHub 代理 (如果配置了)
-        return applyGithubProxy(originalUrl);
+        return { url: applyGithubProxy(originalUrl), mirrorUrl: null };
     };
 
     // GET /api/java/installed — 已安装的 Java 列表
@@ -1029,13 +1071,14 @@ if (cluster.isPrimary) {
                     if (resp.data && resp.data.length > 0) {
                         const asset = resp.data[0];
                         const originalDownloadUrl = asset.binary?.package?.link;
-                        const downloadUrl = resolveJavaMirrorUrl(originalDownloadUrl, source, fv, arch, osType);
+                        const resolved = resolveJavaMirrorUrl(originalDownloadUrl, source, fv, arch, osType);
 
                         return {
                             featureVersion: fv,
                             version: asset.version?.openjdk_version || asset.version?.semver || `${fv}`,
                             releaseName: asset.release_name,
-                            downloadUrl: downloadUrl,
+                            downloadUrl: resolved.url,
+                            fallbackUrl: (source !== 'adoptium' && originalDownloadUrl !== resolved.url) ? applyGithubProxy(originalDownloadUrl) : null,
                             size: asset.binary?.package?.size || 0,
                             imageType: typeUsed,
                             vendor: asset.vendor || 'Adoptium',
@@ -1059,7 +1102,7 @@ if (cluster.isPrimary) {
 
     // POST /api/java/install — 下载并安装 Java
     app.post('/api/java/install', requireAuth, async (req, res) => {
-        const { featureVersion, downloadUrl, version, source } = req.body;
+        const { featureVersion, downloadUrl, version, source, fallbackUrl } = req.body;
         if (!downloadUrl || !featureVersion) return res.status(400).json({ error: '参数不完整' });
 
         const id = `temurin-${featureVersion}-jre`;
@@ -1076,29 +1119,124 @@ if (cluster.isPrimary) {
         const controller = new AbortController();
         activeDownloads.set(`java-${featureVersion}`, controller);
 
+        const tryDownloadWithAxios = async (url, label) => {
+            console.log(`[Java Install] [axios] Downloading from ${label}: ${url}`);
+            io.emit('java_install_progress', { featureVersion, step: 'downloading', percent: 0, message: `正在从${label}下载...` });
+
+            const response = await axios({
+                method: 'get',
+                url,
+                responseType: 'stream',
+                timeout: 600000,
+                signal: controller.signal,
+                headers: { 'User-Agent': MODRINTH_UA },
+                validateStatus: (status) => status >= 200 && status < 400,
+                maxRedirects: 10,
+                httpAgent: new http.Agent({ timeout: 15000 }),
+                httpsAgent: new https.Agent({ timeout: 15000 })
+            });
+
+            console.log(`[Java Install] [axios] Connected to ${label}, status: ${response.status}, size: ${response.headers['content-length'] || 'unknown'}`);
+            return { stream: response.data, contentLength: parseInt(response.headers['content-length'] || '0', 10) };
+        };
+
+        const tryDownloadNative = async (url, label) => {
+            console.log(`[Java Install] [native] Downloading from ${label}: ${url}`);
+            io.emit('java_install_progress', { featureVersion, step: 'downloading', percent: 0, message: `正在从${label}下载(原生模式)...` });
+
+            const res = await nativeHttpGet(url, {
+                headers: { 'User-Agent': MODRINTH_UA },
+                maxRedirects: 10,
+                signal: controller.signal
+            });
+
+            console.log(`[Java Install] [native] Connected to ${label}, status: ${res.statusCode}, size: ${res.headers['content-length'] || 'unknown'}`);
+            return { stream: res, contentLength: parseInt(res.headers['content-length'] || '0', 10) };
+        };
+
+        const tryDownload = async (url, label) => {
+            try {
+                return await tryDownloadWithAxios(url, label);
+            } catch (axiosErr) {
+                if (controller.signal.aborted) throw axiosErr;
+                console.warn(`[Java Install] axios failed for ${label}: ${axiosErr.message}`);
+                console.log(`[Java Install] Retrying with native HTTP...`);
+                try {
+                    return await tryDownloadNative(url, label);
+                } catch (nativeErr) {
+                    if (controller.signal.aborted) throw nativeErr;
+                    throw new Error(`${label}下载失败(axios: ${axiosErr.message}, native: ${nativeErr.message})`);
+                }
+            }
+        };
+
         // Download in background with progress
         try {
             fs.ensureDirSync(installDir);
             const tmpFile = path.join(JAVA_DIR, `${id}.tar.gz`);
 
-            io.emit('java_install_progress', { featureVersion, step: 'downloading', percent: 0, message: '正在下载...' });
+            let dlResult;
+            let usedUrl = downloadUrl;
+            const sourceLabel = source === 'tuna' ? '清华镜像' : (source === 'ghproxy' ? 'GitHub代理' : '源站');
 
-            const response = await axios({
-                method: 'get',
-                url: applyGithubProxy(downloadUrl),
-                responseType: 'stream',
-                timeout: 600000, // 10 min timeout
-                signal: controller.signal
-            });
+            let urlsToTry = [{ url: downloadUrl, label: sourceLabel }];
 
-            const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+            if (fallbackUrl && fallbackUrl !== downloadUrl) {
+                urlsToTry.push({ url: fallbackUrl, label: '备用源' });
+            }
+
+            if (downloadUrl.includes('github.com') && source !== 'tuna') {
+                try {
+                    const filename = path.basename(downloadUrl);
+                    const imageType = downloadUrl.includes('-jdk_') ? 'jdk' : 'jre';
+                    const arch = os.arch() === 'x64' ? 'x64' : os.arch() === 'arm64' ? 'aarch64' : os.arch();
+                    const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'mac' : 'windows';
+                    const autoMirrorUrl = `${ADOPTIUM_SOURCES.tuna}/${featureVersion}/${imageType}/${arch}/${osType}/${filename}`;
+                    if (!urlsToTry.some(u => u.url === autoMirrorUrl)) {
+                        urlsToTry.push({ url: autoMirrorUrl, label: '清华镜像(自动)' });
+                    }
+                } catch (e) { }
+            }
+
+            if (appConfig.githubProxy && downloadUrl.includes('github.com')) {
+                const proxyUrl = applyGithubProxy(downloadUrl);
+                if (proxyUrl !== downloadUrl && !urlsToTry.some(u => u.url === proxyUrl)) {
+                    urlsToTry.push({ url: proxyUrl, label: 'GitHub代理' });
+                }
+            }
+
+            let lastError = null;
+            for (let i = 0; i < urlsToTry.length; i++) {
+                const { url, label } = urlsToTry[i];
+                try {
+                    if (i > 0) {
+                        console.log(`[Java Install] Trying fallback ${i}/${urlsToTry.length - 1}: ${label}`);
+                        io.emit('java_install_progress', { featureVersion, step: 'downloading', percent: 0, message: `正在尝试${label}...` });
+                    }
+                    dlResult = await tryDownload(url, label);
+                    usedUrl = url;
+                    lastError = null;
+                    break;
+                } catch (err) {
+                    if (controller.signal.aborted) throw err;
+                    lastError = err;
+                    console.warn(`[Java Install] ${label} failed: ${err.message}`);
+                }
+            }
+
+            if (!dlResult) {
+                const failedSources = urlsToTry.map(u => `[${u.label}]`).join(', ');
+                throw new Error(`所有下载源均失败(${failedSources}): ${lastError?.message || '未知错误'}`);
+            }
+
+            const totalBytes = dlResult.contentLength;
             let downloadedBytes = 0;
 
             const writer = fs.createWriteStream(tmpFile);
             let lastUpdateTime = Date.now();
             let lastDownloadedBytes = 0;
 
-            response.data.on('data', (chunk) => {
+            dlResult.stream.on('data', (chunk) => {
                 downloadedBytes += chunk.length;
                 const now = Date.now();
                 if (now - lastUpdateTime >= 1000) {
@@ -1117,7 +1255,7 @@ if (cluster.isPrimary) {
                 }
             });
             await pipeline(
-                response.data,
+                dlResult.stream,
                 writer,
                 { signal: controller.signal }
             );
@@ -1269,12 +1407,87 @@ if (cluster.isPrimary) {
     });
 
     // GET /api/java/sources — 获取可用下载源列表
+    app.post('/api/probe-url', requireAuth, async (req, res) => {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: '缺少 URL' });
+        try {
+            const resp = await axios.head(url, {
+                timeout: 10000,
+                headers: { 'User-Agent': MODRINTH_UA },
+                maxRedirects: 5
+            });
+            res.json({ accessible: resp.status >= 200 && resp.status < 400, status: resp.status, size: parseInt(resp.headers['content-length'] || '0', 10) });
+        } catch (e) {
+            res.json({ accessible: false, status: e.response?.status || 0, error: e.message });
+        }
+    });
+
     app.get('/api/java/sources', requireAuth, (req, res) => {
         res.json([
             { id: 'adoptium', name: 'Adoptium (Official)', url: ADOPTIUM_SOURCES.adoptium },
             { id: 'tuna', name: '清华大学镜像', url: ADOPTIUM_SOURCES.tuna },
             { id: 'ghproxy', name: 'GitHub 代理加速 (推荐)', url: appConfig.githubProxy || 'Mirror' }
         ]);
+    });
+
+    app.get('/api/java/diagnose', requireAuth, async (req, res) => {
+        const results = {};
+        const arch = os.arch() === 'x64' ? 'x64' : os.arch() === 'arm64' ? 'aarch64' : os.arch();
+        const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'mac' : 'windows';
+        const fv = 17;
+
+        results.system = { arch, os: osType, nodeVersion: process.version, platform: process.platform };
+        results.paths = { BASE_DIR, DATA_DIR, JAVA_DIR: path.join(DATA_DIR, 'java') };
+
+        const testUrl = async (label, url) => {
+            const r = { url, axios: null, native: null };
+            try {
+                const resp = await axios.head(url, { timeout: 10000, headers: { 'User-Agent': MODRINTH_UA }, maxRedirects: 5 });
+                r.axios = { ok: true, status: resp.status, size: parseInt(resp.headers['content-length'] || '0', 10) };
+            } catch (e) {
+                r.axios = { ok: false, status: e.response?.status || 0, error: e.message };
+            }
+            try {
+                const resp = await nativeHttpGet(url, { method: 'HEAD', headers: { 'User-Agent': MODRINTH_UA }, connectTimeout: 10000, maxRedirects: 5 });
+                r.native = { ok: true, status: resp.statusCode, size: parseInt(resp.headers['content-length'] || '0', 10) };
+                resp.resume();
+            } catch (e) {
+                r.native = { ok: false, error: e.message };
+            }
+            return r;
+        };
+
+        try {
+            results.adoptiumApi = await testUrl('Adoptium API', `${ADOPTIUM_SOURCES.adoptium}/info/available_releases`);
+        } catch (e) { results.adoptiumApi = { error: e.message }; }
+
+        try {
+            const assetUrl = `${ADOPTIUM_SOURCES.adoptium}/assets/latest/${fv}/hotspot?architecture=${arch}&os=${osType}&image_type=jre`;
+            const assetResp = await axios.get(assetUrl, { timeout: 15000, headers: { 'User-Agent': MODRINTH_UA } });
+            if (assetResp.data && assetResp.data[0]) {
+                const originalUrl = assetResp.data[0].binary?.package?.link;
+                const filename = path.basename(originalUrl);
+                const imageType = originalUrl.includes('-jdk_') ? 'jdk' : 'jre';
+                const mirrorUrl = `${ADOPTIUM_SOURCES.tuna}/${fv}/${imageType}/${arch}/${osType}/${filename}`;
+
+                results.originalUrl = originalUrl;
+                results.mirrorUrl = mirrorUrl;
+                results.tunaMirror = await testUrl('清华镜像', mirrorUrl);
+                results.githubDirect = await testUrl('GitHub', originalUrl);
+
+                if (appConfig.githubProxy) {
+                    const proxyUrl = applyGithubProxy(originalUrl);
+                    if (proxyUrl !== originalUrl) {
+                        results.githubProxy = { proxy: appConfig.githubProxy, proxyUrl };
+                        results.githubProxyTest = await testUrl('GitHub代理', proxyUrl);
+                    }
+                }
+            }
+        } catch (e) {
+            results.assetFetchError = e.message;
+        }
+
+        res.json(results);
     });
 
 
@@ -1341,10 +1554,18 @@ if (cluster.isPrimary) {
             const { tempDir, finalDir } = req.body;
             if (!tempDir || !finalDir) return res.status(400).json({ error: '缺少安装信息' });
 
-            // Complete the installation
+            const normalizedPluginsDir = path.resolve(PLUGINS_DIR);
+            const resolvedFinalDir = path.resolve(finalDir);
+            const resolvedTempDir = path.resolve(tempDir);
+            if (!resolvedFinalDir.startsWith(normalizedPluginsDir)) {
+                return res.status(400).json({ error: '非法的安装路径' });
+            }
+            if (!resolvedTempDir.startsWith(normalizedPluginsDir)) {
+                return res.status(400).json({ error: '非法的临时路径' });
+            }
+
             const manifest = await pluginLoader.install(finalDir);
 
-            // Cleanup the tempDir
             if (tempDir && fs.existsSync(tempDir)) {
                 try { await fs.remove(tempDir); } catch (e) { }
             }
@@ -1419,6 +1640,37 @@ if (cluster.isPrimary) {
     
     app.get('/api/plugins/translations', requireAuth, (req, res) => {
         res.json(pluginLoader.getTranslations());
+    });
+
+    app.get('/api/plugins/permissions', requireAuth, (req, res) => {
+        res.json(PluginLoader.getKnownPermissions());
+    });
+
+    app.get('/api/plugins/status', requireAuth, (req, res) => {
+        const pluginId = req.query.pluginId;
+        res.json(pluginLoader.getPluginStatus(pluginId));
+    });
+
+    app.get('/api/plugins/settings', requireAuth, (req, res) => {
+        const pluginId = req.query.pluginId;
+        res.json(pluginLoader.getPluginSettings(pluginId));
+    });
+
+    app.post('/api/plugins/settings', requireAuth, (req, res) => {
+        try {
+            const { pluginId, values } = req.body;
+            if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
+            if (!values || typeof values !== 'object') return res.status(400).json({ error: '缺少设置值' });
+            const ok = pluginLoader.updatePluginSettings(pluginId, values);
+            if (!ok) return res.status(404).json({ error: '插件设置未注册或插件不存在' });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/plugins/version', requireAuth, (req, res) => {
+        res.json({ version: PluginLoader.API_VERSION || '2.0.0' });
     });
 
 
@@ -2748,15 +3000,35 @@ if (cluster.isPrimary) {
 
 
     // Helper: Fix Multer filename encoding
-    const fixFileName = (name) => Buffer.from(name, 'latin1').toString('utf8');
+    const fixFileName = (name) => {
+        if (!name) return name;
+        let hasHighUnicode = false;
+        let hasLatin1Extended = false;
+        for (let i = 0; i < name.length; i++) {
+            const code = name.charCodeAt(i);
+            if (code > 0xFF) { hasHighUnicode = true; break; }
+            if (code >= 0x80) hasLatin1Extended = true;
+        }
+        if (hasHighUnicode || !hasLatin1Extended) return name;
+        try {
+            const decoded = Buffer.from(name, 'latin1').toString('utf8');
+            if (/[\x00-\x1f\x7f-\x9f]/.test(decoded)) return name;
+            return decoded;
+        } catch (e) {
+            return name;
+        }
+    };
 
     app.post('/api/files/upload', requireAuth, withInstance, upload.array('files'), async (req, res) => {
         const { instDir } = req;
         const targetDir = req.body.path ? path.join(instDir, req.body.path) : instDir;
         if (!targetDir.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
+        let fileNames = [];
+        try { if (req.body.fileNames) fileNames = JSON.parse(req.body.fileNames); } catch (e) {}
         try {
-            for (const file of req.files) {
-                const originalName = fixFileName(file.originalname);
+            for (let i = 0; i < req.files.length; i++) {
+                const file = req.files[i];
+                const originalName = fileNames[i] || fixFileName(file.originalname);
                 const destPath = path.join(targetDir, originalName);
                 const destDir = path.dirname(destPath);
                 if (!destDir.startsWith(instDir)) continue;
@@ -2912,10 +3184,40 @@ if (cluster.isPrimary) {
                     if (!srcPath.startsWith(instDir)) continue;
                     const ext = src.toLowerCase();
                     const zip = new AdmZip(srcPath);
-                    const extractDir = ext.endsWith('.tar.gz') || ext.endsWith('.tgz')
-                        ? srcPath.replace(/\.(tar\.gz|tgz)$/i, '')
-                        : srcPath.replace(/\.(zip|tar|gz)$/i, '');
-                    zip.extractAllTo(extractDir, true);
+                    let extractDir;
+                    if (destination) {
+                        extractDir = path.join(instDir, destination);
+                    } else {
+                        extractDir = ext.endsWith('.tar.gz') || ext.endsWith('.tgz')
+                            ? srcPath.replace(/\.(tar\.gz|tgz)$/i, '')
+                            : srcPath.replace(/\.(zip|tar|gz)$/i, '');
+                    }
+                    if (!extractDir.startsWith(instDir)) continue;
+                    await fs.ensureDir(extractDir);
+                    const entries = zip.getEntries();
+                    for (const entry of entries) {
+                        let entryName = entry.entryName;
+                        try {
+                            const rawName = entry.rawEntryName;
+                            const hasUtf8Flag = (entry.header.flags & 0x0800) !== 0;
+                            if (!hasUtf8Flag && rawName) {
+                                try {
+                                    const gbkDecoded = new TextDecoder('gbk').decode(rawName);
+                                    if (gbkDecoded && !/[\x00-\x08\x0e-\x1f]/.test(gbkDecoded)) {
+                                        entryName = gbkDecoded;
+                                    }
+                                } catch (_) {}
+                            }
+                        } catch (_) {}
+                        const outputPath = path.join(extractDir, entryName);
+                        if (!outputPath.startsWith(extractDir)) continue;
+                        if (entry.isDirectory) {
+                            await fs.ensureDir(outputPath);
+                        } else {
+                            await fs.ensureDir(path.dirname(outputPath));
+                            await fs.writeFile(outputPath, entry.getData());
+                        }
+                    }
                 }
             }
             else if (action === 'disable') {
@@ -2988,6 +3290,58 @@ if (cluster.isPrimary) {
             if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
             res.json({ content: await fs.readFile(filepath, 'utf8') });
         } catch (e) { res.status(500).send('Err'); }
+    });
+
+    app.get('/api/files/archive-list', requireAuth, withInstance, async (req, res) => {
+        const { instDir } = req;
+        try {
+            const filepath = path.join(instDir, req.query.path);
+            if (!filepath.startsWith(instDir)) return res.status(403).send('Denied');
+            if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
+            const zip = new AdmZip(filepath);
+            const entries = zip.getEntries().map(e => {
+                let name = e.entryName;
+                try {
+                    const rawName = e.rawEntryName;
+                    const hasUtf8Flag = (e.header.flags & 0x0800) !== 0;
+                    if (!hasUtf8Flag && rawName) {
+                        try {
+                            const gbkDecoded = new TextDecoder('gbk').decode(rawName);
+                            if (gbkDecoded && !/[\x00-\x08\x0e-\x1f]/.test(gbkDecoded)) {
+                                name = gbkDecoded;
+                            }
+                        } catch (_) {}
+                    }
+                } catch (_) {}
+                return {
+                    name,
+                    isDir: e.isDirectory,
+                    size: e.header.size,
+                    compressedSize: e.header.compressedSize,
+                    date: e.header.time ? new Date(e.header.time * 1000).toISOString() : null
+                };
+            });
+            res.json({ entries, total: entries.length });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.get('/api/files/preview-image', requireAuth, withInstance, async (req, res) => {
+        const { instDir } = req;
+        try {
+            const filepath = path.join(instDir, req.query.path);
+            if (!filepath.startsWith(instDir)) return res.status(403).send('Denied');
+            if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
+            const ext = path.extname(filepath).toLowerCase();
+            const mimeMap = {
+                '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
+                '.svg': 'image/svg+xml', '.ico': 'image/x-icon'
+            };
+            const mime = mimeMap[ext] || 'application/octet-stream';
+            res.setHeader('Content-Type', mime);
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            fs.createReadStream(filepath).pipe(res);
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
     app.post('/api/files/save', requireAuth, withInstance, async (req, res) => {
         const { instDir } = req;

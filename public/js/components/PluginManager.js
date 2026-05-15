@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, computed, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, onMounted, computed, getCurrentInstance, watch, nextTick } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
@@ -53,14 +53,41 @@ export default {
                                         </div>
                                     </div>
                                     <p class="text-muted small mb-3" style="line-height: 1.5; height: 3em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">{{ plugin.description }}</p>
+
+                                    <div v-if="plugin.permissions && plugin.permissions.length > 0" class="mb-3 d-flex flex-wrap gap-1">
+                                        <span v-for="perm in plugin.permissions.slice(0, 4)" :key="perm"
+                                              class="badge rounded-pill px-2 py-1" style="font-size: 0.62rem; background: var(--c-surface-elevated, #f0f0f0); color: var(--c-text-secondary, #666); border: 1px solid var(--c-border, #ddd);">
+                                            {{ perm }}
+                                        </span>
+                                        <span v-if="plugin.permissions.length > 4"
+                                              class="badge rounded-pill px-2 py-1" style="font-size: 0.62rem; background: var(--c-surface-elevated, #f0f0f0); color: var(--c-text-secondary, #666); border: 1px solid var(--c-border, #ddd);">
+                                            +{{ plugin.permissions.length - 4 }}
+                                        </span>
+                                    </div>
+
+                                    <div v-if="pluginStatusMap[plugin.id]" class="mb-2 d-flex align-items-center gap-2 small">
+                                        <i class="fa-solid fa-heart-pulse" :class="getStatusColor(pluginStatusMap[plugin.id])" style="font-size: 0.7rem;"></i>
+                                        <span class="text-muted" style="font-size: 0.7rem;">{{ pluginStatusMap[plugin.id].status || 'ok' }}</span>
+                                    </div>
+
+                                    <div v-if="plugin.error" class="mb-2 p-2 rounded-3" style="background: rgba(220,53,69,0.08); border: 1px solid rgba(220,53,69,0.2);">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <i class="fa-solid fa-circle-exclamation text-danger flex-shrink-0 mt-1" style="font-size: 0.7rem;"></i>
+                                            <div class="small text-danger" style="font-size: 0.7rem; line-height: 1.4; word-break: break-all;">{{ plugin.error }}</div>
+                                        </div>
+                                    </div>
+
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div class="d-flex align-items-center gap-2">
-                                            <span class="status-indicator" :class="plugin.enabled && plugin.loaded ? 'bg-success' : 'bg-secondary'" style="width: 6px; height: 6px;"></span>
-                                            <span class="small" :class="plugin.enabled && plugin.loaded ? 'text-success' : 'text-muted'">
-                                                {{ plugin.enabled && plugin.loaded ? $t('plugins.running') : $t('plugins.stopped') }}
+                                            <span class="status-indicator" :class="plugin.error ? 'bg-danger' : (plugin.enabled && plugin.loaded ? 'bg-success' : 'bg-secondary')" style="width: 6px; height: 6px;"></span>
+                                            <span class="small" :class="plugin.error ? 'text-danger' : (plugin.enabled && plugin.loaded ? 'text-success' : 'text-muted')">
+                                                {{ plugin.error ? $t('plugins.error') : (plugin.enabled && plugin.loaded ? $t('plugins.running') : $t('plugins.stopped')) }}
                                             </span>
                                         </div>
                                         <div class="d-flex gap-2 align-items-center">
+                                            <button v-if="pluginSettingsMap[plugin.id]" class="btn btn-sm btn-outline-info px-2 py-0" @click="openSettingsModal(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('plugins.settings') || 'Settings'">
+                                                <i class="fa-solid fa-gear"></i>
+                                            </button>
                                             <div class="form-check form-switch m-0 me-1">
                                                 <input class="form-check-input" type="checkbox" :checked="plugin.enabled"
                                                     @change="togglePlugin(plugin)" :disabled="toggling === plugin.id">
@@ -155,7 +182,16 @@ export default {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div v-if="analysisResult.manifest?.dependencies" class="mt-4 p-3 bg-warning bg-opacity-10 rounded-4 border border-warning border-opacity-25">
+                                        <div v-if="analysisResult.manifest?.permissions && analysisResult.manifest.permissions.length > 0" class="mt-3 p-3 bg-warning bg-opacity-10 rounded-3 border border-warning border-opacity-25">
+                                            <h6 class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-shield-halved me-1"></i>{{ $t('plugins.permissions_title') || '权限声明' }}</h6>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <span v-for="perm in analysisResult.manifest.permissions" :key="perm"
+                                                      class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.68rem;">
+                                                    {{ getPermissionLabel(perm) }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div v-if="analysisResult.manifest?.dependencies" class="mt-3 p-3 bg-warning bg-opacity-10 rounded-4 border border-warning border-opacity-25">
                                             <h6 class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-box-open me-1"></i>检测到依赖项</h6>
                                             <div class="d-flex flex-wrap gap-2 mb-2">
                                                 <span v-for="(ver, name) in analysisResult.manifest.dependencies" :key="name" class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2" style="font-size: 0.7rem;">
@@ -163,6 +199,14 @@ export default {
                                                 </span>
                                             </div>
                                             <p class="text-muted m-0" style="font-size: 0.7rem; line-height: 1.4;">系统将在安装过程中自动通过 NPM 下载这些依赖包。由于需要连接外部镜像源，安装时间可能会稍有延长。</p>
+                                        </div>
+                                        <div v-if="analysisResult.manifest?.pluginDependencies && Object.keys(analysisResult.manifest.pluginDependencies).length > 0" class="mt-3 p-3 bg-info bg-opacity-10 rounded-3 border border-info border-opacity-25">
+                                            <h6 class="fw-bold small mb-2 text-info"><i class="fa-solid fa-puzzle-piece me-1"></i>{{ $t('plugins.plugin_dependencies') || '插件依赖' }}</h6>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <span v-for="(ver, depId) in analysisResult.manifest.pluginDependencies" :key="depId" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.68rem;">
+                                                    {{ depId }}@{{ ver }}
+                                                </span>
+                                            </div>
                                         </div>
                                         
                                         <div v-if="analysisResult.isUpdate && analysisResult.existing" class="mt-4 p-3 bg-white bg-opacity-50 rounded-3 border border-white">
@@ -235,8 +279,64 @@ export default {
                 </div>
             </Transition>
         </Teleport>
+
+        <Teleport to="body">
+            <Transition name="modal-fade">
+                <div class="modal fade show" v-if="showSettingsModal" style="display: block; z-index: 1050;">
+                    <div class="modal-backdrop fade show" @click="closeSettingsModal" style="z-index: -1;"></div>
+                    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                        <div class="modal-content border-0 shadow-lg overflow-hidden" style="border-radius: 20px; background-color: var(--c-surface); color: var(--c-text-primary);">
+                            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                                <h5 class="modal-title fw-bold">
+                                    <i class="fa-solid fa-gear me-2 text-info"></i>
+                                    {{ settingsPlugin?.name }} - {{ $t('plugins.settings') || '设置' }}
+                                </h5>
+                                <button type="button" class="btn-close" @click="closeSettingsModal"></button>
+                            </div>
+                            <div class="modal-body px-4 py-4">
+                                <div v-if="settingsSchema && settingsSchema.fields">
+                                    <div v-for="field in settingsSchema.fields" :key="field.key" class="mb-3">
+                                        <label class="form-label small fw-bold">
+                                            {{ localize(field.label) }}
+                                            <span v-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <p v-if="field.description" class="text-muted mb-1" style="font-size: 0.72rem;">{{ localize(field.description) }}</p>
+
+                                        <select v-if="field.type === 'select'" class="form-select" v-model="settingsForm[field.key]">
+                                            <option v-for="opt in field.options" :key="opt.value" :value="opt.value">{{ localize(opt.label) }}</option>
+                                        </select>
+                                        <div v-else-if="field.type === 'boolean'" class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" v-model="settingsForm[field.key]" :id="'setting-' + field.key">
+                                            <label class="form-check-label small" :for="'setting-' + field.key">{{ localize(field.label) }}</label>
+                                        </div>
+                                        <textarea v-else-if="field.type === 'textarea'" class="form-control" v-model="settingsForm[field.key]" :rows="field.rows || 3" :placeholder="localize(field.placeholder)"></textarea>
+                                        <input v-else-if="field.type === 'number'" type="number" class="form-control" v-model.number="settingsForm[field.key]" :min="field.min" :max="field.max" :step="field.step || 1">
+                                        <input v-else type="text" class="form-control" v-model="settingsForm[field.key]" :placeholder="localize(field.placeholder)">
+                                    </div>
+                                </div>
+                                <div v-else class="text-center py-4 text-muted">
+                                    <i class="fa-solid fa-gear d-block mb-2 opacity-25" style="font-size: 2rem;"></i>
+                                    <p>{{ $t('plugins.no_settings') || '该插件未注册设置项' }}</p>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                                <button class="btn rounded-pill px-4" @click="closeSettingsModal" :class="store.isDark ? 'btn-outline-light' : 'btn-light'">{{ $t('common.cancel') }}</button>
+                                <button v-if="settingsSchema && settingsSchema.fields" class="btn btn-outline-warning rounded-pill px-4" @click="resetSettings">
+                                    <i class="fa-solid fa-rotate-left me-1"></i>{{ $t('common.reset') || '重置' }}
+                                </button>
+                                <button v-if="settingsSchema && settingsSchema.fields" class="btn btn-primary rounded-pill px-4 fw-bold" @click="saveSettings" :disabled="savingSettings">
+                                    <span v-if="savingSettings" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="fa-solid fa-check me-1"></i>{{ $t('common.save') || '保存' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
     `,
+
     setup() {
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
@@ -265,12 +365,35 @@ export default {
         const showUninstallConfirm = ref(false);
         const pluginToUninstall = ref(null);
         const uninstallConfirmName = ref('');
+        const knownPermissions = ref({});
+        const pluginStatusMap = ref({});
+        const pluginSettingsMap = ref({});
+        const showSettingsModal = ref(false);
+        const settingsPlugin = ref(null);
+        const settingsSchema = ref(null);
+        const settingsForm = reactive({});
+        const savingSettings = ref(false);
 
         const refreshPlugins = async () => {
             loading.value = true;
             try {
-                const res = await api.get('/api/plugins/list?lang=' + (store.lang || 'zh'));
-                plugins.value = res.data;
+                const [listRes, permRes, statusRes, settingsRes] = await Promise.allSettled([
+                    api.get('/api/plugins/list?lang=' + (store.lang || 'zh')),
+                    api.get('/api/plugins/permissions'),
+                    api.get('/api/plugins/status'),
+                    api.get('/api/plugins/settings')
+                ]);
+                if (listRes.status === 'fulfilled') plugins.value = listRes.value.data;
+                if (permRes.status === 'fulfilled') knownPermissions.value = permRes.value.data;
+                if (statusRes.status === 'fulfilled') pluginStatusMap.value = statusRes.value.data;
+                if (settingsRes.status === 'fulfilled') {
+                    const allSettings = settingsRes.value.data;
+                    const map = {};
+                    for (const [id, s] of Object.entries(allSettings)) {
+                        if (s && s.schema) map[id] = s;
+                    }
+                    pluginSettingsMap.value = map;
+                }
             } catch (e) {
                 showToast(e.response?.data?.error || e.message, 'danger');
             } finally {
@@ -278,16 +401,33 @@ export default {
             }
         };
 
+        const getPermissionLabel = (perm) => {
+            const info = knownPermissions.value[perm];
+            if (info && info.label) return localize(info.label);
+            return perm;
+        };
+
+        const getStatusColor = (status) => {
+            if (!status) return 'text-muted';
+            const s = (status.status || '').toLowerCase();
+            if (s === 'ok' || s === 'healthy' || s === 'running') return 'text-success';
+            if (s === 'warning' || s === 'degraded') return 'text-warning';
+            if (s === 'error' || s === 'critical' || s === 'unhealthy') return 'text-danger';
+            return 'text-muted';
+        };
+
         const togglePlugin = async (plugin) => {
             toggling.value = plugin.id;
             try {
                 const action = plugin.enabled ? 'disable' : 'enable';
                 await api.post(`/api/plugins/${action}`, { pluginId: plugin.id });
-                showToast($t(`plugins.${action}d_success`, { name: plugin.name }) + ' (若未生效请尝试重启面板)', 'success');
+                showToast($t(`plugins.${action}d_success`, { name: plugin.name }) + (action === 'enable' ? '' : ' (若未生效请尝试重启面板)'), 'success');
                 await refreshPlugins();
                 if (window.loadPlugins) await window.loadPlugins();
             } catch (e) {
-                showToast(e.response?.data?.error || e.message, 'danger');
+                const errorMsg = e.response?.data?.error || e.message;
+                showToast(`${$t('plugins.error')}: ${errorMsg}`, 'danger');
+                await refreshPlugins();
             } finally {
                 toggling.value = null;
             }
@@ -309,7 +449,7 @@ export default {
         const openUpdateModal = (plugin) => {
             updatingPlugin.value = plugin;
             analysisResult.value = null;
-            disclaimerAccepted.value = true; // Skip disclaimer for updates
+            disclaimerAccepted.value = true;
             showUninstallConfirm.value = false;
             showInstallModal.value = true;
         };
@@ -317,7 +457,6 @@ export default {
         const closeInstallModal = () => {
             if (installing.value) return;
             showInstallModal.value = false;
-            // Delay clearing to allow animation to finish
             setTimeout(() => {
                 updatingPlugin.value = null;
                 analysisResult.value = null;
@@ -345,7 +484,6 @@ export default {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 analysisResult.value = res.data.analysis;
-                // If it's an update, skip disclaimer
                 if (analysisResult.value?.isUpdate) {
                     disclaimerAccepted.value = true;
                 }
@@ -400,6 +538,56 @@ export default {
             }
         };
 
+        const openSettingsModal = (plugin) => {
+            const settingsInfo = pluginSettingsMap.value[plugin.id];
+            if (!settingsInfo || !settingsInfo.schema) return;
+            settingsPlugin.value = plugin;
+            settingsSchema.value = settingsInfo.schema;
+            Object.keys(settingsForm).forEach(k => delete settingsForm[k]);
+            if (settingsInfo.values) {
+                Object.assign(settingsForm, settingsInfo.values);
+            }
+            if (settingsSchema.value.defaults) {
+                for (const [k, v] of Object.entries(settingsSchema.value.defaults)) {
+                    if (settingsForm[k] === undefined) settingsForm[k] = v;
+                }
+            }
+            showSettingsModal.value = true;
+        };
+
+        const closeSettingsModal = () => {
+            showSettingsModal.value = false;
+            setTimeout(() => {
+                settingsPlugin.value = null;
+                settingsSchema.value = null;
+                Object.keys(settingsForm).forEach(k => delete settingsForm[k]);
+            }, 300);
+        };
+
+        const saveSettings = async () => {
+            if (!settingsPlugin.value) return;
+            savingSettings.value = true;
+            try {
+                await api.post('/api/plugins/settings', {
+                    pluginId: settingsPlugin.value.id,
+                    values: { ...settingsForm }
+                });
+                showToast(($t('plugins.settings_saved') || '设置已保存'), 'success');
+                await refreshPlugins();
+                closeSettingsModal();
+            } catch (e) {
+                showToast(e.response?.data?.error || e.message, 'danger');
+            } finally {
+                savingSettings.value = false;
+            }
+        };
+
+        const resetSettings = async () => {
+            if (!settingsSchema.value || !settingsSchema.value.defaults) return;
+            Object.keys(settingsForm).forEach(k => delete settingsForm[k]);
+            Object.assign(settingsForm, { ...settingsSchema.value.defaults });
+        };
+
         const compareVersions = (v1, v2) => {
             const parts1 = v1.split('.').map(Number);
             const parts2 = v2.split('.').map(Number);
@@ -421,7 +609,10 @@ export default {
             showInstallModal, disclaimerAccepted, disclaimerChecked, installPath, installing, installFileInput,
             refreshPlugins, togglePlugin, exportPlugin, askUninstall, confirmUninstall, startUpload, confirmInstall, openInstallModal, openUpdateModal, closeInstallModal,
             updatingPlugin, analysisResult, hasFile, handleFileChange, compareVersions,
-            showUninstallConfirm, pluginToUninstall, uninstallConfirmName
+            showUninstallConfirm, pluginToUninstall, uninstallConfirmName,
+            knownPermissions, getPermissionLabel, pluginStatusMap, getStatusColor,
+            pluginSettingsMap, showSettingsModal, settingsPlugin, settingsSchema, settingsForm,
+            openSettingsModal, closeSettingsModal, saveSettings, resetSettings, savingSettings
         };
     }
 };

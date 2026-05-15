@@ -8,7 +8,7 @@ export default {
     <div class="h-100 d-flex flex-column">
         <Transition name="fade" mode="out-in">
             <!-- 1. 文件列表视图 -->
-            <div v-if="!editingFile" class="d-flex flex-column h-100" key="list"
+            <div v-if="!editingFile && !previewingFile" class="d-flex flex-column h-100" key="list"
                 @dragenter.prevent="dragCounter++; isDragging = true" @dragleave.prevent="dragCounter--; if (dragCounter <= 0) { isDragging = false; dragCounter = 0; }" @dragover.prevent @drop.prevent="dragCounter = 0; isDragging = false; handleDrop($event)">
                 <!-- 页面标题 -->
                 <div class="page-header d-flex justify-content-between align-items-center">
@@ -93,8 +93,8 @@ export default {
                                 <tr v-for="f in filteredFiles" :key="f.name" class="file-row" :class="{selected: selectedFiles.includes(f.name)}">
                                     <td @click.stop class="px-3"><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
                                     
-                                    <!-- 点击名称：文件夹进入，文件尝试编辑 -->
-                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : editFile(f.name)" class="py-2 pe-0 cursor-pointer">
+                                    <!-- 点击名称：文件夹进入，图片预览，压缩包预览，其他文件编辑 -->
+                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : isImageFile(f.name) ? previewImage(f.name) : isArchive(f.name) ? previewArchive(f.name) : editFile(f.name)" class="py-2 pe-0 cursor-pointer">
                                         <div class="d-flex align-items-center">
                                             <i class="fa-solid me-2 flex-shrink-0" :class="getIcon(f)" style="width: 1.2rem; text-align: center;"></i>
                                             <span class="text-truncate flex-grow-1" style="max-width: calc(100vw - 180px);">{{ f.name }}</span>
@@ -155,7 +155,7 @@ export default {
             </div>
             
             <!-- 2. 编辑器视图 (全屏模式) -->
-            <div v-else class="d-flex flex-column h-100" key="editor">
+            <div v-else-if="editingFile" class="d-flex flex-column h-100" key="editor">
                 <div class="card h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden;">
                     <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 px-3">
                         <div class="d-flex align-items-center overflow-hidden">
@@ -184,6 +184,60 @@ export default {
                     ></textarea>
                 </div>
             </div>
+
+            <!-- 3. 预览视图 -->
+            <div v-else-if="previewingFile" class="d-flex flex-column h-100" key="preview">
+                <div class="card h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 px-3">
+                        <div class="d-flex align-items-center overflow-hidden">
+                            <i class="fa-solid me-2 flex-shrink-0" :class="previewType === 'image' ? 'fa-file-image text-primary' : 'fa-file-zipper text-danger'"></i>
+                            <span class="fw-bold text-truncate" style="max-width: 300px;">{{ previewingFile.split('/').pop() }}</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button v-if="previewType === 'archive'" class="btn btn-sm btn-warning px-2 px-md-3" @click="askExtract(previewingFile.split('/').pop())">
+                                <i class="fa-solid fa-box-open me-md-1"></i><span class="d-none d-md-inline">{{ $t('files.extract') }}</span>
+                            </button>
+                            <button class="btn btn-sm btn-secondary px-2 px-md-3" @click="closePreview">
+                                <i class="fa-solid fa-xmark me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.close') }}</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 overflow-auto custom-scrollbar p-3">
+                        <!-- 图片预览 -->
+                        <div v-if="previewType === 'image'" class="d-flex align-items-center justify-content-center h-100">
+                            <img :src="previewData" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;" @error="previewData = ''">
+                        </div>
+                        <!-- 压缩包预览 -->
+                        <div v-else-if="previewType === 'archive'">
+                            <div v-if="previewData && previewData.length > 0">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead>
+                                        <tr class="small text-uppercase text-muted">
+                                            <th>{{ $t('common.name') }}</th>
+                                            <th style="width: 80px;">{{ $t('common.size') }}</th>
+                                            <th style="width: 80px;" class="d-none d-sm-table-cell">{{ $t('files.compress') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="entry in previewData" :key="entry.name">
+                                            <td class="text-truncate" style="max-width: 400px;">
+                                                <i class="fa-solid me-1" :class="entry.isDir ? 'fa-folder text-warning' : 'fa-file text-muted'" style="width: 1rem;"></i>
+                                                {{ entry.name }}
+                                            </td>
+                                            <td class="small">{{ entry.isDir ? '-' : formatSize(entry.size) }}</td>
+                                            <td class="small d-none d-sm-table-cell">{{ entry.isDir ? '-' : formatSize(entry.compressedSize) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div v-else class="text-center text-muted py-5">
+                                <i class="fa-solid fa-spinner fa-spin fa-2x mb-2 d-block"></i>
+                                {{ $t('common.loading') }}...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </Transition>
     </div>
     `,
@@ -206,6 +260,9 @@ export default {
         const folderUp = ref(null);
         const isDragging = ref(false);
         const dragCounter = ref(0);
+        const previewingFile = ref(null);
+        const previewType = ref('');
+        const previewData = ref(null);
 
         // ... computed ...
         const pathParts = computed(() => currentPath.value ? currentPath.value.split('/') : []);
@@ -216,25 +273,79 @@ export default {
         const filteredFiles = computed(() => fileList.value.filter(f => f.name.toLowerCase().includes(searchQuery.value.toLowerCase())));
         const selectedArchiveFiles = computed(() => selectedFiles.value.filter(f => isArchive(f)));
         watch(selectAll, (v) => selectedFiles.value = v ? filteredFiles.value.map(f => f.name) : []);
-        const getIcon = (f) => { if (f.isDir) return 'fa-folder text-warning'; if (f.name.endsWith('.jar')) return 'fa-cube text-success'; if (/\.(json|toml|yaml|yml|conf|properties)$/.test(f.name)) return 'fa-file-code text-info'; if (/\.(log|txt|md)$/.test(f.name)) return 'fa-file-lines text-secondary'; if (/\.(zip|tar|gz)$/.test(f.name)) return 'fa-file-zipper text-danger'; return 'fa-file text-muted'; };
+        const getIcon = (f) => { if (f.isDir) return 'fa-folder text-warning'; if (f.name.endsWith('.jar')) return 'fa-cube text-success'; if (/\.(json|toml|yaml|yml|conf|properties)$/.test(f.name)) return 'fa-file-code text-info'; if (/\.(log|txt|md)$/.test(f.name)) return 'fa-file-lines text-secondary'; if (/\.(zip|tar|gz)$/.test(f.name)) return 'fa-file-zipper text-danger'; if (/\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)$/.test(f.name)) return 'fa-file-image text-primary'; return 'fa-file text-muted'; };
         const formatSize = (bytes) => { if (bytes === 0) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]; };
         const isArchive = (name) => /\.(zip|tar\.gz|tgz|tar|gz)$/i.test(name);
-        const extractFile = (name) => operateFiles('extract', [name]);
-        const extractSelected = () => { selectedArchiveFiles.value.forEach(f => extractFile(f)); selectedFiles.value = selectedFiles.value.filter(f => !isArchive(f)); };
+        const isImageFile = (name) => /\.(png|jpg|jpeg|gif|webp|bmp|svg|ico)$/i.test(name);
+        const previewImage = (name) => {
+            previewingFile.value = joinPath(currentPath.value, name);
+            previewType.value = 'image';
+            const params = new URLSearchParams({ path: joinPath(currentPath.value, name) });
+            if (store.currentInstanceId) params.set('instanceId', store.currentInstanceId);
+            previewData.value = `/api/files/preview-image?${params.toString()}`;
+        };
+        const previewArchive = async (name) => {
+            previewingFile.value = joinPath(currentPath.value, name);
+            previewType.value = 'archive';
+            previewData.value = [];
+            try {
+                const res = await api.get(`/api/files/archive-list?path=${encodeURIComponent(joinPath(currentPath.value, name))}`);
+                previewData.value = res.data.entries || [];
+            } catch (e) {
+                showToast($t('common.error'), 'danger');
+            }
+        };
+        const closePreview = () => {
+            previewingFile.value = null;
+            previewType.value = '';
+            previewData.value = null;
+        };
+        const askExtract = (name) => {
+            const defaultDest = name.replace(/\.(zip|tar\.gz|tgz|tar|gz)$/i, '');
+            openModal({
+                title: $t('files.modal_extract_title'),
+                message: $t('files.modal_extract_dest'),
+                mode: 'input',
+                inputValue: defaultDest,
+                placeholder: defaultDest,
+                callback: async (dest) => {
+                    const destPath = dest ? joinPath(currentPath.value, dest) : joinPath(currentPath.value, defaultDest);
+                    await operateFilesWithProgress('extract', [name], destPath);
+                }
+            });
+        };
+        const extractFile = (name) => askExtract(name);
+        const extractSelected = () => {
+            if (selectedArchiveFiles.value.length === 0) return;
+            if (selectedArchiveFiles.value.length === 1) {
+                askExtract(selectedArchiveFiles.value[0]);
+            } else {
+                selectedArchiveFiles.value.forEach(f => {
+                    const defaultDest = f.replace(/\.(zip|tar\.gz|tgz|tar|gz)$/i, '');
+                    operateFilesWithProgress('extract', [f], joinPath(currentPath.value, defaultDest));
+                });
+            }
+            selectedFiles.value = selectedFiles.value.filter(f => !isArchive(f));
+        };
 
         const handleDrop = async (e) => {
             isDragging.value = false;
             const items = e.dataTransfer.items;
             const files = [];
-            if (items) {
+            if (items && items.length > 0) {
+                const entries = [];
                 for (let i = 0; i < items.length; i++) {
+                    if (items[i].kind !== 'file') continue;
                     const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
                     if (entry) {
-                        await collectFilesFromEntry(entry, '', files);
-                    } else if (items[i].kind === 'file') {
+                        entries.push(entry);
+                    } else {
                         const f = items[i].getAsFile();
                         if (f) files.push({ file: f, relativePath: f.name });
                     }
+                }
+                for (const entry of entries) {
+                    await collectFilesFromEntry(entry, '', files);
                 }
             } else {
                 for (let i = 0; i < e.dataTransfer.files.length; i++) {
@@ -252,17 +363,17 @@ export default {
                 files.push({ file, relativePath: basePath + file.name });
             } else if (entry.isDirectory) {
                 const reader = entry.createReader();
-                const entries = await new Promise((resolve) => {
-                    const results = [];
+                const allEntries = [];
+                await new Promise((resolve) => {
                     const readBatch = () => {
                         reader.readEntries((batch) => {
-                            if (!batch.length) resolve(results);
-                            else { results.push(...batch); readBatch(); }
-                        });
+                            if (!batch.length) resolve();
+                            else { allEntries.push(...batch); readBatch(); }
+                        }, (err) => { console.warn('readEntries error:', err); resolve(); });
                     };
                     readBatch();
                 });
-                for (const e of entries) {
+                for (const e of allEntries) {
                     await collectFilesFromEntry(e, basePath + entry.name + '/', files);
                 }
             }
@@ -280,8 +391,13 @@ export default {
 
                 if (smallFiles.length) {
                     const fd = new FormData();
-                    for (const e of smallFiles) fd.append('files', e.file, e.relativePath);
+                    const fileNames = [];
+                    for (const e of smallFiles) {
+                        fd.append('files', e.file, e.relativePath);
+                        fileNames.push(e.relativePath);
+                    }
                     fd.append('path', currentPath.value);
+                    fd.append('fileNames', JSON.stringify(fileNames));
                     const smallTotal = smallFiles.reduce((s, e) => s + e.file.size, 0);
                     await api.post('/api/files/upload', fd, {
                         onUploadProgress: (p) => {
@@ -381,8 +497,13 @@ export default {
             try {
                 if (smallFiles.length) {
                     const fd = new FormData();
-                    for (const f of smallFiles) fd.append('files', f, f.webkitRelativePath || f.name);
+                    const fileNames = [];
+                    for (const f of smallFiles) {
+                        fd.append('files', f, f.webkitRelativePath || f.name);
+                        fileNames.push(f.webkitRelativePath || f.name);
+                    }
                     fd.append('path', currentPath.value);
+                    fd.append('fileNames', JSON.stringify(fileNames));
                     const smallTotal = smallFiles.reduce((s, f) => s + f.size, 0);
                     await api.post('/api/files/upload', fd, {
                         onUploadProgress: (p) => {
@@ -424,6 +545,28 @@ export default {
             } catch (e) { showToast($t('common.error'), 'danger'); }
         };
 
+        const operateFilesWithProgress = async (action, files, dest = '', extra = {}) => {
+            const fullFiles = files.map(f => joinPath(currentPath.value, f));
+            const isCompressOrExtract = action === 'compress' || action === 'extract';
+            if (isCompressOrExtract) {
+                store.task.visible = true;
+                store.task.title = action === 'compress' ? $t('files.compressing') : $t('files.extracting');
+                store.task.percent = -1;
+                store.task.message = files.length === 1 ? files[0] : `${files.length} files`;
+                store.task.subMessage = '';
+            }
+            try {
+                await api.post('/api/files/operate', { action, sources: fullFiles, destination: dest, ...extra });
+                showToast($t('common.success')); loadFiles();
+            } catch (e) { showToast($t('common.error'), 'danger'); }
+            finally {
+                if (isCompressOrExtract) {
+                    store.task.percent = 100;
+                    setTimeout(() => { store.task.visible = false; }, 500);
+                }
+            }
+        };
+
         const copyToClipboard = (action) => {
             clipboard.value = { action, files: [...selectedFiles.value], sourcePath: currentPath.value };
             showToast(t('files.clipboard_msg', { action: action === 'copy' ? t('files.copy') : t('files.move'), count: selectedFiles.value.length }));
@@ -451,7 +594,7 @@ export default {
                 callback: (name) => {
                     if (!name) return;
                     const finalName = name.endsWith('.zip') ? name : name + '.zip';
-                    operateFiles('compress', selectedFiles.value, currentPath.value, { compressName: finalName });
+                    operateFilesWithProgress('compress', selectedFiles.value, currentPath.value, { compressName: finalName });
                 }
             });
         };
@@ -490,7 +633,11 @@ export default {
             }
         });
 
-        const downloadFile = (name) => window.open(`/api/files/download?path=${joinPath(currentPath.value, name)}`, '_blank');
+        const downloadFile = (name) => {
+            const params = new URLSearchParams({ path: joinPath(currentPath.value, name) });
+            if (store.currentInstanceId) params.set('instanceId', store.currentInstanceId);
+            window.open(`/api/files/download?${params.toString()}`, '_blank');
+        };
 
         const refreshFiles = () => loadFiles();
         const toggleActionMenu = (name) => {
@@ -502,9 +649,11 @@ export default {
         return {
             currentPath, pathParts, fileList, filteredFiles, selectedFiles, selectAll, searchQuery,
             editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp, isDragging, dragCounter,
-            changeDir, goUp, joinPath, getIcon, formatSize, isArchive, extractFile, extractSelected, selectedArchiveFiles, handleDrop,
+            previewingFile, previewType, previewData,
+            changeDir, goUp, joinPath, getIcon, formatSize, isArchive, isImageFile, extractFile, extractSelected, selectedArchiveFiles, handleDrop,
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
             editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder,
+            previewImage, previewArchive, closePreview,
             toggleActionMenu, activeActionMenu
         };
     }

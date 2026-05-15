@@ -100,6 +100,9 @@ export default {
                 <span class="fw-bold small text-uppercase text-muted"><i class="fa-solid fa-cloud-arrow-down me-2 text-primary"></i>{{ $t('java.online_install') }}</span>
                 <div class="d-flex align-items-center gap-2">
                     <CustomSelect v-model="selectedSource" :options="sources.map(s => ({value: s.id, label: s.name}))" size="sm" width="auto" @change="fetchAvailable" />
+                    <button class="btn btn-sm btn-link text-warning p-0" @click="runDiagnose" :disabled="diagnosing" :title="'诊断下载源'">
+                        <i class="fa-solid fa-stethoscope" :class="{'fa-spin': diagnosing}"></i>
+                    </button>
                     <button class="btn btn-sm btn-link text-primary p-0" @click="fetchAvailable" :disabled="loadingAvailable" :title="$t('common.refresh')">
                         <i class="fa-solid fa-rotate" :class="{'fa-spin': loadingAvailable}"></i>
                     </button>
@@ -190,6 +193,7 @@ export default {
 
         const activeInstall = ref(null);
         const cancelling = ref(false);
+        const diagnosing = ref(false);
 
         const formattedJavaSpeed = computed(() => {
             const speed = activeInstall.value?.speed;
@@ -261,6 +265,7 @@ export default {
                 await api.post('/api/java/install', {
                     featureVersion: j.featureVersion,
                     downloadUrl: j.downloadUrl,
+                    fallbackUrl: j.fallbackUrl || null,
                     version: j.version,
                     source: selectedSource.value
                 });
@@ -330,6 +335,48 @@ export default {
             }
         };
 
+        const runDiagnose = async () => {
+            diagnosing.value = true;
+            try {
+                const res = await api.get('/api/java/diagnose');
+                const d = res.data;
+                let msg = `<div style="text-align:left;font-size:0.8rem;max-height:60vh;overflow:auto;">`;
+                msg += `<p><b>系统信息:</b> ${d.system?.platform || '?'} ${d.system?.arch || '?'} | Node ${d.system?.nodeVersion || '?'}</p>`;
+                msg += `<p><b>数据目录:</b> <code>${d.paths?.DATA_DIR || '?'}</code></p>`;
+                msg += `<p><b>Java目录:</b> <code>${d.paths?.JAVA_DIR || '?'}</code></p>`;
+                msg += `<hr style="margin:8px 0;">`;
+
+                const fmtTest = (label, test) => {
+                    if (!test) return `<p>${label}: <span class="text-muted">未测试</span></p>`;
+                    const a = test.axios?.ok ? `<span class="text-success">✓ axios OK (${test.axios.status})</span>` : `<span class="text-danger">✗ axios ${test.axios?.status || 'ERR'}: ${test.axios?.error || ''}</span>`;
+                    const n = test.native?.ok ? `<span class="text-success">✓ native OK (${test.native.status})</span>` : `<span class="text-danger">✗ native: ${test.native?.error || ''}</span>`;
+                    return `<p><b>${label}:</b><br>&nbsp;&nbsp;${a}<br>&nbsp;&nbsp;${n}</p>`;
+                };
+
+                msg += fmtTest('Adoptium API', d.adoptiumApi);
+                if (d.mirrorUrl) msg += `<p><b>清华镜像URL:</b> <code style="word-break:break-all;font-size:0.7rem;">${d.mirrorUrl}</code></p>`;
+                msg += fmtTest('清华镜像', d.tunaMirror);
+                if (d.originalUrl) msg += `<p><b>GitHub URL:</b> <code style="word-break:break-all;font-size:0.7rem;">${d.originalUrl}</code></p>`;
+                msg += fmtTest('GitHub直连', d.githubDirect);
+                if (d.githubProxyTest) {
+                    msg += `<p><b>GitHub代理:</b> <code style="word-break:break-all;font-size:0.7rem;">${d.githubProxy?.proxyUrl || ''}</code></p>`;
+                    msg += fmtTest('GitHub代理', d.githubProxyTest);
+                }
+                if (d.assetFetchError) msg += `<p class="text-danger"><b>元数据获取失败:</b> ${d.assetFetchError}</p>`;
+                msg += `</div>`;
+
+                openModal({
+                    title: '下载源诊断结果',
+                    message: msg,
+                    callback: () => {}
+                });
+            } catch (e) {
+                showToast('诊断失败: ' + (e.response?.data?.error || e.message), 'danger');
+            } finally {
+                diagnosing.value = false;
+            }
+        };
+
         // Listen for install progress via socket
         let socket = null;
         onMounted(async () => {
@@ -376,9 +423,9 @@ export default {
             installed, available, sources, ltsVersions, selectedSource,
             loadingInstalled, loadingAvailable, detecting,
             showAddLocal, localJavaPath, addingLocal,
-            installing, installProgress, activeInstall, cancelling, formattedJavaSpeed,
+            installing, installProgress, activeInstall, cancelling, formattedJavaSpeed, diagnosing,
             loadInstalled, fetchAvailable, installJava, removeJava,
-            addLocalJava, detectSystemJava, isInstalled, cancelInstall
+            addLocalJava, detectSystemJava, isInstalled, cancelInstall, runDiagnose
         };
     }
 };
