@@ -4,6 +4,29 @@
 
 ---
 
+## [2.1.3] - 2026-05-15
+
+### 🐛 Bug 修复
+
+- **FRP 管理器下载 404 错误**：修复了在中国网络环境下 FRP 插件下载失败返回 404 的问题
+  - 新增 `nativeHttpGet` 函数，使用 Node.js 原生 `https`/`http` 模块作为 axios 的备选下载方式，解决打包后 axios 兼容性问题
+  - 修复 `applyGithubProxy` 代理 URL 拼接逻辑：旧实现用 `url.replace()` 替换域名，改为正确的代理 URL 拼接方式（`proxy + url`）
+  - 重写下载逻辑，添加多源回退机制：依次尝试 GitHub 源站 → 用户配置的 GitHub 代理 → 内置镜像源（ghfast.top、mirror.ghproxy.com、gh-proxy.com），每个源先尝试 axios，失败后用 native HTTP 重试
+  - 改进 `/releases` 端点：GitHub API 不可达时自动尝试代理获取版本列表
+  - 添加连接超时控制（15 秒），快速失败并回退到下一个源
+  - 简化前端下载逻辑，移除冗余的 URL 探测代码（后端已自动处理回退）
+- **中文文件名上传乱码**：修复了 `fixFileName` 函数对已经是正确 UTF-8 的文件名进行双重编码的 bug
+  - 根本原因：新版浏览器（Chrome/Firefox）发送 `filename*=UTF-8''...`（RFC 5987），busboy 会正确解码为 UTF-8，但 `fixFileName` 仍然对它做 latin1→utf8 转换，导致双重编码
+  - 新增字符码点检测逻辑：如果字符串包含码点 > 0xFF 的字符（如中文字符），说明已经是正确的 UTF-8，不需要修复；如果只包含 0x80-0xFF 范围的 latin1 扩展字符，才尝试 latin1→utf8 修复
+- **删除遗留前端文件**：移除了 `public/js/components/FrpManager.js`，该文件使用错误的 API 路径 `/api/frp/*`（正确路径为 `/api/plugins/mc-panel-plugin-frp/*`），实际使用的是插件自带的 `frontend/FrpManager.js`
+
+### 🔧 优化
+
+- **FRP 下载日志增强**：每次下载尝试都有详细日志记录（源、方式、状态码、文件大小），方便排查网络问题
+- **FRP 下载进度提示**：显示当前正在使用的下载源名称（如"正在从GitHub代理下载..."），用户可感知回退过程
+
+---
+
 ## [2.1.2] - 2026-05-14
 
 ### 🐛 Bug 修复
