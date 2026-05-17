@@ -100,12 +100,19 @@ export const messages = {
             download: '前往下载',
             update_now: '立即更新',
             updating: '正在更新...',
-            current_is_latest: '您当前使用的是最新版本。'
+            current_is_latest: '您当前使用的是最新版本。',
+            released_at: '发布时间',
+            show_changelog: '查看更新日志',
+            hide_changelog: '收起更新日志'
         },
         dashboard: {
             console_title: '控制台',
             start: '启动服务器',
             stop: '停止服务器',
+            force_stop: '强制关闭',
+            force_stop_confirm_title: '强制关闭服务器',
+            force_stop_confirm_msg: '确定要强制关闭服务器吗？<br><strong class="text-danger">此操作将立即终止服务器进程，可能导致数据丢失！</strong><br>请仅在服务器无法正常关闭时使用此功能。',
+            force_stop_sent: '已发送强制关闭指令',
             state_running: '运行中',
             state_stopped: '已停止',
             server_info: 'MC 服务器信息',
@@ -806,12 +813,19 @@ export const messages = {
             download: 'Download',
             update_now: 'Update Now',
             updating: 'Updating...',
-            current_is_latest: 'You are using the latest version.'
+            current_is_latest: 'You are using the latest version.',
+            released_at: 'Released',
+            show_changelog: 'View Changelog',
+            hide_changelog: 'Hide Changelog'
         },
         dashboard: {
             console_title: 'Console',
             start: 'Start Server',
             stop: 'Stop Server',
+            force_stop: 'Force Kill',
+            force_stop_confirm_title: 'Force Kill Server',
+            force_stop_confirm_msg: 'Are you sure you want to force kill the server?<br><strong class="text-danger">This will immediately terminate the server process, which may cause data loss!</strong><br>Only use this when the server cannot be stopped normally.',
+            force_stop_sent: 'Force kill command sent',
             state_running: 'Running',
             state_stopped: 'Stopped',
             server_info: 'Minecraft Server',

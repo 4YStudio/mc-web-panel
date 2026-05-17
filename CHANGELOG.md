@@ -4,6 +4,17 @@
 
 ---
 
+## [2.1.5] - 2026-05-17
+
+### 🐛 Bug 修复
+
+- **状态指示器脉冲动画被截断**：修复了实例列表界面中服务器状态为"运行中"时，状态小绿点的脉冲圆环动画左侧被 `overflow` 截断的问题
+  - 移除了实例卡片名称容器的 `overflow-hidden` 类
+  - 状态显示区域设置 `overflow: visible`
+  - 给 `.status-indicator` 增加 `padding: 3px` 和 `box-sizing: content-box`，为动画预留空间
+
+---
+
 ## [2.1.4] - 2026-05-15
 
 ### 🐛 Bug 修复
@@ -16,6 +27,26 @@
   - **后端**：`/api/instances/update` 中 `javaArgs`/`jarName`/`javaPath` 的更新条件从 truthy 检查改为 `!== undefined`，确保空数组/空字符串也能正确保存
   - **后端**：`/api/server/start` 和新建实例逻辑中，`javaArgs` 回退条件从 `instConf.javaArgs || appConfig.javaArgs` 改为 `(instConf.javaArgs && instConf.javaArgs.length) ? ... : ...`，确保空数组时能正确回退到全局默认值
   - **前端**：Dashboard 的 `saveStartupSettings` 中，移除了 `if (payload.javaArgs)` 判断，改为始终将字符串按行分割并过滤为空数组，确保后端始终接收到数组而非字符串
+- **Java 版本显示 "Not Installed"**：修复了当实例使用非系统包管理器安装的 Java（如 Java 管理器下载的 Java）时，实例详情页控制台卡片中 Java 版本始终显示 "Not Installed" 的问题
+  - 根本原因：`system_stats` 事件中的 `javaVersion` 只检测全局默认 Java 路径（`appConfig.javaPath`，默认为 `'java'`），未考虑实例可能使用了自定义 Java 路径
+  - 在实例状态中新增 `javaVersion` 缓存字段，服务器启动时自动检测并缓存
+  - `system_stats` 事件优先使用当前实例缓存的 Java 版本，未缓存时异步检测并回退到全局版本
+  - 后端 `/api/system/update_check` 新增返回 `publishedAt`（发布时间）字段
+
+### ✨ 新功能
+
+- **更新日志显示**：检查更新发现新版本时，现在可以查看更新日志和发布时间
+  - 新增"发布时间"显示，格式化为本地化日期时间
+  - 新增"查看更新日志"按钮，点击展开/收起 Markdown 格式的更新日志
+  - 使用 marked.js 渲染 GitHub Release 的 Markdown 正文
+  - 更新日志区域限制最大高度 400px，超出自动滚动
+  - 新增 i18n 翻译键：`released_at`、`show_changelog`、`hide_changelog`（中英文）
+- **服务器强制关闭**：新增强制关闭服务器功能，当 MC 服务器无法被正常 `stop` 命令关闭时可使用
+  - 实例详情页右上角新增骷髅图标按钮（仅在服务器运行时显示），点击后弹出确认对话框
+  - 确认后发送 `SIGKILL` 信号立即终止服务器进程
+  - 后端新增 `/api/server/force_stop` API
+  - 控制台日志记录强制终止操作
+  - 新增 i18n 翻译键：`force_stop`、`force_stop_confirm_title`、`force_stop_confirm_msg`、`force_stop_sent`（中英文）
 
 ---
 

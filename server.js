@@ -25,7 +25,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.1.4';
+const APP_VERSION = '2.1.5';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -584,7 +584,8 @@ if (cluster.isPrimary) {
                 process: null,
                 onlinePlayers: new Set(),
                 logHistory: [],
-                detectedVersion: { mc: 'Unknown', loader: 'Unknown' }
+                detectedVersion: { mc: 'Unknown', loader: 'Unknown' },
+                javaVersion: ''
             });
         }
         return instancesState.get(instanceId);
@@ -822,6 +823,13 @@ if (cluster.isPrimary) {
                 // Backward compatibility: emit system_stats based on active instance
                 const activeId = instanceConfig.activeInstanceId || 'default';
                 const activeStatus = allInstancesStatus.find(s => s.id === activeId) || allInstancesStatus[0];
+                const activeInstState = getOrCreateInstanceState(activeId);
+                const activeInst = instanceConfig.instances.find(i => i.id === activeId);
+
+                if (!activeInstState.javaVersion && activeInst) {
+                    const rawPath = activeInst.javaPath || appConfig.javaPath;
+                    checkJavaVersion(rawPath).then(v => { if (v && v !== 'Not Installed') activeInstState.javaVersion = v; });
+                }
 
                 io.emit('system_stats', {
                     ...systemStats,
@@ -831,7 +839,7 @@ if (cluster.isPrimary) {
                     hasEasyAuth: activeStatus.hasEasyAuth,
                     hasVoicechat: activeStatus.hasVoicechat,
                     isSetup: activeStatus.isSetup,
-                    javaVersion: globalJavaVersion || 'Checking...',
+                    javaVersion: activeInstState.javaVersion || globalJavaVersion || 'Checking...',
                     isRunning: activeStatus.isRunning
                 });
 
@@ -2908,6 +2916,7 @@ if (cluster.isPrimary) {
             appendLog(instanceId, `[错误] Java 未找到: ${javaPath}\n`);
             return res.json({ success: false, message: `Java 未安装或二进制文件未找到: ${javaPath}` });
         }
+        instState.javaVersion = javaVer;
 
         const eulaPath = path.join(instDir, 'eula.txt');
         try { if (!await fs.pathExists(eulaPath) || !(await fs.readFile(eulaPath, 'utf8')).includes('eula=true')) await fs.writeFile(eulaPath, 'eula=true'); } catch (e) { }
@@ -2970,6 +2979,19 @@ if (cluster.isPrimary) {
     });
     app.post('/api/server/stop', requireAuth, withInstance, (req, res) => {
         if (req.instState.process) req.instState.process.stdin.write('stop\n');
+        res.json({ success: true });
+    });
+
+    app.post('/api/server/force_stop', requireAuth, withInstance, (req, res) => {
+        const proc = req.instState.process;
+        if (proc) {
+            try {
+                proc.kill('SIGKILL');
+                appendLog(req.instanceId, '[系统] 服务器进程已被强制终止\n');
+            } catch (e) {
+                return res.status(500).json({ error: '强制终止失败: ' + e.message });
+            }
+        }
         res.json({ success: true });
     });
     app.post('/api/server/command', requireAuth, withInstance, (req, res) => {
@@ -3394,7 +3416,8 @@ if (cluster.isPrimary) {
                 latestVersion,
                 currentVersion,
                 url: gh.data.html_url,
-                body: gh.data.body
+                body: gh.data.body,
+                publishedAt: gh.data.published_at
             });
         } catch (e) {
             console.error('Update check failed:', e.message);

@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import { api } from '../api.js';
-import { showToast, formatLog, t } from '../utils.js';
+import { showToast, formatLog, t, openModal } from '../utils.js';
 import { ref, nextTick, watch, onMounted } from '/js/vue.esm-browser.js';
 import SetupWizard from './SetupWizard.js';
 
@@ -22,9 +22,14 @@ export default {
                     <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-3 px-md-4 fw-bold">
                         <i class="fa-solid fa-play me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.start') }}</span>
                     </button>
-                    <button v-else @click="serverAction('stop')" class="btn btn-danger px-3 px-md-4 fw-bold">
-                        <i class="fa-solid fa-stop me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.stop') }}</span>
-                    </button>
+                    <template v-else>
+                        <button @click="serverAction('stop')" class="btn btn-danger px-3 px-md-4 fw-bold">
+                            <i class="fa-solid fa-stop me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.stop') }}</span>
+                        </button>
+                        <button @click="forceStop" class="btn btn-outline-danger px-2 px-md-3" :title="$t('dashboard.force_stop')">
+                            <i class="fa-solid fa-skull-crossbones"></i>
+                        </button>
+                    </template>
                 </div>
             </div>
 
@@ -207,6 +212,21 @@ export default {
             }
         };
 
+        const forceStop = () => {
+            openModal({
+                title: t('dashboard.force_stop_confirm_title'),
+                message: t('dashboard.force_stop_confirm_msg'),
+                callback: async () => {
+                    try {
+                        await api.post('/api/server/force_stop');
+                        showToast('dashboard.force_stop_sent');
+                    } catch (e) {
+                        showToast('common.error', 'danger');
+                    }
+                }
+            });
+        };
+
         const sendCommand = async () => {
             if (command.value) {
                 await api.post('/api/server/command', { command: command.value });
@@ -214,6 +234,6 @@ export default {
             }
         };
 
-        return { store, command, serverAction, sendCommand, formatLog, onSetupComplete, openStartupSettings, saveStartupSettings, saving, form, jars, fetchJars };
+        return { store, command, serverAction, forceStop, sendCommand, formatLog, onSetupComplete, openStartupSettings, saveStartupSettings, saving, form, jars, fetchJars };
     }
 };

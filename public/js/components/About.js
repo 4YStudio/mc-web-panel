@@ -51,12 +51,22 @@ export default {
                                         {{ updateInfo.hasUpdate ? $t('about.update_available') : $t('about.latest_version') }}
                                     </h5>
                                     <div class="mb-0" v-if="updateInfo.hasUpdate">
-                                        <p>{{ $t('about.new_version') }}: <strong>{{ updateInfo.latestVersion }}</strong></p>
+                                        <p class="mb-1">{{ $t('about.new_version') }}: <strong>v{{ updateInfo.latestVersion }}</strong></p>
+                                        <p v-if="updateInfo.publishedAt" class="mb-2 text-muted small">
+                                            <i class="fa-regular fa-clock me-1"></i>{{ $t('about.released_at') }}: {{ formatDate(updateInfo.publishedAt) }}
+                                        </p>
                                         <div class="d-flex justify-content-center gap-2 mt-2">
                                             <button @click="startUpdate" class="btn btn-success" :disabled="store.task.visible">
                                                 <i class="fa-solid fa-download me-1"></i> {{ $t('about.update_now') }}
                                             </button>
                                             <a :href="updateInfo.url" target="_blank" class="btn btn-outline-success">{{ $t('about.download') }}</a>
+                                        </div>
+                                        <div v-if="updateInfo.body" class="changelog-section mt-3 text-start">
+                                            <button class="btn btn-sm btn-outline-secondary w-100 mb-2" @click="showChangelog = !showChangelog">
+                                                <i class="fa-solid fa-scroll me-1"></i>
+                                                {{ showChangelog ? $t('about.hide_changelog') : $t('about.show_changelog') }}
+                                            </button>
+                                            <div v-if="showChangelog" class="changelog-content border rounded p-3 bg-body" v-html="renderedChangelog"></div>
                                         </div>
                                     </div>
                                     <p class="mb-0" v-else>
@@ -82,6 +92,28 @@ export default {
         const checking = ref(false);
         const updateInfo = ref(null);
         const appVersion = ref('...');
+        const showChangelog = ref(false);
+
+        const formatDate = (dateStr) => {
+            try {
+                const d = new Date(dateStr);
+                return d.toLocaleDateString(store.lang === 'zh' ? 'zh-CN' : 'en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        const renderedChangelog = computed(() => {
+            if (!updateInfo.value?.body) return '';
+            try {
+                return window.marked.parse(updateInfo.value.body, { breaks: true });
+            } catch (e) {
+                return updateInfo.value.body;
+            }
+        });
 
         const getVersion = async () => {
             try {
@@ -95,6 +127,7 @@ export default {
         const checkUpdate = async () => {
             checking.value = true;
             updateInfo.value = null;
+            showChangelog.value = false;
             try {
                 const { data } = await api.get('/api/system/update_check');
                 updateInfo.value = data;
@@ -107,14 +140,11 @@ export default {
         };
 
         const startUpdate = async () => {
-            // Show the progress modal BEFORE starting the request
-            // Socket handlers in app.js will update progress during download
             store.task.visible = true;
             store.task.title = '系统更新';
             store.task.message = '正在请求更新...';
             store.task.percent = 0;
 
-            // Setup cancellation
             store.task.canCancel = true;
             store.task.onCancel = async () => {
                 try {
@@ -127,16 +157,14 @@ export default {
 
             try {
                 await api.post('/api/system/update');
-                // Don't set state here — socket events have already updated it
             } catch (e) {
                 store.task.visible = false;
                 showToast('启动更新失败: ' + (e.response?.data?.error || e.message), 'danger');
             }
         };
 
-        // Initial fetch
         getVersion();
 
-        return { store, checkUpdate, checking, updateInfo, appVersion, ref, startUpdate };
+        return { store, checkUpdate, checking, updateInfo, appVersion, ref, startUpdate, showChangelog, renderedChangelog, formatDate };
     }
 };

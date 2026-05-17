@@ -144,9 +144,9 @@ export default {
                                         <i class="fa-solid fa-server"></i>
                                     </div>
                                 </div>
-                                <div class="overflow-hidden">
+                                <div>
                                     <h5 class="fw-bold m-0 text-truncate" style="font-size: 0.9375rem;">{{ inst.name }}</h5>
-                                    <div class="d-flex align-items-center mt-1">
+                                    <div class="d-flex align-items-center mt-1" style="overflow: visible;">
                                         <span class="status-indicator me-2" :class="inst.isRunning ? 'bg-success' : 'bg-danger'"></span>
                                         <span class="small text-muted">{{ inst.isRunning ? $t('instance_manager.state_running') : $t('instance_manager.state_stopped') }}</span>
                                     </div>
