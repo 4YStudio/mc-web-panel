@@ -1,6 +1,6 @@
 {
   "name": "mc-web-panel",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "A web panel for Minecraft servers.",
   "main": "index.js",
   "bin": "server.js",

@@ -1469,6 +1469,10 @@ h3 { font-size: 1.25rem; }
     transition: all 0.3s ease;
 }
 
+.rotate-90 {
+    transform: rotate(90deg);
+}
+
 .transition-all {
     transition: all var(--transition-base);
 }

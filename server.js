@@ -25,7 +25,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.1.5';
+const APP_VERSION = '2.1.6';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -3373,6 +3373,155 @@ if (cluster.isPrimary) {
             await fs.writeFile(filepath, req.body.content);
             res.json({ success: true });
         } catch (e) { res.status(500).send('Err'); }
+    });
+
+    const SERVER_PROPS_SCHEMA = {
+        'motd': { type: 'text' },
+        'server-port': { type: 'number' },
+        'max-players': { type: 'number' },
+        'online-mode': { type: 'boolean' },
+        'white-list': { type: 'boolean' },
+        'enable-rcon': { type: 'boolean' },
+        'rcon.password': { type: 'text' },
+        'rcon.port': { type: 'number' },
+        'gamemode': { type: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
+        'force-gamemode': { type: 'boolean' },
+        'difficulty': { type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
+        'hardcore': { type: 'boolean' },
+        'pvp': { type: 'boolean' },
+        'allow-flight': { type: 'boolean' },
+        'level-seed': { type: 'text' },
+        'level-type': { type: 'text' },
+        'level-name': { type: 'text' },
+        'generate-structures': { type: 'boolean' },
+        'generator-settings': { type: 'text' },
+        'allow-nether': { type: 'boolean' },
+        'spawn-monsters': { type: 'boolean' },
+        'spawn-animals': { type: 'boolean' },
+        'spawn-npcs': { type: 'boolean' },
+        'spawn-protection': { type: 'number' },
+        'view-distance': { type: 'number' },
+        'simulation-distance': { type: 'number' },
+        'max-tick-time': { type: 'number' },
+        'rate-limit': { type: 'number' },
+        'enable-query': { type: 'boolean' },
+        'query.port': { type: 'number' },
+        'enable-status': { type: 'boolean' },
+        'enforce-secure-profile': { type: 'boolean' },
+        'enforce-whitelist': { type: 'boolean' },
+        'entity-broadcast-range-percentage': { type: 'number' },
+        'function-permission-level': { type: 'select', options: ['1', '2', '3', '4'] },
+        'op-permission-level': { type: 'select', options: ['1', '2', '3', '4'] },
+        'player-idle-timeout': { type: 'number' },
+        'prevent-proxy-connections': { type: 'boolean' },
+        'network-compression-threshold': { type: 'number' },
+        'max-world-size': { type: 'number' },
+        'sync-chunk-writes': { type: 'boolean' },
+        'use-native-transport': { type: 'boolean' },
+        'enable-jmx-monitoring': { type: 'boolean' },
+        'broadcast-console-to-ops': { type: 'boolean' },
+        'broadcast-rcon-to-ops': { type: 'boolean' },
+        'require-resource-pack': { type: 'boolean' },
+        'resource-pack': { type: 'text' },
+        'resource-pack-sha1': { type: 'text' },
+        'resource-pack-prompt': { type: 'text' },
+        'resource-pack-id': { type: 'text' },
+        'server-ip': { type: 'text' },
+        'hide-online-players': { type: 'boolean' },
+        'initial-enabled-packs': { type: 'text' },
+        'initial-disabled-packs': { type: 'text' },
+        'max-chained-neighbor-updates': { type: 'number' },
+        'log-ips': { type: 'boolean' },
+        'region-file-compression': { type: 'select', options: ['deflate', 'lz4'] },
+        'pause-when-empty-seconds': { type: 'number' },
+        'accepts-transfers': { type: 'boolean' },
+        'enable-code-of-conduct': { type: 'boolean' },
+        'bug-report-link': { type: 'text' },
+        'text-filtering-config': { type: 'text' },
+        'text-filtering-version': { type: 'number' },
+        'management-server-enabled': { type: 'boolean' },
+        'management-server-host': { type: 'text' },
+        'management-server-port': { type: 'number' },
+        'management-server-secret': { type: 'text' },
+        'management-server-allowed-origins': { type: 'text' },
+        'management-server-tls-enabled': { type: 'boolean' },
+        'management-server-tls-keystore': { type: 'text' },
+        'management-server-tls-keystore-password': { type: 'text' },
+        'status-heartbeat-interval': { type: 'number' },
+        'enable-command-block': { type: 'boolean' }
+    };
+
+    const SERVER_PROPS_GROUPS = [
+        { titleKey: 'properties.groups.general', keys: ['motd', 'server-port', 'max-players', 'online-mode', 'white-list', 'server-ip', 'enable-status', 'hide-online-players', 'log-ips'] },
+        { titleKey: 'properties.groups.gameplay', keys: ['gamemode', 'force-gamemode', 'difficulty', 'hardcore', 'pvp', 'allow-flight', 'enforce-secure-profile', 'enforce-whitelist'] },
+        { titleKey: 'properties.groups.world', keys: ['level-seed', 'level-type', 'level-name', 'generate-structures', 'generator-settings', 'allow-nether', 'initial-enabled-packs', 'initial-disabled-packs'] },
+        { titleKey: 'properties.groups.spawning', keys: ['spawn-monsters', 'spawn-animals', 'spawn-npcs', 'spawn-protection', 'entity-broadcast-range-percentage'] },
+        { titleKey: 'properties.groups.network', keys: ['view-distance', 'simulation-distance', 'max-tick-time', 'rate-limit', 'network-compression-threshold', 'max-world-size', 'sync-chunk-writes', 'use-native-transport', 'max-chained-neighbor-updates', 'pause-when-empty-seconds'] },
+        { titleKey: 'properties.groups.security', keys: ['enable-rcon', 'rcon.password', 'rcon.port', 'enable-query', 'query.port', 'prevent-proxy-connections', 'enable-jmx-monitoring', 'broadcast-console-to-ops', 'broadcast-rcon-to-ops'] },
+        { titleKey: 'properties.groups.resource_pack', keys: ['require-resource-pack', 'resource-pack', 'resource-pack-sha1', 'resource-pack-prompt', 'resource-pack-id'] },
+        { titleKey: 'properties.groups.permissions', keys: ['function-permission-level', 'op-permission-level', 'player-idle-timeout'] },
+        { titleKey: 'properties.groups.management', keys: ['management-server-enabled', 'management-server-host', 'management-server-port', 'management-server-secret', 'management-server-allowed-origins', 'management-server-tls-enabled', 'management-server-tls-keystore', 'management-server-tls-keystore-password', 'status-heartbeat-interval'] },
+        { titleKey: 'properties.groups.other', keys: ['accepts-transfers', 'enable-code-of-conduct', 'bug-report-link', 'text-filtering-config', 'text-filtering-version', 'region-file-compression', 'enable-command-block'] }
+    ];
+
+    app.get('/api/server/properties', requireAuth, withInstance, async (req, res) => {
+        const { instDir } = req;
+        try {
+            const propsFile = path.join(instDir, 'server.properties');
+            if (!fs.existsSync(propsFile)) return res.status(404).json({ error: 'File not found' });
+            const content = await fs.readFile(propsFile, 'utf-8');
+            const lines = content.split('\n');
+            const properties = [];
+            const groupedKeys = new Set(SERVER_PROPS_GROUPS.flatMap(g => g.keys));
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+                const eqIdx = trimmed.indexOf('=');
+                if (eqIdx === -1) continue;
+                const key = trimmed.substring(0, eqIdx).trim();
+                const value = trimmed.substring(eqIdx + 1).trim();
+                const schema = SERVER_PROPS_SCHEMA[key] || { type: 'text' };
+                let parsedValue = value;
+                if (schema.type === 'boolean') parsedValue = value === 'true';
+                else if (schema.type === 'number') parsedValue = Number(value) || 0;
+                properties.push({
+                    key,
+                    value: parsedValue,
+                    rawValue: value,
+                    type: schema.type,
+                    options: schema.options || undefined,
+                    known: !!SERVER_PROPS_SCHEMA[key],
+                    grouped: groupedKeys.has(key)
+                });
+            }
+            res.json({ properties, groups: SERVER_PROPS_GROUPS, schema: SERVER_PROPS_SCHEMA });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/server/properties', requireAuth, withInstance, async (req, res) => {
+        const { instDir } = req;
+        try {
+            const propsFile = path.join(instDir, 'server.properties');
+            if (!fs.existsSync(propsFile)) return res.status(404).json({ error: 'File not found' });
+            const content = await fs.readFile(propsFile, 'utf-8');
+            const updates = req.body.properties || {};
+            let result = content;
+            for (const [key, value] of Object.entries(updates)) {
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`^(${escapedKey}\\s*=\\s*)(.*)$`, 'm');
+                if (regex.test(result)) {
+                    result = result.replace(regex, `$1${value}`);
+                } else {
+                    result += `\n${key}=${value}`;
+                }
+            }
+            await fs.writeFile(propsFile, result);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     });
 
     app.get('/api/lists/:type', requireAuth, withInstance, async (req, res) => {

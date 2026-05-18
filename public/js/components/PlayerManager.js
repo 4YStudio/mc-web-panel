@@ -1,4 +1,4 @@
-import { ref, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, computed, onMounted, onUnmounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
@@ -8,59 +8,131 @@ export default {
     components: { Avatar },
     template: `
     <div>
-        <div class="page-header"><h3 class="m-0">{{ $t('players.title') }}</h3></div>
-        
+        <div class="page-header d-flex justify-content-between align-items-center">
+            <h3 class="m-0 fw-bold"><i class="fa-solid fa-users me-2 text-primary"></i>{{ $t('players.title') }}</h3>
+        </div>
+
         <div class="card mb-4 border-primary">
-            <div class="card-header bg-primary-subtle fw-bold">{{ $t('players.online_players') }} ({{ store.onlinePlayers.length }})</div>
-            <div class="card-body">
-                <div v-if="store.onlinePlayers.length === 0" class="text-center text-muted py-3">{{ $t('players.no_online') }}</div>
-                <div class="d-flex flex-wrap gap-3">
-                    <div v-for="p in store.onlinePlayers" class="card shadow-sm" style="width: 220px;">
-                        <div class="card-body text-center p-3">
-                            <avatar :player="p" :size="64" class="mb-2 shadow-sm"></avatar>
-                            <h5 class="card-title">{{ p }}</h5>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" @click.stop="toggleDropdown(p)">{{ $t('common.actions') }}</button>
-                                <ul class="dropdown-menu w-100 shadow" :class="{show: activeDropdown === p}">
-                                    <li><a class="dropdown-item player-action-item" @click="askTeleport(p)">{{ $t('players.teleport') }}</a></li>
-                                    <li><a class="dropdown-item player-action-item" @click="askGamemode(p)">{{ $t('players.gamemode') }}</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item player-action-item" @click="sendCmd('clear ' + p)">{{ $t('players.clear_inv') }}</a></li>
-                                    <li><a class="dropdown-item player-action-item text-danger" @click="sendCmd('kill ' + p)">{{ $t('players.kill') }}</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item player-action-item text-danger" @click="sendCmd('kick ' + p)">{{ $t('players.kick') }}</a></li>
-                                    <li><a class="dropdown-item player-action-item text-danger" @click="sendCmd('ban ' + p)">{{ $t('players.ban') }}</a></li>
-                                </ul>
-                            </div>
-                        </div>
+            <div class="card-header bg-primary-subtle fw-bold d-flex justify-content-between align-items-center">
+                <span><i class="fa-solid fa-signal me-2"></i>{{ $t('players.online_players') }}</span>
+                <span class="badge bg-primary fs-6">{{ filteredOnline.length }}{{ store.onlinePlayers.length !== filteredOnline.length ? ' / ' + store.onlinePlayers.length : '' }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-2">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0" :placeholder="$t('players.search_player')" v-model="onlineFilter">
                     </div>
+                </div>
+                <div v-if="store.onlinePlayers.length === 0" class="text-center text-muted py-4">
+                    <i class="fa-solid fa-user-slash fa-2x mb-2 opacity-25"></i>
+                    <div>{{ $t('players.no_online') }}</div>
+                </div>
+                <div v-else class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:40px;"></th>
+                                <th>{{ $t('players.player_name') }}</th>
+                                <th class="text-end" style="width:1%; white-space:nowrap;">{{ $t('common.actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="p in filteredOnline" :key="p">
+                                <td><avatar :player="p" :size="28"></avatar></td>
+                                <td class="fw-bold">{{ p }}</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @click="askTeleport(p)" :title="$t('players.teleport')">
+                                            <i class="fa-solid fa-location-dot"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info" @click="askGamemode(p)" :title="$t('players.gamemode')">
+                                            <i class="fa-solid fa-gamepad"></i>
+                                        </button>
+                                        <button class="btn btn-outline-warning" @click="sendCmd('clear ' + p)" :title="$t('players.clear_inv')">
+                                            <i class="fa-solid fa-broom"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" @click="sendCmd('kill ' + p)" :title="$t('players.kill')">
+                                            <i class="fa-solid fa-skull"></i>
+                                        </button>
+                                        <button class="btn btn-outline-secondary" @click="sendCmd('kick ' + p)" :title="$t('players.kick')">
+                                            <i class="fa-solid fa-right-from-bracket"></i>
+                                        </button>
+                                        <button class="btn btn-outline-dark" @click="sendCmd('ban ' + p)" :title="$t('players.ban')">
+                                            <i class="fa-solid fa-gavel"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <div class="card-header overflow-auto no-scrollbar">
-                <ul class="nav nav-tabs card-header-tabs flex-nowrap" style="min-width: max-content;">
-                    <li class="nav-item"><a class="nav-link" :class="{active: listType==='whitelist'}" @click="listType='whitelist'; loadLists()">{{ $t('players.whitelist') }}</a></li>
-                    <li class="nav-item"><a class="nav-link" :class="{active: listType==='ops'}" @click="listType='ops'; loadLists()">{{ $t('players.ops') }}</a></li>
-                    <li class="nav-item"><a class="nav-link" :class="{active: listType==='banned-players'}" @click="listType='banned-players'; loadLists()">{{ $t('players.bans') }}</a></li>
+            <div class="card-header bg-body-tertiary py-2 px-3">
+                <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-auto no-scrollbar" style="margin: -0.5rem -0.75rem; padding: 0.5rem 0.75rem;">
+                    <li class="nav-item">
+                        <a class="nav-link" :class="{active: listType==='whitelist'}" @click="listType='whitelist'; loadLists()">
+                            <i class="fa-solid fa-shield-halved me-1"></i>{{ $t('players.whitelist') }}
+                            <span v-if="listType==='whitelist'" class="badge bg-secondary ms-1">{{ listData.length }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" :class="{active: listType==='ops'}" @click="listType='ops'; loadLists()">
+                            <i class="fa-solid fa-crown me-1"></i>{{ $t('players.ops') }}
+                            <span v-if="listType==='ops'" class="badge bg-secondary ms-1">{{ listData.length }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" :class="{active: listType==='banned-players'}" @click="listType='banned-players'; loadLists()">
+                            <i class="fa-solid fa-ban me-1"></i>{{ $t('players.bans') }}
+                            <span v-if="listType==='banned-players'" class="badge bg-secondary ms-1">{{ listData.length }}</span>
+                        </a>
+                    </li>
                 </ul>
             </div>
             <div class="card-body">
-                <div class="input-group mb-3">
-                    <input type="text" class="form-control" v-model="newPlayerName" :placeholder="$t('common.player_name')">
-                    <button class="btn btn-outline-success" @click="modifyList('add')"><i class="fa-solid fa-plus"></i> {{ $t('common.add') }}</button>
+                <div class="d-flex gap-2 mb-3">
+                    <div class="input-group input-group-sm flex-grow-1">
+                        <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0" :placeholder="$t('players.search_player')" v-model="listFilter">
+                    </div>
+                    <div class="input-group input-group-sm" style="max-width: 300px;">
+                        <input type="text" class="form-control" v-model="newPlayerName" :placeholder="$t('common.player_name')" @keyup.enter="modifyList('add')">
+                        <button class="btn btn-outline-success" @click="modifyList('add')"><i class="fa-solid fa-plus me-1"></i>{{ $t('common.add') }}</button>
+                    </div>
                 </div>
-                <ul class="list-group">
-                    <li v-for="p in listData" class="list-group-item d-flex justify-content-between align-items-center">
-                        <span class="d-flex align-items-center">
-                            <avatar :player="p.name || p" :size="24" class="me-2"></avatar> 
-                            {{ p.name || p }}
-                        </span>
-                        <button class="btn btn-sm btn-outline-danger" @click="removeListUser(p.name||p)">{{ $t('common.remove') }}</button>
-                    </li>
-                    <li v-if="listData.length===0" class="list-group-item text-muted text-center">{{ $t('players.empty') }}</li>
-                </ul>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:40px;"></th>
+                                <th>{{ $t('players.player_name') }}</th>
+                                <th v-if="listType==='banned-players'" class="d-none d-md-table-cell">{{ $t('players.reason') }}</th>
+                                <th v-if="listType==='banned-players'" class="d-none d-md-table-cell">{{ $t('players.expires') }}</th>
+                                <th style="width:80px;" class="text-end">{{ $t('common.actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="p in filteredList" :key="p.name || p">
+                                <td><avatar :player="p.name || p" :size="28"></avatar></td>
+                                <td class="fw-bold">{{ p.name || p }}</td>
+                                <td v-if="listType==='banned-players'" class="d-none d-md-table-cell small text-muted">{{ p.reason || '-' }}</td>
+                                <td v-if="listType==='banned-players'" class="d-none d-md-table-cell small text-muted">{{ p.expires === 'forever' ? $t('players.permanent') : (p.expires || '-') }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-danger" @click="removeListUser(p.name||p)" :title="$t('common.remove')">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredList.length === 0">
+                                <td :colspan="listType==='banned-players' ? 5 : 3" class="text-center text-muted py-3">{{ $t('players.empty') }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -69,8 +141,22 @@ export default {
         const listType = ref('whitelist');
         const listData = ref([]);
         const newPlayerName = ref('');
+        const onlineFilter = ref('');
+        const listFilter = ref('');
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
+
+        const filteredOnline = computed(() => {
+            const f = onlineFilter.value.toLowerCase().trim();
+            if (!f) return store.onlinePlayers;
+            return store.onlinePlayers.filter(p => p.toLowerCase().includes(f));
+        });
+
+        const filteredList = computed(() => {
+            const f = listFilter.value.toLowerCase().trim();
+            if (!f) return listData.value;
+            return listData.value.filter(p => (p.name || p).toLowerCase().includes(f));
+        });
 
         const sendCmd = async (c) => {
             if (!store.isRunning) {
@@ -110,30 +196,15 @@ export default {
             callback: (val) => sendCmd(`gamemode ${val} ${player}`)
         });
 
-        const activeDropdown = ref(null);
-
-        const toggleDropdown = (p) => {
-            activeDropdown.value = activeDropdown.value === p ? null : p;
-        };
-
-        // Close dropdown when clicking outside
-        const closeDropdown = (e) => {
-            if (!e.target.closest('.dropdown')) activeDropdown.value = null;
-        };
-
         onMounted(() => {
             sendCmd('list');
             loadLists();
-            document.addEventListener('click', closeDropdown);
         });
 
-        // Clean up listener
-        // onUnmounted(() => document.removeEventListener('click', closeDropdown)); 
-        // Note: Vue.esm-browser doesn't export onUnmounted by default in the import above, let's look at imports. 
-        // It imports { ref, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
-        // I should stick to what's available or add onUnmounted.
-        // For simplicity and safety against import errors if onUnmounted isn't exported in the minimal build users use, I will skip unmount cleanup for now or add it if easy.
-
-        return { store, listType, listData, newPlayerName, loadLists, modifyList, removeListUser, sendCmd, askTeleport, askGamemode, activeDropdown, toggleDropdown };
+        return {
+            store, listType, listData, newPlayerName, loadLists, modifyList, removeListUser,
+            sendCmd, askTeleport, askGamemode, onlineFilter, listFilter,
+            filteredOnline, filteredList
+        };
     }
 };

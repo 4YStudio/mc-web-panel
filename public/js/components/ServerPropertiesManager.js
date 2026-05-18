@@ -1,64 +1,7 @@
-import { ref, reactive, onMounted, watch, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, onMounted, watch, getCurrentInstance, computed } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
-
-// --- 配置定义 (Schema) ---
-// Keys for i18n, descriptions removed for brevity or need keys too.
-// I'll assume users accept English for direct property keys, but sections can be translated.
-// Actually, I can wrap the whole PROP_GROUPS in a function or just use Title keys.
-const PROP_GROUPS = [
-    {
-        titleKey: 'properties.groups.general',
-        items: [
-            { key: 'motd', labelKey: 'properties.labels.motd', type: 'text' },
-            { key: 'server-port', labelKey: 'properties.labels.port', type: 'number' },
-            { key: 'max-players', labelKey: 'properties.labels.max_players', type: 'number' },
-            { key: 'online-mode', labelKey: 'properties.labels.online_mode', type: 'boolean' },
-            { key: 'white-list', labelKey: 'properties.labels.white_list', type: 'boolean' },
-            { key: 'enable-rcon', labelKey: 'properties.labels.enable_rcon', type: 'boolean' }
-        ]
-    },
-    {
-        titleKey: 'properties.groups.gameplay',
-        items: [
-            { key: 'gamemode', labelKey: 'properties.labels.gamemode', type: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
-            { key: 'force-gamemode', labelKey: 'properties.labels.force_gamemode', type: 'boolean' },
-            { key: 'difficulty', labelKey: 'properties.labels.difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
-            { key: 'hardcore', labelKey: 'properties.labels.hardcore', type: 'boolean' },
-            { key: 'pvp', labelKey: 'properties.labels.pvp', type: 'boolean' },
-            { key: 'allow-flight', labelKey: 'properties.labels.allow_flight', type: 'boolean' }
-        ]
-    },
-    {
-        titleKey: 'properties.groups.world',
-        items: [
-            { key: 'level-seed', labelKey: 'properties.labels.level_seed', type: 'text' },
-            { key: 'level-type', labelKey: 'properties.labels.level_type', type: 'select', options: ['minecraft:normal', 'minecraft:flat', 'minecraft:large_biomes', 'minecraft:amplified'] },
-            { key: 'level-name', labelKey: 'properties.labels.level_name', type: 'text' },
-            { key: 'generate-structures', labelKey: 'properties.labels.generate_structures', type: 'boolean' },
-            { key: 'allow-nether', labelKey: 'properties.labels.allow_nether', type: 'boolean' }
-        ]
-    },
-    {
-        titleKey: 'properties.groups.spawning',
-        items: [
-            { key: 'spawn-monsters', labelKey: 'properties.labels.spawn_monsters', type: 'boolean' },
-            { key: 'spawn-animals', labelKey: 'properties.labels.spawn_animals', type: 'boolean' },
-            { key: 'spawn-npcs', labelKey: 'properties.labels.spawn_npcs', type: 'boolean' },
-            { key: 'difficulty', labelKey: 'properties.labels.difficulty', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] }
-        ]
-    },
-    {
-        titleKey: 'properties.groups.network',
-        items: [
-            { key: 'view-distance', labelKey: 'properties.labels.view_distance', type: 'number', min: 2, max: 32 },
-            { key: 'simulation-distance', labelKey: 'properties.labels.simulation_distance', type: 'number', min: 2, max: 32 },
-            { key: 'max-tick-time', labelKey: 'properties.labels.max_tick_time', type: 'number' },
-            { key: 'rate-limit', labelKey: 'properties.labels.rate_limit', type: 'number' }
-        ]
-    }
-];
 
 export default {
     template: `
@@ -70,13 +13,13 @@ export default {
                     <i class="fa-solid" :class="editMode==='gui'?'fa-code':'fa-sliders'"></i>
                     <span class="d-none d-md-inline ms-1">{{ editMode==='gui' ? 'Text Mode' : 'GUI Mode' }}</span>
                 </button>
-                <button class="btn btn-success" @click="saveConfig">
-                    <i class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
+                <button class="btn btn-success" @click="saveConfig" :disabled="saving">
+                    <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                    <i v-else class="fa-solid fa-save me-0 me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
                 </button>
             </div>
         </div>
 
-        <!-- 文件未找到提示 -->
         <div v-if="notFound" class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
             <i class="fa-solid fa-file-circle-exclamation fa-4x mb-3 opacity-25"></i>
             <h4>{{ $t('files.file_not_found', { name: 'server.properties' }) }}</h4>
@@ -88,7 +31,6 @@ export default {
         </div>
 
         <template v-else>
-            <!-- 服务器图标管理 -->
             <div class="card mb-4 border-secondary-subtle">
                 <div class="card-header bg-body-tertiary fw-bold">{{ $t('properties.server_icon') }}</div>
                 <div class="card-body d-flex align-items-center gap-4">
@@ -113,114 +55,117 @@ export default {
                 </div>
             </div>
 
-            <!-- 编辑区域 -->
-            <div v-if="editMode === 'gui'" class="row g-4 pb-4">
-                <div class="col-md-6" v-for="(group, idx) in PROP_GROUPS" :key="idx">
-                    <div class="card h-100 border-secondary">
-                        <div class="card-header bg-body-tertiary fw-bold">{{ $t(group.titleKey) }}</div>
-                        <div class="card-body">
-                            <div v-for="item in group.items" :key="item.key" class="mb-3 row align-items-center">
-                                <label class="col-sm-5 col-form-label small">{{ $t(item.labelKey) }}</label>
-                                <div class="col-sm-7">
-                                    
-                                    <!-- Boolean -->
-                                    <div v-if="item.type === 'boolean'" class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" v-model="formModel[item.key]">
+            <div v-if="editMode === 'gui'" class="pb-4">
+                <div class="mb-3">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0" :placeholder="$t('properties.filter')" v-model="filterText">
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div v-for="group in visibleGroups" :key="group.titleKey" class="col-lg-6">
+                        <div class="card h-100 border-secondary-subtle shadow-sm">
+                            <div class="card-header bg-body-tertiary fw-bold d-flex align-items-center">
+                                {{ $t(group.titleKey) }}
+                                <span class="badge bg-secondary ms-2">{{ group.items.length }}</span>
+                            </div>
+                            <div class="card-body">
+                                <div v-for="prop in group.items" :key="prop.key" class="mb-3 row align-items-center">
+                                    <label class="col-sm-5 col-form-label small text-break" :title="prop.key">
+                                        {{ getLabel(prop.key) }}
+                                    </label>
+                                    <div class="col-sm-7">
+                                        <div v-if="prop.type === 'boolean'" class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" v-model="formModel[prop.key]">
+                                        </div>
+                                        <CustomSelect v-else-if="prop.type === 'select'" v-model="formModel[prop.key]" :options="prop.options" size="sm" />
+                                        <input v-else-if="prop.type === 'number'" type="number" class="form-control form-control-sm" v-model.number="formModel[prop.key]">
+                                        <input v-else type="text" class="form-control form-control-sm" v-model="formModel[prop.key]">
                                     </div>
-                                    
-                                    <!-- Select -->
-                                    <CustomSelect v-else-if="item.type === 'select'" v-model="formModel[item.key]" :options="item.options" size="sm" />
-
-                                    <!-- Number/Text -->
-                                    <input v-else :type="item.type" class="form-control form-control-sm" v-model="formModel[item.key]">
-                                    
-                                    <div v-if="item.desc" class="form-text text-secondary small" style="font-size: 0.75rem;">{{ item.desc }}</div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 备份策略 -->
-                <div class="col-md-6">
-                    <div class="card h-100 border-primary-subtle shadow-sm overflow-hidden" style="border-radius: 12px;">
-                        <div class="card-header bg-primary-subtle text-primary fw-bold border-0 py-2 px-3 small text-uppercase">
-                            <i class="fa-solid fa-clock-rotate-left me-2"></i>{{ $t('properties.map_backup.strategy') }}
-                        </div>
-                        <div class="card-body p-3 d-flex flex-column">
-                            <div class="mb-3 flex-grow-1">
-                                <div class="form-check form-switch d-flex justify-content-between p-0 mb-3">
-                                    <label class="form-check-label fw-bold text-muted">{{ $t('properties.map_backup.strategy_panel') }}</label>
-                                    <input class="form-check-input ms-0" type="checkbox" :checked="backupStrategy === 'panel'" @change="backupStrategy = $event.target.checked ? 'panel' : 'mod'">
-                                </div>
-                                <div class="form-text small mt-2 opacity-75" style="font-size: 0.75rem;">
-                                    <i class="fa-solid fa-circle-info me-1"></i>
-                                    {{ $t('properties.map_backup.panel_tips') }}
-                                </div>
-                            </div>
-                            <button class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm mt-auto" @click="saveBackupStrategy">
-                                <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Fabric 核心版本 (左下角) -->
-                <div class="col-md-6">
-                    <div class="card h-100 border-info-subtle shadow-sm overflow-hidden" style="border-radius: 12px;">
-                        <div class="card-header bg-info-subtle text-info fw-bold border-0 py-2 px-3 small text-uppercase">
-                            <i class="fa-solid fa-cube me-2"></i>{{ $t('properties.fabric_version') }}
-                            <span v-if="fabricChanging" class="spinner-border spinner-border-sm text-info ms-2" role="status"></span>
-                        </div>
-                        <div class="card-body p-3 d-flex flex-column">
-                            <div class="d-flex align-items-center gap-3 mb-3 flex-grow-1">
-                                <div class="flex-fill">
-                                    <div class="small text-muted mb-1">{{ $t('properties.current_mc') }}</div>
-                                    <div class="fw-bold">{{ currentVersion.mc === 'Unknown' ? $t('common.unknown') : currentVersion.mc }}</div>
-                                </div>
-                                <div class="flex-fill">
-                                    <div class="small text-muted mb-1">{{ $t('properties.current_loader') }}</div>
-                                    <div class="fw-bold">{{ currentVersion.loader === 'Unknown' ? $t('common.unknown') : currentVersion.loader }}</div>
-                                </div>
-                            </div>
-                            <button class="btn btn-outline-info w-100 rounded-pill fw-bold mt-auto" @click="openFabricModal" :disabled="fabricChanging">
-                                <i class="fa-solid fa-arrows-rotate me-2"></i>{{ $t('properties.change_version') }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 危险区域 (右下角) -->
-                <div class="col-md-6">
-                    <div class="card h-100 border-danger-subtle">
-                        <div class="card-header bg-danger-subtle text-danger fw-bold">
-                            <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ $t('common.danger_zone') }}
-                        </div>
-                        <div class="card-body d-flex flex-column justify-content-center">
-                            <h5 class="card-title text-danger mb-2">{{ $t('panel_settings.reinstall') }}</h5>
-                            <p class="card-text text-muted small mb-3">{{ $t('panel_settings.reinstall_confirm') }}</p>
-                            <button class="btn btn-outline-danger w-100 mt-auto" @click="askReinstall">
-                                <i class="fa-solid fa-trash-can me-2"></i>{{ $t('panel_settings.reinstall') }}
-                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 文本编辑器 -->
             <div v-else class="h-100">
                 <div class="card h-100 shadow-sm">
                     <div class="card-header bg-body-tertiary small text-muted">mc_server/server.properties</div>
-                    <textarea class="form-control border-0 rounded-0 h-100" 
-                        style="font-family: monospace; resize: none; min-height: 65vh;" 
-                        v-model="fileContent" 
+                    <textarea class="form-control border-0 rounded-0 h-100"
+                        style="font-family: monospace; resize: none; min-height: 65vh;"
+                        v-model="fileContent"
                         spellcheck="false"
                     ></textarea>
                 </div>
             </div>
         </template>
 
-        <!-- Fabric 版本选择对话框 -->
+        <div class="row g-4 mt-1">
+            <div class="col-md-6">
+                <div class="card h-100 border-primary-subtle shadow-sm">
+                    <div class="card-header bg-primary-subtle text-primary fw-bold py-2 px-3 small text-uppercase">
+                        <i class="fa-solid fa-clock-rotate-left me-2"></i>{{ $t('properties.map_backup.strategy') }}
+                    </div>
+                    <div class="card-body p-3 d-flex flex-column">
+                        <div class="mb-3 flex-grow-1">
+                            <div class="form-check form-switch d-flex justify-content-between p-0 mb-3">
+                                <label class="form-check-label fw-bold text-muted">{{ $t('properties.map_backup.strategy_panel') }}</label>
+                                <input class="form-check-input ms-0" type="checkbox" :checked="backupStrategy === 'panel'" @change="backupStrategy = $event.target.checked ? 'panel' : 'mod'">
+                            </div>
+                            <div class="form-text small mt-2 opacity-75" style="font-size: 0.75rem;">
+                                <i class="fa-solid fa-circle-info me-1"></i>
+                                {{ $t('properties.map_backup.panel_tips') }}
+                            </div>
+                        </div>
+                        <button class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm mt-auto" @click="saveBackupStrategy">
+                            <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100 border-info-subtle shadow-sm">
+                    <div class="card-header bg-info-subtle text-info fw-bold py-2 px-3 small text-uppercase">
+                        <i class="fa-solid fa-cube me-2"></i>{{ $t('properties.fabric_version') }}
+                        <span v-if="fabricChanging" class="spinner-border spinner-border-sm text-info ms-2" role="status"></span>
+                    </div>
+                    <div class="card-body p-3 d-flex flex-column">
+                        <div class="d-flex align-items-center gap-3 mb-3 flex-grow-1">
+                            <div class="flex-fill">
+                                <div class="small text-muted mb-1">{{ $t('properties.current_mc') }}</div>
+                                <div class="fw-bold">{{ currentVersion.mc === 'Unknown' ? $t('common.unknown') : currentVersion.mc }}</div>
+                            </div>
+                            <div class="flex-fill">
+                                <div class="small text-muted mb-1">{{ $t('properties.current_loader') }}</div>
+                                <div class="fw-bold">{{ currentVersion.loader === 'Unknown' ? $t('common.unknown') : currentVersion.loader }}</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-info w-100 rounded-pill fw-bold mt-auto" @click="openFabricModal" :disabled="fabricChanging">
+                            <i class="fa-solid fa-arrows-rotate me-2"></i>{{ $t('properties.change_version') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100 border-danger-subtle">
+                    <div class="card-header bg-danger-subtle text-danger fw-bold">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ $t('common.danger_zone') }}
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <h5 class="card-title text-danger mb-2">{{ $t('panel_settings.reinstall') }}</h5>
+                        <p class="card-text text-muted small mb-3">{{ $t('panel_settings.reinstall_confirm') }}</p>
+                        <button class="btn btn-outline-danger w-100 mt-auto" @click="askReinstall">
+                            <i class="fa-solid fa-trash-can me-2"></i>{{ $t('panel_settings.reinstall') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="modal fade" :class="{ show: fabricModalVisible }" :style="{ display: fabricModalVisible ? 'block' : 'none' }" tabindex="-1" @click.self="closeFabricModal">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -285,7 +230,8 @@ export default {
         const fileContent = ref('');
         const notFound = ref(false);
         const formModel = reactive({});
-        const FILE_PATH = 'server.properties';
+        const filterText = ref('');
+        const saving = ref(false);
         const iconUrl = ref('/api/server/icon');
         const iconInput = ref(null);
         const hasCustomIcon = ref(false);
@@ -303,107 +249,131 @@ export default {
         const fabricChanging = ref(false);
         const fabricModalVisible = ref(false);
 
-        const openFabricModal = () => {
-            selectedMc.value = '';
-            selectedLoader.value = '';
-            loaderVersions.value = [];
-            fabricModalVisible.value = true;
-            if (mcVersions.value.length === 0) fetchMcVersions();
-        };
+        const rawProperties = ref([]);
+        const rawGroups = ref([]);
+        const rawSchema = ref({});
 
-        const closeFabricModal = () => {
-            fabricModalVisible.value = false;
-        };
-
-        const fetchCurrentVersion = async () => {
-            try {
-                const res = await api.get('/api/fabric/current-version');
-                currentVersion.mc = res.data.mc;
-                currentVersion.loader = res.data.loader;
-            } catch (e) { }
-        };
-
-        const fetchMcVersions = async () => {
-            loadingMcVersions.value = true;
-            try {
-                const res = await api.get('/api/fabric/versions/mc');
-                mcVersions.value = res.data;
-            } catch (e) {
-                showToast($t('properties.fetch_versions_fail'), 'danger');
-            } finally {
-                loadingMcVersions.value = false;
+        const getLabel = (key) => {
+            // 先尝试使用 $t，如果返回的是键本身，则直接返回键
+            const translated = $t('properties.labels.' + key);
+            if (translated !== 'properties.labels.' + key) {
+                return translated;
             }
-        };
-
-        const fetchFabricLoaders = async () => {
-            if (!selectedMc.value) return;
-            loaderVersions.value = [];
-            selectedLoader.value = '';
-            loadingLoaderVersions.value = true;
-            try {
-                const res = await api.get(`/api/fabric/versions/loader/${selectedMc.value}`);
-                loaderVersions.value = res.data;
-                if (res.data.length > 0) selectedLoader.value = res.data[0];
-            } catch (e) {
-                showToast($t('properties.fetch_versions_fail'), 'danger');
-            } finally {
-                loadingLoaderVersions.value = false;
-            }
-        };
-
-        const changeFabricVersion = () => {
-            openModal({
-                title: $t('properties.change_version'),
-                message: $t('properties.change_version_confirm', { mc: selectedMc.value, loader: selectedLoader.value }),
-                callback: async () => {
-                    fabricChanging.value = true;
-                    try {
-                        await api.post('/api/fabric/change-version', {
-                            gameVersion: selectedMc.value,
-                            loaderVersion: selectedLoader.value
-                        });
-                        showToast($t('properties.version_changing'), 'info');
-                        let checks = 0;
-                        const interval = setInterval(async () => {
-                            checks++;
-                            try {
-                                const res = await api.get('/api/fabric/current-version');
-                                if (res.data.mc === selectedMc.value && res.data.loader === selectedLoader.value) {
-                                    clearInterval(interval);
-                                    fabricChanging.value = false;
-                                    currentVersion.mc = res.data.mc;
-                                    currentVersion.loader = res.data.loader;
-                                    fabricModalVisible.value = false;
-                                    showToast($t('properties.version_change_success'), 'success');
-                                }
-                            } catch (e) { }
-                            if (checks > 60) {
-                                clearInterval(interval);
-                                fabricChanging.value = false;
-                                showToast($t('properties.version_change_timeout'), 'warning');
-                                fetchCurrentVersion();
-                            }
-                        }, 2000);
-                    } catch (e) {
-                        fabricChanging.value = false;
-                        const msg = e.response?.data?.error || e.message;
-                        showToast(msg, 'danger');
-                    }
+            // 如果 $t 失败（可能是因为键包含点号），手动查找
+            const lang = store.lang || 'zh';
+            const manualLabels = {
+                zh: {
+                    'query.port': 'Query 端口',
+                    'rcon.password': 'RCON 密码',
+                    'rcon.port': 'RCON 端口'
+                },
+                en: {
+                    'query.port': 'Query Port',
+                    'rcon.password': 'RCON Password',
+                    'rcon.port': 'RCON Port'
                 }
-            });
+            };
+            return manualLabels[lang]?.[key] ?? key;
+        };
+
+        const visibleGroups = computed(() => {
+            const filter = filterText.value.toLowerCase().trim();
+            const groups = [];
+
+            for (const group of rawGroups.value) {
+                const items = rawProperties.value.filter(p => group.keys.includes(p.key));
+                const filtered = filter
+                    ? items.filter(p => p.key.toLowerCase().includes(filter) || String(p.value).toLowerCase().includes(filter))
+                    : items;
+                if (filtered.length > 0) {
+                    groups.push({ titleKey: group.titleKey, items: filtered });
+                }
+            }
+
+            const ungrouped = rawProperties.value.filter(p => !p.grouped);
+            const filteredUngrouped = filter
+                ? ungrouped.filter(p => p.key.toLowerCase().includes(filter) || String(p.value).toLowerCase().includes(filter))
+                : ungrouped;
+            if (filteredUngrouped.length > 0) {
+                groups.push({ titleKey: 'properties.groups.other', items: filteredUngrouped });
+            }
+
+            return groups;
+        });
+
+        const loadProperties = async () => {
+            try {
+                const res = await api.get('/api/server/properties');
+                rawProperties.value = res.data.properties;
+                rawGroups.value = res.data.groups;
+                rawSchema.value = res.data.schema;
+                notFound.value = false;
+
+                for (const prop of res.data.properties) {
+                    formModel[prop.key] = prop.value;
+                }
+            } catch (e) {
+                if (e.response?.status === 404) {
+                    notFound.value = true;
+                } else {
+                    showToast($t('common.error'), 'danger');
+                }
+            }
+        };
+
+        const loadFileContent = async () => {
+            try {
+                const res = await api.get(`/api/files/content?path=server.properties`);
+                fileContent.value = res.data.content;
+            } catch (e) {
+                fileContent.value = '# Error reading server.properties';
+            }
+        };
+
+        const saveConfig = async () => {
+            saving.value = true;
+            try {
+                if (editMode.value === 'gui') {
+                    const updates = {};
+                    for (const prop of rawProperties.value) {
+                        const newVal = formModel[prop.key];
+                        if (newVal !== undefined && newVal !== prop.value) {
+                            if (prop.type === 'boolean') updates[prop.key] = newVal ? 'true' : 'false';
+                            else updates[prop.key] = String(newVal);
+                        }
+                    }
+                    if (Object.keys(updates).length > 0) {
+                        await api.post('/api/server/properties', { properties: updates });
+                        await loadProperties();
+                    }
+                } else {
+                    await api.post('/api/files/save', { filepath: 'server.properties', content: fileContent.value });
+                }
+                showToast($t('properties.restart_tips'));
+            } catch (e) {
+                showToast($t('common.error'), 'danger');
+            } finally {
+                saving.value = false;
+            }
+        };
+
+        const toggleEditMode = () => {
+            if (editMode.value === 'text') {
+                loadProperties();
+                editMode.value = 'gui';
+            } else {
+                loadFileContent();
+                editMode.value = 'text';
+            }
         };
 
         const updateIconPreview = () => {
-            // Force reload with timestamp. We assume it might exist, or let error handler catch it.
-            // Resetting hasCustomIcon to true optimistically? No, better let the img load event decide.
-            // But if we deleted it, we know it's gone.
             iconUrl.value = `/api/server/icon?t=${store.serverIconVersion}`;
-        }
-        const iconLoadError = (e) => {
+        };
+        const iconLoadError = () => {
             hasCustomIcon.value = false;
         };
 
-        // Watch global version
         watch(() => store.serverIconVersion, updateIconPreview);
         watch(() => store.stats?.backupStrategy, (val) => {
             if (val) backupStrategy.value = val;
@@ -440,86 +410,6 @@ export default {
             });
         };
 
-        // 正则：匹配 key=value (兼容空格)
-        const createRegex = (key) => new RegExp(`^${key}\\s*=\\s*(.*)$`, 'm');
-
-        const loadFile = async () => {
-            try {
-                const res = await api.get(`/api/files/content?path=${FILE_PATH}`);
-                fileContent.value = res.data.content;
-                notFound.value = false;
-                parseToGui();
-            } catch (e) {
-                if (e.response?.status === 404) {
-                    notFound.value = true;
-                } else {
-                    fileContent.value = '# Error reading server.properties';
-                    showToast($t('common.error'), 'danger');
-                }
-            }
-        };
-
-        // 解析文本到 GUI 模型
-        const parseToGui = () => {
-            const text = fileContent.value;
-            PROP_GROUPS.forEach(group => {
-                group.items.forEach(item => {
-                    const match = text.match(createRegex(item.key));
-                    if (match) {
-                        let valStr = match[1].trim();
-                        if (item.type === 'boolean') formModel[item.key] = (valStr === 'true');
-                        else if (item.type === 'number') formModel[item.key] = Number(valStr);
-                        else formModel[item.key] = valStr;
-                    } else {
-                        // 默认值处理
-                        formModel[item.key] = item.type === 'boolean' ? false : '';
-                    }
-                });
-            });
-        };
-
-        // 将 GUI 模型回写到文本 (保留注释)
-        const syncToText = () => {
-            let text = fileContent.value;
-            // 记录哪些key已经被替换
-            const updatedKeys = new Set();
-
-            PROP_GROUPS.forEach(group => {
-                group.items.forEach(item => {
-                    if (formModel[item.key] !== undefined) {
-                        const regex = createRegex(item.key);
-                        if (regex.test(text)) {
-                            // 替换现有行
-                            text = text.replace(regex, `${item.key}=${formModel[item.key]}`);
-                            updatedKeys.add(item.key);
-                        } else {
-                            // 如果原文件中没有这个key，追加到末尾
-                            text += `\n${item.key}=${formModel[item.key]}`;
-                        }
-                    }
-                });
-            });
-            fileContent.value = text;
-        };
-
-        const saveConfig = async () => {
-            if (editMode.value === 'gui') syncToText();
-            try {
-                await api.post('/api/files/save', { filepath: FILE_PATH, content: fileContent.value });
-                showToast($t('properties.restart_tips'));
-            } catch (e) { showToast($t('common.error'), 'danger'); }
-        };
-
-        const toggleEditMode = () => {
-            if (editMode.value === 'text') {
-                parseToGui();
-                editMode.value = 'gui';
-            } else {
-                syncToText();
-                editMode.value = 'text';
-            }
-        };
-
         const askReinstall = () => {
             openModal({
                 title: $t('panel_settings.reinstall'),
@@ -528,9 +418,7 @@ export default {
                     try {
                         await api.post('/api/setup/reinstall');
                         showToast($t('panel_settings.reinstall_success'));
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 2000);
+                        setTimeout(() => { window.location.reload(); }, 2000);
                     } catch (e) {
                         showToast((e.response?.data?.error || e.message), 'danger');
                     }
@@ -538,13 +426,79 @@ export default {
             });
         };
 
-        onMounted(() => {
-            loadFile();
-            updateIconPreview();
-            fetchCurrentVersion();
-        });
+        const openFabricModal = () => {
+            selectedMc.value = '';
+            selectedLoader.value = '';
+            loaderVersions.value = [];
+            fabricModalVisible.value = true;
+            if (mcVersions.value.length === 0) fetchMcVersions();
+        };
 
+        const closeFabricModal = () => {
+            fabricModalVisible.value = false;
+        };
 
+        const fetchCurrentVersion = async () => {
+            try {
+                const res = await api.get('/api/fabric/current-version');
+                currentVersion.mc = res.data.mc;
+                currentVersion.loader = res.data.loader;
+            } catch (e) { }
+        };
+
+        const fetchMcVersions = async () => {
+            loadingMcVersions.value = true;
+            try {
+                const res = await api.get('/api/fabric/versions/mc');
+                mcVersions.value = res.data;
+            } catch (e) {
+                showToast($t('properties.fetch_versions_fail'), 'danger');
+            } finally {
+                loadingMcVersions.value = false;
+            }
+        };
+
+        const fetchFabricLoaders = async () => {
+            if (!selectedMc.value) return;
+            loadingLoaderVersions.value = true;
+            selectedLoader.value = '';
+            loaderVersions.value = [];
+            try {
+                const res = await api.get(`/api/fabric/versions/loader?mc=${selectedMc.value}`);
+                loaderVersions.value = res.data;
+            } catch (e) {
+                showToast($t('properties.fetch_versions_fail'), 'danger');
+            } finally {
+                loadingLoaderVersions.value = false;
+            }
+        };
+
+        const changeFabricVersion = async () => {
+            if (!selectedMc.value || !selectedLoader.value) return;
+            openModal({
+                title: $t('properties.change_version'),
+                message: $t('properties.change_version_confirm', { mc: selectedMc.value, loader: selectedLoader.value }),
+                callback: async () => {
+                    fabricChanging.value = true;
+                    closeFabricModal();
+                    store.task.visible = true;
+                    store.task.title = $t('properties.version_changing');
+                    store.task.message = `${selectedMc.value} / ${selectedLoader.value}`;
+                    store.task.percent = 0;
+                    try {
+                        await api.post('/api/fabric/change-version', { mc: selectedMc.value, loader: selectedLoader.value });
+                        fabricChanging.value = false;
+                        store.task.visible = false;
+                        showToast($t('properties.version_change_success'));
+                        fetchCurrentVersion();
+                    } catch (e) {
+                        fabricChanging.value = false;
+                        store.task.visible = false;
+                        showToast(e.response?.data?.error || $t('common.error'), 'danger');
+                    }
+                }
+            });
+        };
 
         const saveBackupStrategy = async () => {
             try {
@@ -558,14 +512,21 @@ export default {
             }
         };
 
+        onMounted(() => {
+            loadProperties();
+            updateIconPreview();
+            fetchCurrentVersion();
+        });
+
         return {
-            editMode, fileContent, formModel, PROP_GROUPS, notFound,
+            editMode, fileContent, formModel, notFound,
             saveConfig, toggleEditMode, iconUrl, iconInput,
             uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon,
             askReinstall, backupStrategy, saveBackupStrategy,
             currentVersion, mcVersions, loaderVersions, selectedMc, selectedLoader,
             loadingMcVersions, loadingLoaderVersions, fabricChanging, fabricModalVisible,
-            openFabricModal, closeFabricModal, fetchFabricLoaders, changeFabricVersion, store
+            openFabricModal, closeFabricModal, fetchFabricLoaders, changeFabricVersion, store,
+            filterText, visibleGroups, getLabel, saving
         };
     }
 };
