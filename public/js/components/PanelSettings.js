@@ -497,7 +497,7 @@ export default {
         const loadInstances = async () => {
             try {
                 const res = await api.get('/api/instances/list');
-                instances.value = res.data;
+                instances.value = res.data.instances || res.data;
             } catch (e) { }
         };
 

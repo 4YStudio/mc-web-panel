@@ -674,13 +674,23 @@ if (cluster.isPrimary) {
 
     const getOrCreateInstanceState = (instanceId) => {
         if (!instancesState.has(instanceId)) {
-            instancesState.set(instanceId, {
+            const state = {
                 process: null,
                 onlinePlayers: new Set(),
                 logHistory: [],
                 detectedVersion: { mc: 'Unknown', loader: 'Unknown' },
                 javaVersion: ''
-            });
+            };
+            const instDir = getInstanceDir(instanceId);
+            const logPath = instDir ? path.join(instDir, 'panel.log') : null;
+            if (logPath && fs.existsSync(logPath)) {
+                try {
+                    const data = fs.readFileSync(logPath, 'utf8');
+                    const lines = data.slice(-50000).split('\n');
+                    state.logHistory = lines.slice(-(appConfig.maxLogHistory || 1000));
+                } catch (e) { }
+            }
+            instancesState.set(instanceId, state);
         }
         return instancesState.get(instanceId);
     };
@@ -804,9 +814,10 @@ if (cluster.isPrimary) {
 
     io.on('connection', (socket) => {
         socket.on('req_history', (instanceId) => {
-            const id = instanceId || instanceConfig.activeInstanceId;
+            const id = (typeof instanceId === 'string' && instanceId) ? instanceId : instanceConfig.activeInstanceId;
             const state = getOrCreateInstanceState(id);
-            socket.emit(instanceId ? `console_history:${instanceId}` : 'console_history', state.logHistory);
+            const channel = (typeof instanceId === 'string' && instanceId) ? `console_history:${instanceId}` : 'console_history';
+            socket.emit(channel, state.logHistory);
         });
     });
 
@@ -943,7 +954,7 @@ if (cluster.isPrimary) {
 
     // --- 多实例管理 API ---
     app.get('/api/instances/list', requireAuth, (req, res) => {
-        res.json(instanceConfig.instances);
+        res.json({ instances: instanceConfig.instances, activeInstanceId: instanceConfig.activeInstanceId });
     });
 
     app.post('/api/instances/create', requireAuth, async (req, res) => {

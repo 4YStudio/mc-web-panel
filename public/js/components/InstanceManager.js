@@ -323,8 +323,6 @@ export default {
             try {
                 await api.post('/api/instances/select', { id: inst.id });
                 store.currentInstanceId = inst.id;
-                store.logs = [];
-                socket.emit('req_history');
                 const { getFirstVisibleView } = await import('/js/components/Sidebar.js');
                 store.view = getFirstVisibleView(inst.id);
             } catch (e) {
@@ -335,7 +333,7 @@ export default {
         const fetchInstances = async () => {
             try {
                 const res = await api.get('/api/instances/list');
-                store.instanceList = res.data;
+                store.instanceList = res.data.instances || res.data;
             } catch (e) { }
         };
 

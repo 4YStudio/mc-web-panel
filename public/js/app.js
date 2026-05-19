@@ -301,13 +301,17 @@ const app = createApp({
             // Instance-specific Socket Switching
             watch(() => store.currentInstanceId, (newId, oldId) => {
                 if (oldId) {
+                    socket.off(`console_history:${oldId}`);
                     socket.off(`console:${oldId}`);
                     socket.off(`status:${oldId}`);
                     socket.off(`players_update:${oldId}`);
                 }
                 if (newId) {
                     store.logs = [];
-                    socket.emit('req_history', { instanceId: newId });
+                    socket.on(`console_history:${newId}`, history => {
+                        store.logs = history;
+                    });
+                    socket.emit('req_history', newId);
                     socket.on(`console:${newId}`, l => {
                         store.logs.push(l);
                         if (store.logs.length > 1000) store.logs.shift();
@@ -335,7 +339,12 @@ const app = createApp({
             });
 
             // Initial fetch
-            api.get('/api/instances/list').then(res => store.instanceList = res.data);
+            api.get('/api/instances/list').then(res => {
+                store.instanceList = res.data.instances || res.data;
+                if (!store.currentInstanceId && res.data.activeInstanceId) {
+                    store.currentInstanceId = res.data.activeInstanceId;
+                }
+            });
             socket.on('instances_update', list => store.instanceList = list);
         };
 

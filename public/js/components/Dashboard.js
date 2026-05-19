@@ -339,7 +339,7 @@ export default {
                 showToast('instance_manager.update_success');
                 startupModal.value.hide();
                 const res = await api.get('/api/instances/list');
-                store.instanceList = res.data;
+                store.instanceList = res.data.instances || res.data;
             } catch (e) {
                 showToast(e.response?.data?.error || 'common.error', 'danger');
             } finally {
