@@ -27,6 +27,7 @@ node-*
 logo.ico
 
 # Runtime Data & Configuration
+.trae/
 plugins/
 data/
 mc_server/
