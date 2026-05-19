@@ -506,6 +506,11 @@ export default {
                     id: store.currentInstanceId,
                     backupStrategy: backupStrategy.value
                 });
+                store.stats.backupStrategy = backupStrategy.value;
+                if (backupStrategy.value !== 'panel') {
+                    store.stats.autoBackupEnabled = false;
+                    if (store.view === 'backups') store.view = 'dashboard';
+                }
                 showToast($t('common.success'));
             } catch (err) {
                 showToast($t('common.error'), 'danger');

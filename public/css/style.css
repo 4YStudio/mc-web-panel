@@ -149,6 +149,7 @@ h3 { font-size: 1.25rem; }
 .content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: visible;
     display: flex;
     flex-direction: column;
     padding: 1.75rem 2rem;
@@ -1339,6 +1340,30 @@ h3 { font-size: 1.25rem; }
     padding: 0.625rem 1.25rem;
 }
 
+.cmd-panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--card-radius);
+    padding: 0.75rem;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.cmd-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.cmd-item {
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    border-radius: 6px;
+}
+
+.cmd-item:hover {
+    background: var(--c-primary-glow);
+}
+
 .btn-back {
     background: none;
     border: none;
@@ -2186,13 +2211,14 @@ h3 { font-size: 1.25rem; }
 }
 
 .player-card {
-    transition: all var(--transition-base);
+    transition: box-shadow var(--transition-base);
     border-radius: var(--card-radius);
     border: 1px solid var(--c-border);
+    position: relative;
 }
 
-.player-card:hover {
-    transform: translateY(-2px);
+.player-card.menu-open {
+    z-index: 1050;
     box-shadow: var(--card-shadow-hover);
 }
 
@@ -2204,6 +2230,30 @@ h3 { font-size: 1.25rem; }
 .player-action-item:hover {
     background-color: var(--c-primary-glow);
     color: var(--c-primary);
+}
+
+.min-w-0 { min-width: 0; }
+
+.text-purple { color: #9c27b0 !important; }
+.text-indigo { color: #3f51b5 !important; }
+.text-cyan { color: #00bcd4 !important; }
+
+.player-card .dropdown-menu {
+    min-width: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1060 !important;
+}
+
+.player-card .dropdown-item {
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    padding: 0.35rem 0.75rem;
+}
+
+.player-card .dropdown-item:hover {
+    background-color: var(--c-primary-glow);
 }
 
 @keyframes gradient-shift {

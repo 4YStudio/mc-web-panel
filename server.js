@@ -25,7 +25,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.1.6';
+const APP_VERSION = '2.1.7';
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
 
@@ -54,13 +54,47 @@ if (_isDaemon || !isNode) {
 // --- Method 1: Detect caxa environment from extraction path ---
 const caxaMatch = process.execPath.match(/[\/\\]caxa[\/\\]applications[\/\\]([^\/\\]+)[\/\\]/);
 if (caxaMatch) {
-    const exeName = caxaMatch[1]; // e.g. "mc-web-panel-linux-x64"
-    const candidate = path.join(process.cwd(), exeName);
+    const exeName = caxaMatch[1]; // e.g. "MWP-216-linux-x64"
     console.log(`  Detected caxa environment, executable name: ${exeName}`);
-    console.log(`  Looking for wrapper at: ${candidate}`);
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-        APP_EXECUTABLE = candidate;
-        if (_isDaemon || !isNode) console.log(`  Found caxa wrapper: ${APP_EXECUTABLE}`);
+    
+    // Try multiple possible locations for the wrapper
+    const candidateDirs = [
+        process.cwd(),
+        ...(process.argv[0] ? [path.dirname(path.resolve(process.argv[0]))] : []),
+        ...(process.argv[1] ? [path.dirname(path.resolve(process.argv[1]))] : [])
+    ];
+    
+    // Remove duplicates
+    const uniqueDirs = [...new Set(candidateDirs)];
+    
+    for (const dir of uniqueDirs) {
+        const candidate = path.join(dir, exeName);
+        console.log(`  Looking for wrapper at: ${candidate}`);
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            APP_EXECUTABLE = candidate;
+            if (_isDaemon || !isNode) console.log(`  Found caxa wrapper: ${APP_EXECUTABLE}`);
+            break;
+        }
+    }
+    
+    // If still not found, try scanning argv for any non-js, non-node file
+    if (!APP_EXECUTABLE) {
+        for (const arg of process.argv) {
+            if (!arg) continue;
+            const base = path.basename(arg).toLowerCase();
+            const isJs = base.endsWith('.js') || base.endsWith('.cjs') || base.endsWith('.mjs');
+            const isNodeBin = base.startsWith('node');
+            if (!isNodeBin && !isJs) {
+                try {
+                    const fullPath = path.resolve(arg);
+                    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                        APP_EXECUTABLE = fullPath;
+                        console.log(`  Found caxa wrapper via argv: ${fullPath}`);
+                        break;
+                    }
+                } catch (e) { }
+            }
+        }
     }
 }
 
@@ -359,6 +393,7 @@ if (command === 'reset') {
 }
 
 if (command === 'stop') {
+    const force = userArgs.includes('--force') || userArgs.includes('-f');
     const pid = readPid();
     if (!pid) {
         console.log('面板未在运行（未找到 PID 文件）。');
@@ -369,7 +404,14 @@ if (command === 'stop') {
         cleanPid();
         process.exit(0);
     }
+    if (force) {
+        console.log(`正在强制停止面板 (PID: ${pid})...`);
+        try { process.kill(pid, 'SIGKILL'); } catch (e) { }
+        cleanPid();
+        process.exit(0);
+    }
     console.log(`正在停止面板 (PID: ${pid})...`);
+    console.log(`提示：如果面板因存在运行中的实例而拒绝关闭，请先关闭实例，或使用 --force 强制关闭`);
     try {
         process.kill(pid, 'SIGTERM');
         let waited = 0;
@@ -381,10 +423,9 @@ if (command === 'stop') {
             }
             waited += 500;
             if (waited > 10000) {
-                console.log('⚠️ 进程未响应，强制终止...');
-                try { process.kill(pid, 'SIGKILL'); } catch (e) { }
-                cleanPid();
-                process.exit(0);
+                console.log('⚠️ 面板可能因存在运行中的实例而拒绝关闭。');
+                console.log('   请先在面板中关闭所有运行中的实例，或使用 --force 强制关闭（可能导致数据丢失）');
+                process.exit(1);
             }
             setTimeout(check, 500);
         };
@@ -396,26 +437,37 @@ if (command === 'stop') {
     }
     return;
 } else if (command === 'restart') {
+    const force = userArgs.includes('--force') || userArgs.includes('-f');
     const pid = readPid();
     if (pid && isPidAlive(pid)) {
-        console.log(`正在停止面板 (PID: ${pid})...`);
-        try { process.kill(pid, 'SIGTERM'); } catch (e) { }
-        // Wait for it to die then start
-        let waited = 0;
-        const check = () => {
-            if (!isPidAlive(pid) || waited > 10000) {
-                if (waited > 10000) {
-                    try { process.kill(pid, 'SIGKILL'); } catch (e) { }
+        if (force) {
+            console.log(`正在强制停止面板 (PID: ${pid})...`);
+            try { process.kill(pid, 'SIGKILL'); } catch (e) { }
+            cleanPid();
+            console.log('旧进程已停止，正在启动...');
+            doStart();
+        } else {
+            console.log(`正在停止面板 (PID: ${pid})...`);
+            console.log(`提示：如果面板因存在运行中的实例而拒绝关闭，请先关闭实例，或使用 --force 强制关闭`);
+            try { process.kill(pid, 'SIGTERM'); } catch (e) { }
+            let waited = 0;
+            const check = () => {
+                if (!isPidAlive(pid)) {
+                    cleanPid();
+                    console.log('旧进程已停止，正在启动...');
+                    doStart();
+                } else {
+                    waited += 500;
+                    if (waited > 10000) {
+                        console.log('⚠️ 面板可能因存在运行中的实例而拒绝关闭。');
+                        console.log('   请先在面板中关闭所有运行中的实例，或使用 --force 强制重启（可能导致数据丢失）');
+                        process.exit(1);
+                    }
+                    setTimeout(check, 500);
                 }
-                cleanPid();
-                console.log('旧进程已停止，正在启动...');
-                doStart();
-            } else {
-                waited += 500;
-                setTimeout(check, 500);
-            }
-        };
-        setTimeout(check, 500);
+            };
+            setTimeout(check, 500);
+        }
         return;
     } else {
         console.log('面板未在运行，直接启动...');
@@ -426,7 +478,7 @@ if (command === 'stop') {
     console.log(`MC Web Panel v${APP_VERSION}`);
     console.log('');
     console.log('用法:');
-    console.log(`  ./${name} [命令]`);
+    console.log(`  ./${name} [命令] [选项]`);
     console.log('');
     console.log('命令:');
     console.log('  start          启动面板（后台运行，默认）');
@@ -435,6 +487,9 @@ if (command === 'stop') {
     console.log('  host <端口>    修改面板端口');
     console.log('  reset          重置 2FA 密钥');
     console.log('  help           显示帮助');
+    console.log('');
+    console.log('选项:');
+    console.log('  --force, -f    强制停止/重启（跳过运行中实例检查，可能导致数据丢失）');
     process.exit(0);
 } else {
     // start 命令（默认行为）
@@ -493,7 +548,7 @@ if (cluster.isPrimary) {
     const forkWorker = () => {
         const worker = cluster.fork();
         worker.on('exit', (code, signal) => {
-            if (restartingMaster) return; // Don't fork during restart_master
+            if (restartingMaster) return;
             if (code === 100) {
                 console.log('Worker requested restart. Restarting...');
                 forkWorker();
@@ -507,61 +562,100 @@ if (cluster.isPrimary) {
         worker.on('message', (msg) => {
             if (msg.type === 'restart_master') {
                 restartingMaster = true;
-                // Use newExecutable from message if provided (e.g. after update renamed the binary)
                 const executableToRun = msg.newExecutable || APP_EXECUTABLE;
                 console.log('Received restart_master signal. Restarting entire panel...');
                 if (executableToRun) {
                     const { spawn } = require('child_process');
                     const spawnCwd = path.dirname(executableToRun);
-
-                    // Detect if we should use 'start' or '--daemon' based on how we were launched
                     const args = process.argv.slice(1).some(arg => arg === 'start') ? ['start'] : ['--daemon'];
-
                     console.log(`[Restart] Spawning new process: ${executableToRun} with args: ${JSON.stringify(args)}`);
                     console.log(`[Restart] CWD: ${spawnCwd}`);
-
                     cleanPid();
                     const child = spawn(executableToRun, args, {
                         detached: true,
                         stdio: 'ignore',
                         cwd: spawnCwd
                     });
-
                     if (child.pid) {
                         console.log(`[Restart] New process spawned with PID: ${child.pid}. Exiting current master...`);
                     }
-
                     child.on('error', (err) => {
                         console.error('[Restart] Failed to spawn new process:', err);
                     });
-
                     child.unref();
-                    // Give it a bit more time to ensure child process is initialized
                     setTimeout(() => process.exit(0), 1000);
                 } else {
                     console.log('[Restart] No executable path found, exiting...');
                     process.exit(0);
                 }
+            } else if (msg.type === 'shutdown_allowed') {
+                forceShutdown();
+            } else if (msg.type === 'shutdown_blocked') {
+                console.log(`\n⚠️  拒绝关闭：存在正在运行的实例（${msg.names}），请先手动关闭所有运行中的实例后再关闭面板`);
+                console.log(`   提示：再次按 Ctrl+C 可强制关闭（不推荐，可能导致数据丢失）`);
+                shutdownRequested = false;
             }
         });
     };
 
     forkWorker();
 
-    // Handle signals to kill worker gracefully
     const cleanup = () => {
+        for (const id in cluster.workers) {
+            cluster.workers[id].send({ type: 'check_running_before_shutdown' });
+        }
+    };
+
+    let shutdownRequested = false;
+    process.on('SIGINT', () => {
+        if (shutdownRequested) {
+            for (const id in cluster.workers) cluster.workers[id].kill();
+            cleanPid();
+            process.exit();
+            return;
+        }
+        shutdownRequested = true;
+        cleanup();
+    });
+    process.on('SIGTERM', () => {
+        if (shutdownRequested) {
+            for (const id in cluster.workers) cluster.workers[id].kill();
+            cleanPid();
+            process.exit();
+            return;
+        }
+        shutdownRequested = true;
+        cleanup();
+    });
+
+    const forceShutdown = () => {
         for (const id in cluster.workers) {
             cluster.workers[id].kill();
         }
         cleanPid();
         process.exit();
     };
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
 
 } else {
     // Worker Process Logic
     const upload = multer({ dest: path.join(os.tmpdir(), 'mc-uploads') });
+
+    process.on('message', (msg) => {
+        if (msg.type === 'check_running_before_shutdown') {
+            const runningInstances = instanceConfig.instances.filter(inst => {
+                const state = getOrCreateInstanceState(inst.id);
+                return state.process !== null;
+            });
+            if (runningInstances.length > 0) {
+                const names = runningInstances.map(i => i.name).join('、');
+                console.log(`\n⚠️  拒绝关闭：存在正在运行的实例（${names}），请先手动关闭所有运行中的实例后再关闭面板`);
+                console.log(`   提示：再次按 Ctrl+C 可强制关闭（不推荐，可能导致数据丢失）`);
+                process.send({ type: 'shutdown_blocked', names });
+            } else {
+                process.send({ type: 'shutdown_allowed' });
+            }
+        }
+    });
 
     console.log(`Initializing Data Directories...`);
     console.log(`  INSTANCES_DIR: ${INSTANCES_DIR}`);
@@ -892,7 +986,10 @@ if (cluster.isPrimary) {
         if (jarName !== undefined) inst.jarName = jarName;
         if (javaArgs !== undefined) inst.javaArgs = javaArgs;
         if (javaPath !== undefined) inst.javaPath = javaPath;
-        if (backupStrategy) inst.backupStrategy = backupStrategy;
+        if (backupStrategy) {
+            inst.backupStrategy = backupStrategy;
+            if (backupStrategy !== 'panel') inst.autoBackupEnabled = false;
+        }
         if (autoBackupEnabled !== undefined) inst.autoBackupEnabled = autoBackupEnabled;
         if (autoBackupInterval !== undefined) inst.autoBackupInterval = autoBackupInterval;
         if (autoBackupMode !== undefined) inst.autoBackupMode = autoBackupMode;
@@ -2833,6 +2930,80 @@ if (cluster.isPrimary) {
     // 服务器控制
     app.get('/api/server/status', requireAuth, withInstance, (req, res) => res.json({ running: !!req.instState.process, onlinePlayers: Array.from(req.instState.onlinePlayers) }));
 
+    // Player Pings API
+    app.get('/api/server/player-pings', requireAuth, withInstance, async (req, res) => {
+        try {
+            const instDir = req.instDir;
+            const pings = {};
+            const userCachePath = path.join(instDir, 'usercache.json');
+            if (fs.existsSync(userCachePath)) {
+                try {
+                    const userCache = await fs.readJson(userCachePath);
+                    if (Array.isArray(userCache)) {
+                        for (const entry of userCache) {
+                            if (entry.name && entry.expiresOn) {
+                                pings[entry.name] = -1;
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+            const playersSamplePath = path.join(instDir, 'logs');
+            const latestLogPath = path.join(playersSamplePath, 'latest.log');
+            if (fs.existsSync(latestLogPath)) {
+                try {
+                    const stat = fs.statSync(latestLogPath);
+                    const start = Math.max(0, stat.size - 65536);
+                    const fd = fs.openSync(latestLogPath, 'r');
+                    const buf = Buffer.alloc(stat.size - start);
+                    fs.readSync(fd, buf, 0, buf.length, start);
+                    fs.closeSync(fd);
+                    const tail = buf.toString('utf8');
+                    const lines = tail.split('\n');
+                    for (const line of lines.slice(-500)) {
+                        const m = line.match(/\[(\d{2}:\d{2}:\d{2})\].*\[Server thread\/INFO\]:\s+(\w+)\s.*\((\d+)ms\)/);
+                        if (m) {
+                            pings[m[2]] = parseInt(m[3]);
+                        }
+                    }
+                } catch (_) {}
+            }
+            if (req.instState.process) {
+                try {
+                    const statusOutput = await new Promise((resolve) => {
+                        let output = '';
+                        const timeout = setTimeout(() => resolve(''), 5000);
+                        const dataHandler = (data) => {
+                            output += data.toString();
+                            if (output.includes('ms]') && output.includes('players online')) {
+                                clearTimeout(timeout);
+                                resolve(output);
+                            }
+                        };
+                        req.instState.process.stdout.on('data', dataHandler);
+                        req.instState.process.stdin.write('list\n');
+                        setTimeout(() => {
+                            req.instState.process.stdout.off('data', dataHandler);
+                            clearTimeout(timeout);
+                            resolve(output);
+                        }, 4000);
+                    });
+                    const pingMatches = statusOutput.matchAll(/(\w+)\s*\((\d+)ms\)/g);
+                    for (const m of pingMatches) {
+                        pings[m[1]] = parseInt(m[2]);
+                    }
+                } catch (_) {}
+            }
+            const result = {};
+            for (const name of req.instState.onlinePlayers) {
+                result[name] = pings[name] !== undefined ? pings[name] : -1;
+            }
+            res.json(result);
+        } catch (e) {
+            res.json({});
+        }
+    });
+
     // Server Icon API
     app.get('/api/server/icon', withInstance, (req, res) => {
         const iconPath = path.join(req.instDir, 'server-icon.png');
@@ -3580,21 +3751,57 @@ if (cluster.isPrimary) {
                 return res.status(400).json({ error: '未检测到独立运行环境，无法自动更新' });
             }
 
+            const runningInstances = instanceConfig.instances.filter(inst => {
+                const state = getOrCreateInstanceState(inst.id);
+                return state.process !== null;
+            });
+            if (runningInstances.length > 0) {
+                const names = runningInstances.map(i => i.name).join('、');
+                return res.status(409).json({ error: `存在正在运行的实例（${names}），请先手动关闭所有运行中的实例后再执行更新操作` });
+            }
+
             // 1. 获取最新版本信息
             const gh = await axios.get('https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest', {
                 headers: { 'User-Agent': 'MC-Web-Panel' },
                 timeout: 5000
             });
 
-            const arch = process.arch === 'x64' ? 'linux-x64' : 'linux-arm64';
+            const platform = process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'macos' : 'linux';
+            const archStr = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : process.arch;
+            const arch = `${platform}-${archStr}`;
             const version = gh.data.tag_name.replace(/^v/, '');
             const versionCompact = version.replace(/\./g, '');
             const assetName = `MWP-${versionCompact}-${arch}`;
-            const asset = gh.data.assets.find(a => a.name === assetName);
+            
+            // 1. 精确匹配
+            let asset = gh.data.assets.find(a => a.name === assetName);
+            
+            // 2. 如果精确匹配失败，尝试模糊匹配（只匹配架构部分）
+            if (!asset) {
+                console.log(`[Update] Exact match for "${assetName}" not found, trying fuzzy match...`);
+                asset = gh.data.assets.find(a => 
+                    a.name.includes(arch) && 
+                    a.name.startsWith('MWP-')
+                );
+            }
+            
+            // 3. 如果还失败，尝试更宽松的匹配（只匹配平台和架构关键词）
+            if (!asset) {
+                console.log(`[Update] Fuzzy match failed, trying keyword match...`);
+                asset = gh.data.assets.find(a => 
+                    (a.name.includes(platform) || a.name.includes(process.platform)) &&
+                    (a.name.includes(archStr) || a.name.includes(process.arch)) &&
+                    a.name.startsWith('MWP-')
+                );
+            }
 
             if (!asset) {
-                return res.status(404).json({ error: `未找到对应架构 ( ${arch} ) 的发布文件` });
+                const availableAssets = gh.data.assets.map(a => a.name).join(', ');
+                console.error(`[Update] Asset "${assetName}" not found. Available: ${availableAssets}`);
+                return res.status(404).json({ error: `未找到对应架构 ( ${arch} ) 的发布文件，可用文件: ${availableAssets}` });
             }
+            
+            console.log(`[Update] Found asset: ${asset.name}`);
 
             const downloadUrl = applyGithubProxy(asset.browser_download_url);
             const newExePath = APP_EXECUTABLE + '.new';
@@ -3646,8 +3853,8 @@ if (cluster.isPrimary) {
                 // 给予执行权限
                 await fs.chmod(newExePath, '755');
 
-                // 计算新的可执行文件路径（包含新版本号）
-                const newVersionedName = `MWP-${versionCompact}-${arch}`;
+                // 使用实际的 asset 文件名（支持模糊匹配）
+                const newVersionedName = asset.name;
                 const newVersionedPath = path.join(path.dirname(APP_EXECUTABLE), newVersionedName);
 
                 // 备份旧版本

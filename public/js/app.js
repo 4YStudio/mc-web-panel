@@ -191,10 +191,14 @@ const app = createApp({
 
             // Socket 监听
             socket.emit('req_history');
-            socket.on('console_history', history => store.logs = history);
+            socket.on('console_history', history => {
+                if (!store.currentInstanceId) store.logs = history;
+            });
             socket.on('console', l => {
-                store.logs.push(l);
-                if (store.logs.length > 1000) store.logs.shift();
+                if (!store.currentInstanceId) {
+                    store.logs.push(l);
+                    if (store.logs.length > 1000) store.logs.shift();
+                }
             });
             socket.on('status', s => store.isRunning = s);
             socket.on('players_update', p => store.onlinePlayers = p);

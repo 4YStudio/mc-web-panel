@@ -200,7 +200,11 @@ export default {
             } else {
                 ordered = [...items];
             }
-            return ordered.filter(i => !(configState.hiddenItems || []).includes(i.id));
+            return ordered.filter(i => {
+                if ((configState.hiddenItems || []).includes(i.id)) return false;
+                if (i.id === 'backups' && store.stats?.backupStrategy !== 'panel') return false;
+                return true;
+            });
         });
 
         const openCustomize = () => {

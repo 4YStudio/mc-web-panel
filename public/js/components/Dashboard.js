@@ -1,8 +1,84 @@
 import { store } from '../store.js';
 import { api } from '../api.js';
 import { showToast, formatLog, t, openModal } from '../utils.js';
-import { ref, nextTick, watch, onMounted } from '/js/vue.esm-browser.js';
+import { ref, computed, nextTick, watch, onMounted } from '/js/vue.esm-browser.js';
 import SetupWizard from './SetupWizard.js';
+
+const MC_COMMANDS = [
+    { name: 'advancement', syntax: '/advancement (grant|revoke) <targets> <advancement>', desc: 'advancement_desc', category: 'player', quick: true, template: 'advancement grant @s everything' },
+    { name: 'attribute', syntax: '/attribute <target> <attribute> (get|base|modifier)', desc: 'attribute_desc', category: 'player', quick: false },
+    { name: 'clear', syntax: '/clear [<targets>] [<item>] [<maxCount>]', desc: 'clear_desc', category: 'player', quick: true, template: 'clear @s' },
+    { name: 'clone', syntax: '/clone <begin> <end> <destination>', desc: 'clone_desc', category: 'world', quick: false },
+    { name: 'damage', syntax: '/damage <target> <amount> [<damageType>]', desc: 'damage_desc', category: 'player', quick: true, template: 'damage @s 1 minecraft:generic' },
+    { name: 'data', syntax: '/data (merge|get|remove|modify) <target>', desc: 'data_desc', category: 'advanced', quick: false },
+    { name: 'datapack', syntax: '/datapack (enable|disable|list|create) <name>', desc: 'datapack_desc', category: 'server', quick: true, template: 'datapack list' },
+    { name: 'debug', syntax: '/debug (start|stop|function)', desc: 'debug_desc', category: 'server', quick: true, template: 'debug start' },
+    { name: 'defaultgamemode', syntax: '/defaultgamemode <gamemode>', desc: 'defaultgamemode_desc', category: 'server', quick: true, template: 'defaultgamemode survival' },
+    { name: 'difficulty', syntax: '/difficulty [peaceful|easy|normal|hard]', desc: 'difficulty_desc', category: 'server', quick: true, template: 'difficulty normal' },
+    { name: 'effect', syntax: '/effect (give|clear) <targets> [<effect>]', desc: 'effect_desc', category: 'player', quick: true, template: 'effect give @s minecraft:speed 600 1' },
+    { name: 'enchant', syntax: '/enchant <targets> <enchantment> [<level>]', desc: 'enchant_desc', category: 'player', quick: true, template: 'enchant @s minecraft:sharpness 5' },
+    { name: 'experience', syntax: '/experience (add|set|query) <targets> <amount>', desc: 'experience_desc', category: 'player', quick: true, template: 'experience add @s 100' },
+    { name: 'fill', syntax: '/fill <from> <to> <block> [outline|hollow|destroy|replace|keep]', desc: 'fill_desc', category: 'world', quick: false },
+    { name: 'fillbiome', syntax: '/fillbiome <from> <to> <biome> [replace]', desc: 'fillbiome_desc', category: 'world', quick: false },
+    { name: 'forceload', syntax: '/forceload (add|remove|query)', desc: 'forceload_desc', category: 'world', quick: false },
+    { name: 'function', syntax: '/function <name> [<arguments>|with]', desc: 'function_desc', category: 'advanced', quick: false },
+    { name: 'gamemode', syntax: '/gamemode <gamemode> [<target>]', desc: 'gamemode_desc', category: 'player', quick: true, template: 'gamemode creative' },
+    { name: 'gamerule', syntax: '/gamerule <rule> [<value>]', desc: 'gamerule_desc', category: 'server', quick: true, template: 'gamerule keepInventory true' },
+    { name: 'give', syntax: '/give <targets> <item> [<count>]', desc: 'give_desc', category: 'player', quick: true, template: 'give @s minecraft:diamond 1' },
+    { name: 'help', syntax: '/help [<command>]', desc: 'help_desc', category: 'server', quick: true, template: 'help' },
+    { name: 'item', syntax: '/item (replace|modify) <target>', desc: 'item_desc', category: 'player', quick: false },
+    { name: 'kick', syntax: '/kick <targets> [<reason>]', desc: 'kick_desc', category: 'player', quick: true, template: 'kick ' },
+    { name: 'kill', syntax: '/kill [<targets>]', desc: 'kill_desc', category: 'player', quick: true, template: 'kill @s' },
+    { name: 'list', syntax: '/list [uuids]', desc: 'list_desc', category: 'server', quick: true, template: 'list' },
+    { name: 'locate', syntax: '/locate (structure|biome|poi) <name>', desc: 'locate_desc', category: 'world', quick: true, template: 'locate structure minecraft:village_plains' },
+    { name: 'loot', syntax: '/loot (replace|insert|give|spawn)', desc: 'loot_desc', category: 'advanced', quick: false },
+    { name: 'msg', syntax: '/msg <targets> <message>', desc: 'msg_desc', category: 'player', quick: true, template: 'msg ' },
+    { name: 'particle', syntax: '/particle <name> [<pos>]', desc: 'particle_desc', category: 'world', quick: true, template: 'particle minecraft:happy_villager ~ ~1 ~' },
+    { name: 'place', syntax: '/place (feature|jigsaw|structure|template)', desc: 'place_desc', category: 'world', quick: false },
+    { name: 'playsound', syntax: '/playsound <sound> [source] <targets> [<pos>]', desc: 'playsound_desc', category: 'world', quick: false },
+    { name: 'random', syntax: '/random (value|roll|reset)', desc: 'random_desc', category: 'advanced', quick: false },
+    { name: 'reload', syntax: '/reload', desc: 'reload_desc', category: 'server', quick: true, template: 'reload' },
+    { name: 'recipe', syntax: '/recipe (give|take) <targets> <recipe>', desc: 'recipe_desc', category: 'player', quick: false },
+    { name: 'ride', syntax: '/ride <target> (mount|dismount)', desc: 'ride_desc', category: 'player', quick: false },
+    { name: 'rotate', syntax: '/rotate <target> (<rotation>|facing)', desc: 'rotate_desc', category: 'player', quick: false },
+    { name: 'say', syntax: '/say <message>', desc: 'say_desc', category: 'server', quick: true, template: 'say ' },
+    { name: 'schedule', syntax: '/schedule (function|clear) <name>', desc: 'schedule_desc', category: 'advanced', quick: false },
+    { name: 'scoreboard', syntax: '/scoreboard (objectives|players)', desc: 'scoreboard_desc', category: 'advanced', quick: false },
+    { name: 'seed', syntax: '/seed', desc: 'seed_desc', category: 'server', quick: true, template: 'seed' },
+    { name: 'setblock', syntax: '/setblock <pos> <block> [destroy|keep|replace]', desc: 'setblock_desc', category: 'world', quick: false },
+    { name: 'setworldspawn', syntax: '/setworldspawn [<pos>]', desc: 'setworldspawn_desc', category: 'world', quick: false },
+    { name: 'spawnpoint', syntax: '/spawnpoint [<targets>] [<pos>]', desc: 'spawnpoint_desc', category: 'player', quick: true, template: 'spawnpoint @s' },
+    { name: 'spectate', syntax: '/spectate [<target>]', desc: 'spectate_desc', category: 'player', quick: false },
+    { name: 'spreadplayers', syntax: '/spreadplayers <center> <spreadDistance> <maxRange> (<respectTeams>|under)', desc: 'spreadplayers_desc', category: 'world', quick: false },
+    { name: 'stopsound', syntax: '/stopsound <targets> [*|source]', desc: 'stopsound_desc', category: 'player', quick: false },
+    { name: 'summon', syntax: '/summon <entity> [<pos>] [<nbt>]', desc: 'summon_desc', category: 'world', quick: true, template: 'summon minecraft:zombie ~ ~ ~' },
+    { name: 'tag', syntax: '/tag <targets> (add|remove|list) <name>', desc: 'tag_desc', category: 'player', quick: false },
+    { name: 'team', syntax: '/team (list|add|remove|empty|join|leave|modify)', desc: 'team_desc', category: 'advanced', quick: false },
+    { name: 'teammsg', syntax: '/teammsg <message>', desc: 'teammsg_desc', category: 'player', quick: false },
+    { name: 'teleport', syntax: '/teleport (<location>|<destination>|<targets>)', desc: 'teleport_desc', category: 'player', quick: true, template: 'tp @s ~ ~ ~' },
+    { name: 'tellraw', syntax: '/tellraw <targets> <message>', desc: 'tellraw_desc', category: 'advanced', quick: false },
+    { name: 'time', syntax: '/time (set|add|pause|resume|rate|query) <value>', desc: 'time_desc', category: 'server', quick: true, template: 'time set day' },
+    { name: 'title', syntax: '/title <targets> (clear|reset|title|subtitle|actionbar|times)', desc: 'title_desc', category: 'player', quick: true, template: 'title @s title "Hello"' },
+    { name: 'trigger', syntax: '/trigger <objective> [add|set] <value>', desc: 'trigger_desc', category: 'advanced', quick: false },
+    { name: 'weather', syntax: '/weather (clear|rain|thunder) [<duration>]', desc: 'weather_desc', category: 'server', quick: true, template: 'weather clear 6000' },
+    { name: 'worldborder', syntax: '/worldborder (add|set|center|damage|get|warning)', desc: 'worldborder_desc', category: 'world', quick: false },
+    { name: 'ban', syntax: '/ban <targets> [<reason>]', desc: 'ban_desc', category: 'admin', quick: true, template: 'ban ' },
+    { name: 'ban-ip', syntax: '/ban-ip <target> [<reason>]', desc: 'ban_ip_desc', category: 'admin', quick: true, template: 'ban-ip ' },
+    { name: 'banlist', syntax: '/banlist [ips|players]', desc: 'banlist_desc', category: 'admin', quick: true, template: 'banlist' },
+    { name: 'deop', syntax: '/deop <targets>', desc: 'deop_desc', category: 'admin', quick: true, template: 'deop ' },
+    { name: 'op', syntax: '/op <targets>', desc: 'op_desc', category: 'admin', quick: true, template: 'op ' },
+    { name: 'pardon', syntax: '/pardon <targets>', desc: 'pardon_desc', category: 'admin', quick: true, template: 'pardon ' },
+    { name: 'pardon-ip', syntax: '/pardon-ip <target>', desc: 'pardon_ip_desc', category: 'admin', quick: true, template: 'pardon-ip ' },
+    { name: 'save-all', syntax: '/save-all [flush]', desc: 'save_all_desc', category: 'admin', quick: true, template: 'save-all' },
+    { name: 'save-off', syntax: '/save-off', desc: 'save_off_desc', category: 'admin', quick: true, template: 'save-off' },
+    { name: 'save-on', syntax: '/save-on', desc: 'save_on_desc', category: 'admin', quick: true, template: 'save-on' },
+    { name: 'setidletimeout', syntax: '/setidletimeout <minutes>', desc: 'setidletimeout_desc', category: 'admin', quick: true, template: 'setidletimeout 10' },
+    { name: 'stop', syntax: '/stop', desc: 'stop_desc', category: 'admin', quick: true, template: 'stop' },
+    { name: 'whitelist', syntax: '/whitelist (on|off|list|add|remove|reload)', desc: 'whitelist_desc', category: 'admin', quick: true, template: 'whitelist list' },
+    { name: 'execute', syntax: '/execute (run|if|unless|as|at|store|positioned|rotated|facing|align|anchored|in|summon|on)', desc: 'execute_desc', category: 'advanced', quick: false },
+    { name: 'bossbar', syntax: '/bossbar (add|remove|list|set|get)', desc: 'bossbar_desc', category: 'advanced', quick: false },
+    { name: 'tick', syntax: '/tick (query|rate|step|sprint|unfreeze|freeze)', desc: 'tick_desc', category: 'advanced', quick: true, template: 'tick query' },
+];
 
 export default {
     components: { SetupWizard },
@@ -95,9 +171,45 @@ export default {
                 <div v-for="(log,i) in store.logs" :key="i" v-html="formatLog(log)"></div>
             </div>
             
-            <div class="input-group flex-shrink-0 cmd-input-group">
-                <input type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')">
-                <button class="btn btn-primary fw-bold" @click="sendCommand">{{ $t('dashboard.send') }}</button>
+            <div class="flex-shrink-0">
+                <div class="input-group cmd-input-group">
+                    <input type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')">
+                    <button class="btn btn-outline-secondary" @click="showCmdPanel = !showCmdPanel" :title="$t('dashboard.cmd_helper')">
+                        <i class="fa-solid fa-terminal"></i>
+                    </button>
+                    <button class="btn btn-primary fw-bold" @click="sendCommand">{{ $t('dashboard.send') }}</button>
+                </div>
+
+                <div v-if="showCmdPanel" class="cmd-panel mt-2">
+                    <div class="d-flex gap-2 mb-2 align-items-center flex-wrap">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="cursor:pointer" :class="{'bg-primary text-white': cmdCategory === 'all'}" @click="cmdCategory='all'">{{ $t('dashboard.cmd_all') }}</span>
+                        <span v-for="cat in cmdCategories" :key="cat.key" class="badge border" style="cursor:pointer" :class="cmdCategory===cat.key ? 'bg-'+cat.color+' text-white' : 'bg-body-tertiary text-'+cat.color" @click="cmdCategory=cat.key">
+                            <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
+                        </span>
+                        <div class="input-group input-group-sm ms-auto" style="max-width:200px">
+                            <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted" style="font-size:0.7rem"></i></span>
+                            <input type="text" class="form-control border-start-0" :placeholder="$t('dashboard.cmd_search')" v-model="cmdSearch" style="font-size:0.8rem">
+                        </div>
+                    </div>
+                    <div class="cmd-list">
+                        <div v-for="cmd in filteredCommands" :key="cmd.name" class="cmd-item d-flex align-items-start gap-2 py-1 px-2 rounded" @click="useCommand(cmd)">
+                            <code class="text-primary flex-shrink-0" style="min-width:120px;font-size:0.75rem">{{ cmd.name }}</code>
+                            <span class="small text-muted flex-grow-1" style="font-size:0.7rem">{{ $t('dashboard.cmd_' + cmd.desc) }}</span>
+                            <i v-if="cmd.quick" class="fa-solid fa-bolt text-warning flex-shrink-0" style="font-size:0.65rem" :title="$t('dashboard.cmd_quick')"></i>
+                        </div>
+                        <div v-if="filteredCommands.length === 0" class="text-center text-muted py-2 small">
+                            {{ $t('dashboard.cmd_no_result') }}
+                        </div>
+                    </div>
+                    <div class="mt-2 border-top pt-2" v-if="quickCommands.length > 0">
+                        <div class="small fw-bold text-muted mb-1"><i class="fa-solid fa-bolt me-1 text-warning"></i>{{ $t('dashboard.cmd_quick_title') }}</div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button v-for="cmd in quickCommands" :key="cmd.name" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem" @click="sendQuickCommand(cmd.template)">
+                                {{ cmd.name }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -142,6 +254,47 @@ export default {
         const saving = ref(false);
         const jars = ref([]);
         const form = ref({ jarName: '', javaArgs: '' });
+        const showCmdPanel = ref(false);
+        const cmdCategory = ref('all');
+        const cmdSearch = ref('');
+
+        const cmdCategories = [
+            { key: 'player', icon: 'fa-solid fa-user', color: 'primary' },
+            { key: 'server', icon: 'fa-solid fa-server', color: 'success' },
+            { key: 'world', icon: 'fa-solid fa-globe', color: 'info' },
+            { key: 'admin', icon: 'fa-solid fa-shield-halved', color: 'danger' },
+            { key: 'advanced', icon: 'fa-solid fa-code', color: 'secondary' },
+        ];
+
+        const filteredCommands = computed(() => {
+            let cmds = MC_COMMANDS;
+            if (cmdCategory.value !== 'all') {
+                cmds = cmds.filter(c => c.category === cmdCategory.value);
+            }
+            const s = cmdSearch.value.toLowerCase().trim();
+            if (s) {
+                cmds = cmds.filter(c => c.name.includes(s) || c.syntax.toLowerCase().includes(s));
+            }
+            return cmds;
+        });
+
+        const quickCommands = computed(() => {
+            return MC_COMMANDS.filter(c => c.quick && c.category === cmdCategory.value);
+        });
+
+        const useCommand = (cmd) => {
+            command.value = cmd.template || cmd.name + ' ';
+            showCmdPanel.value = false;
+        };
+
+        const sendQuickCommand = async (template) => {
+            if (!store.isRunning) {
+                showToast('common.server_offline', 'warning');
+                return;
+            }
+            await api.post('/api/server/command', { command: template });
+            showToast(t('dashboard.toast_sent'));
+        };
 
         const scrollToBottom = () => {
             nextTick(() => {
@@ -185,7 +338,6 @@ export default {
                 await api.post('/api/instances/update', payload);
                 showToast('instance_manager.update_success');
                 startupModal.value.hide();
-                // Refresh instances to update local state
                 const res = await api.get('/api/instances/list');
                 store.instanceList = res.data;
             } catch (e) {
@@ -234,6 +386,11 @@ export default {
             }
         };
 
-        return { store, command, serverAction, forceStop, sendCommand, formatLog, onSetupComplete, openStartupSettings, saveStartupSettings, saving, form, jars, fetchJars };
+        return {
+            store, command, serverAction, forceStop, sendCommand, formatLog,
+            onSetupComplete, openStartupSettings, saveStartupSettings, saving, form, jars, fetchJars,
+            showCmdPanel, cmdCategory, cmdSearch, cmdCategories, filteredCommands, quickCommands,
+            useCommand, sendQuickCommand
+        };
     }
 };
