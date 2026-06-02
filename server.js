@@ -182,12 +182,13 @@ const saveInstances = (data) => {
 
 // 默认配置
 const DEFAULT_CONFIG = {
-    secret: '', // Initial secret is empty
+    secret: '',
     isSetup: false,
     port: 3000,
     defaultLang: 'zh',
     theme: 'auto',
     consoleInfoPosition: 'top',
+    loaderType: 'fabric',
     jarName: 'fabric-server-launch.jar',
     javaArgs: ['-Xms1G', '-Xmx4G'],
     sessionTimeout: 7,
@@ -277,6 +278,7 @@ if (fs.existsSync(MC_DIR_LEGACY) && fs.statSync(MC_DIR_LEGACY).isDirectory()) {
                     id: 'default',
                     name: '默认服务器',
                     dir: 'instances/default',
+                    loaderType: 'fabric',
                     jarName: appConfig.jarName,
                     javaArgs: appConfig.javaArgs,
                     javaPath: appConfig.javaPath,
@@ -858,6 +860,7 @@ if (cluster.isPrimary) {
                             if (fs.existsSync(vFile)) {
                                 const vData = await fs.readJson(vFile);
                                 versionInfo = { mc: vData.gameVersion, loader: vData.loaderVersion };
+                                if (vData.loaderType) inst.loaderType = vData.loaderType;
                             } else if (state.detectedVersion.mc !== 'Unknown') {
                                 versionInfo = state.detectedVersion;
                             }
@@ -899,6 +902,7 @@ if (cluster.isPrimary) {
                         port: serverInfo.port,
                         motd: serverInfo.motd,
                         version: versionInfo,
+                        loaderType: inst.loaderType || 'fabric',
                         jarName: inst.jarName,
                         javaArgs: inst.javaArgs,
                         javaPath: inst.javaPath,
@@ -940,6 +944,7 @@ if (cluster.isPrimary) {
                     ...systemStats,
                     mc: { port: activeStatus.port, maxPlayers: activeStatus.maxPlayers, motd: activeStatus.motd, online: activeStatus.onlinePlayers },
                     version: activeStatus.version,
+                    loaderType: activeInst ? (activeInst.loaderType || 'fabric') : 'fabric',
                     hasBackupMod: activeStatus.hasBackupMod,
                     hasEasyAuth: activeStatus.hasEasyAuth,
                     hasVoicechat: activeStatus.hasVoicechat,
@@ -958,23 +963,25 @@ if (cluster.isPrimary) {
     });
 
     app.post('/api/instances/create', requireAuth, async (req, res) => {
-        const { name, jarName, javaArgs, javaPath } = req.body;
+        const { name, jarName, javaArgs, javaPath, loaderType } = req.body;
         if (!name) return res.status(400).json({ error: '实例名称不能为空' });
 
         const id = crypto.randomBytes(4).toString('hex');
         const dir = `instances/${id}`;
         const absDir = path.join(BASE_DIR, dir);
+        const lt = loaderType || appConfig.loaderType || 'fabric';
 
         try {
             fs.ensureDirSync(absDir);
             instanceConfig.instances.push({
                 id, name, dir,
+                loaderType: lt,
                 jarName: jarName || appConfig.jarName,
                 javaArgs: (javaArgs && javaArgs.length) ? javaArgs : appConfig.javaArgs,
                 javaPath: javaPath || appConfig.javaPath,
-                backupStrategy: 'panel', // Default to panel for new instances
+                backupStrategy: 'panel',
                 autoBackupEnabled: false,
-                autoBackupInterval: 12, // Default 12 hours
+                autoBackupInterval: 12,
                 maxBackupCount: 10,
                 createdAt: new Date().toISOString()
             });
@@ -987,7 +994,7 @@ if (cluster.isPrimary) {
     });
 
     app.post('/api/instances/update', requireAuth, (req, res) => {
-        const { id, name, jarName, javaArgs, javaPath, backupStrategy, autoBackupEnabled, autoBackupInterval, maxBackupCount,
+        const { id, name, jarName, javaArgs, javaPath, loaderType, backupStrategy, autoBackupEnabled, autoBackupInterval, maxBackupCount,
             autoBackupMode, autoBackupIntervalHours, autoBackupIntervalMinutes, autoBackupScheduleTime, autoBackupScheduleDays, autoBackupOnlyIfPlayersOnline
         } = req.body;
         const inst = instanceConfig.instances.find(i => i.id === id);
@@ -997,6 +1004,7 @@ if (cluster.isPrimary) {
         if (jarName !== undefined) inst.jarName = jarName;
         if (javaArgs !== undefined) inst.javaArgs = javaArgs;
         if (javaPath !== undefined) inst.javaPath = javaPath;
+        if (loaderType !== undefined) inst.loaderType = loaderType;
         if (backupStrategy) {
             inst.backupStrategy = backupStrategy;
             if (backupStrategy !== 'panel') inst.autoBackupEnabled = false;
@@ -2165,6 +2173,7 @@ if (cluster.isPrimary) {
                 id: newId,
                 name: newName,
                 dir: newDir,
+                loaderType: sourceInst.loaderType || 'fabric',
                 jarName: sourceInst.jarName,
                 javaArgs: sourceInst.javaArgs,
                 javaPath: sourceInst.javaPath,
@@ -2387,68 +2396,224 @@ if (cluster.isPrimary) {
     });
 
     app.get('/api/setup/versions/mc', requireAuth, async (req, res) => {
+        const loaderType = req.query.loaderType || 'fabric';
         try {
-            const resp = await axios.get('https://meta.fabricmc.net/v2/versions/game');
-            // Filter stable releases or just return all
-            const stable = resp.data.filter(v => v.stable).map(v => v.version);
-            res.json(stable);
+            if (loaderType === 'forge') {
+                const versions = await fetchForgeMcVersions();
+                return res.json(versions);
+            } else if (loaderType === 'neoforge') {
+                const versions = await fetchNeoForgeMcVersions();
+                return res.json(versions);
+            } else {
+                const resp = await axios.get('https://meta.fabricmc.net/v2/versions/game');
+                const stable = resp.data.filter(v => v.stable).map(v => v.version);
+                return res.json(stable);
+            }
         } catch (e) { res.status(500).json({ error: 'Failed to fetch MC versions' }); }
     });
 
     app.get('/api/setup/versions/loader/:gameVersion', requireAuth, async (req, res) => {
+        const loaderType = req.query.loaderType || 'fabric';
+        const gameVersion = req.params.gameVersion;
         try {
-            const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${req.params.gameVersion}`);
-            // Return unique loader versions
-            const loaders = [...new Set(resp.data.map(v => v.loader.version))];
-            res.json(loaders);
-        } catch (e) { res.status(500).json({ error: 'Failed to fetch Fabric versions' }); }
+            if (loaderType === 'forge') {
+                const versions = await fetchForgeVersions(gameVersion);
+                return res.json(versions);
+            } else if (loaderType === 'neoforge') {
+                const versions = await fetchNeoForgeVersions(gameVersion);
+                return res.json(versions);
+            } else {
+                const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${gameVersion}`);
+                const loaders = [...new Set(resp.data.map(v => v.loader.version))];
+                return res.json(loaders);
+            }
+        } catch (e) { res.status(500).json({ error: `Failed to fetch ${loaderType} versions` }); }
     });
 
     app.post('/api/setup/install', requireAuth, withInstance, async (req, res) => {
-        const { instDir, instanceId } = req;
-        const { gameVersion, loaderVersion } = req.body;
+        const { instDir, instState, instanceId } = req;
+        const { gameVersion, loaderVersion, loaderType } = req.body;
         if (!gameVersion || !loaderVersion) return res.status(400).json({ error: 'Missing version info' });
 
-        const installerUrl = `https://meta.fabricmc.net/v2/versions/loader/${gameVersion}/${loaderVersion}/1.0.1/server/jar`;
-        const targetJar = path.join(instDir, appConfig.jarName);
-        const versionFile = path.join(instDir, 'server-version.json');
-        const eulaFile = path.join(instDir, 'eula.txt');
+        const lt = loaderType || 'fabric';
+        const instConf = instanceConfig.instances.find(i => i.id === instanceId);
+        if (lt && instConf) {
+            instConf.loaderType = lt;
+            saveInstances(instanceConfig);
+        }
 
-        console.log(`Installing Fabric Server: MC ${gameVersion}, Loader ${loaderVersion}`);
-        res.json({ success: true, message: 'Installation started' }); // Async response
+        const loaderName = lt === 'neoforge' ? 'NeoForge' : lt.charAt(0).toUpperCase() + lt.slice(1);
+        console.log(`Installing ${loaderName} Server: MC ${gameVersion}, Loader ${loaderVersion}`);
+        res.json({ success: true, message: 'Installation started' });
 
         try {
-            const writer = fs.createWriteStream(targetJar);
-            const response = await axios({
-                url: installerUrl,
-                method: 'GET',
-                responseType: 'stream'
-            });
-
-            response.data.pipe(writer);
-
-            writer.on('finish', () => {
-                console.log('Download complete.');
-                // Write version info
-                fs.writeJsonSync(versionFile, { gameVersion, loaderVersion, installDate: new Date() });
-                // Auto accept EULA
-                fs.writeFileSync(eulaFile, 'eula=true\n');
-
-                appendLog(instanceId, `Installed Fabric Server (${gameVersion} / ${loaderVersion})`);
-            });
-
-            writer.on('error', (err) => {
-                console.error('Download failed', err);
-                appendLog('Installation failed: ' + err.message);
-            });
-
+            await installLoaderCore(instanceId, instDir, instState, lt, gameVersion, loaderVersion);
+            const eulaFile = path.join(instDir, 'eula.txt');
+            fs.writeFileSync(eulaFile, 'eula=true\n');
         } catch (e) {
             console.error(e);
-            appendLog(instanceId, 'Installation error: ' + e.message);
+            appendLog(instanceId, `[错误] ${loaderName} 安装失败: ${e.message}\n`);
         }
     });
 
-    // --- Fabric Version Management API ---
+    // --- Loader Version Management API (Fabric / Forge / NeoForge) ---
+    const fetchForgeVersions = async (gameVersion) => {
+        const resp = await axios.get('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json', { timeout: 15000 });
+        const promos = resp.data.promos;
+        const versions = [];
+        for (const [key, val] of Object.entries(promos)) {
+            if (key.startsWith(gameVersion)) {
+                versions.push({ version: val, mc: key.split('-')[0], label: key });
+            }
+        }
+        return versions.filter(v => v.mc === gameVersion).map(v => v.version);
+    };
+
+    const fetchNeoForgeVersions = async (gameVersion) => {
+        const resp = await axios.get('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge', { timeout: 15000 });
+        const allVersions = resp.data.versions || [];
+        const prefix = gameVersion.replace(/^1\./, '') + '.';
+        return allVersions.filter(v => v.startsWith(prefix) && !v.includes('-beta'));
+    };
+
+    const fetchForgeMcVersions = async () => {
+        const resp = await axios.get('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json', { timeout: 15000 });
+        const mcVersions = new Set();
+        for (const key of Object.keys(resp.data.promos)) {
+            const mc = key.split('-')[0];
+            if (mc) mcVersions.add(mc);
+        }
+        return [...mcVersions].sort((a, b) => {
+            const pa = a.split('.').map(Number);
+            const pb = b.split('.').map(Number);
+            for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
+            }
+            return 0;
+        });
+    };
+
+    const fetchNeoForgeMcVersions = async () => {
+        const resp = await axios.get('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge', { timeout: 15000 });
+        const allVersions = resp.data.versions || [];
+        const mcVersions = new Set();
+        for (const v of allVersions) {
+            if (v.includes('-beta')) continue;
+            const parts = v.split('.');
+            if (parts.length >= 2) {
+                const mcVer = '1.' + parts[0] + '.' + parts[1];
+                mcVersions.add(mcVer);
+            }
+        }
+        return [...mcVersions].sort((a, b) => {
+            const pa = a.split('.').map(Number);
+            const pb = b.split('.').map(Number);
+            for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
+            }
+            return 0;
+        });
+    };
+
+    const runForgeInstaller = async (instDir, installerPath, javaPath, instanceId, instState) => {
+        return new Promise((resolve, reject) => {
+            const proc = spawn(javaPath, ['-jar', installerPath, '--installServer'], { cwd: instDir });
+            let lastLine = '';
+            proc.stdout.on('data', (d) => { lastLine = d.toString().trim(); });
+            proc.stderr.on('data', (d) => { lastLine = d.toString().trim(); });
+            proc.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`Forge installer exited with code ${code}: ${lastLine}`));
+            });
+            proc.on('error', reject);
+        });
+    };
+
+    const installLoaderCore = async (instanceId, instDir, instState, loaderType, gameVersion, loaderVersion) => {
+        const instConf = instanceConfig.instances.find(i => i.id === instanceId);
+        const jarName = instConf.jarName || appConfig.jarName;
+        const targetJar = path.join(instDir, jarName);
+        const versionFile = path.join(instDir, 'server-version.json');
+        const oldJarBackup = targetJar + '.bak';
+
+        if (fs.existsSync(targetJar)) {
+            await fs.copy(targetJar, oldJarBackup);
+        }
+
+        try {
+            if (loaderType === 'fabric') {
+                const installerUrl = `https://meta.fabricmc.net/v2/versions/loader/${gameVersion}/${loaderVersion}/1.0.1/server/jar`;
+                const writer = fs.createWriteStream(targetJar);
+                const response = await axios({ url: installerUrl, method: 'GET', responseType: 'stream' });
+                await new Promise((resolve, reject) => {
+                    response.data.pipe(writer);
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+            } else if (loaderType === 'forge') {
+                const installerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${gameVersion}-${loaderVersion}/forge-${gameVersion}-${loaderVersion}-installer.jar`;
+                const installerPath = path.join(instDir, `forge-${gameVersion}-${loaderVersion}-installer.jar`);
+                const writer = fs.createWriteStream(installerPath);
+                const response = await axios({ url: installerUrl, method: 'GET', responseType: 'stream' });
+                await new Promise((resolve, reject) => {
+                    response.data.pipe(writer);
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+                const rawJavaPath = instConf.javaPath || appConfig.javaPath;
+                const javaPath = resolveJavaPath(rawJavaPath);
+                appendLog(instanceId, `[系统] 正在运行 Forge 安装器，请稍候...\n`);
+                await runForgeInstaller(instDir, installerPath, javaPath, instanceId, instState);
+                try { await fs.remove(installerPath); } catch (e) { }
+            } else if (loaderType === 'neoforge') {
+                const installerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${loaderVersion}/neoforge-${loaderVersion}-installer.jar`;
+                const installerPath = path.join(instDir, `neoforge-${loaderVersion}-installer.jar`);
+                const writer = fs.createWriteStream(installerPath);
+                const response = await axios({ url: installerUrl, method: 'GET', responseType: 'stream' });
+                await new Promise((resolve, reject) => {
+                    response.data.pipe(writer);
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+                const rawJavaPath = instConf.javaPath || appConfig.javaPath;
+                const javaPath = resolveJavaPath(rawJavaPath);
+                appendLog(instanceId, `[系统] 正在运行 NeoForge 安装器，请稍候...\n`);
+                await runForgeInstaller(instDir, installerPath, javaPath, instanceId, instState);
+                try { await fs.remove(installerPath); } catch (e) { }
+            }
+
+            fs.writeJsonSync(versionFile, { gameVersion, loaderVersion, loaderType, installDate: new Date() });
+            if (fs.existsSync(oldJarBackup)) await fs.remove(oldJarBackup);
+            instState.detectedVersion = { mc: gameVersion, loader: loaderVersion };
+            const loaderName = loaderType === 'neoforge' ? 'NeoForge' : loaderType.charAt(0).toUpperCase() + loaderType.slice(1);
+            appendLog(instanceId, `[系统] ${loaderName} 核心已安装: MC ${gameVersion} / ${loaderName} ${loaderVersion}\n`);
+        } catch (e) {
+            if (fs.existsSync(oldJarBackup)) {
+                await fs.copy(oldJarBackup, targetJar);
+                await fs.remove(oldJarBackup);
+            }
+            throw e;
+        }
+    };
+
+    app.get('/api/loader/current-version', requireAuth, withInstance, async (req, res) => {
+        const { instDir, instState } = req;
+        try {
+            const vFile = path.join(instDir, 'server-version.json');
+            if (fs.existsSync(vFile)) {
+                const vData = await fs.readJson(vFile);
+                return res.json({ mc: vData.gameVersion, loader: vData.loaderVersion, loaderType: vData.loaderType || 'fabric' });
+            }
+            if (instState.detectedVersion.mc !== 'Unknown') {
+                const instConf = instanceConfig.instances.find(i => i.id === req.instanceId);
+                return res.json({ ...instState.detectedVersion, loaderType: instConf.loaderType || 'fabric' });
+            }
+            res.json({ mc: 'Unknown', loader: 'Unknown', loaderType: 'fabric' });
+        } catch (e) {
+            res.json({ mc: 'Unknown', loader: 'Unknown', loaderType: 'fabric' });
+        }
+    });
+
     app.get('/api/fabric/current-version', requireAuth, withInstance, async (req, res) => {
         const { instDir, instState } = req;
         try {
@@ -2466,6 +2631,23 @@ if (cluster.isPrimary) {
         }
     });
 
+    app.get('/api/loader/versions/mc', requireAuth, async (req, res) => {
+        const loaderType = req.query.loaderType || 'fabric';
+        try {
+            if (loaderType === 'forge') {
+                const versions = await fetchForgeMcVersions();
+                return res.json(versions);
+            } else if (loaderType === 'neoforge') {
+                const versions = await fetchNeoForgeMcVersions();
+                return res.json(versions);
+            } else {
+                const resp = await axios.get('https://meta.fabricmc.net/v2/versions/game');
+                const stable = resp.data.filter(v => v.stable).map(v => v.version);
+                return res.json(stable);
+            }
+        } catch (e) { res.status(500).json({ error: 'Failed to fetch MC versions' }); }
+    });
+
     app.get('/api/fabric/versions/mc', requireAuth, async (req, res) => {
         try {
             const resp = await axios.get('https://meta.fabricmc.net/v2/versions/game');
@@ -2474,12 +2656,52 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: 'Failed to fetch MC versions' }); }
     });
 
+    app.get('/api/loader/versions/loader/:gameVersion', requireAuth, async (req, res) => {
+        const loaderType = req.query.loaderType || 'fabric';
+        const gameVersion = req.params.gameVersion;
+        try {
+            if (loaderType === 'forge') {
+                const versions = await fetchForgeVersions(gameVersion);
+                return res.json(versions);
+            } else if (loaderType === 'neoforge') {
+                const versions = await fetchNeoForgeVersions(gameVersion);
+                return res.json(versions);
+            } else {
+                const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${gameVersion}`);
+                const loaders = [...new Set(resp.data.map(v => v.loader.version))];
+                return res.json(loaders);
+            }
+        } catch (e) { res.status(500).json({ error: `Failed to fetch ${loaderType} loader versions` }); }
+    });
+
     app.get('/api/fabric/versions/loader/:gameVersion', requireAuth, async (req, res) => {
         try {
             const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${req.params.gameVersion}`);
             const loaders = [...new Set(resp.data.map(v => v.loader.version))];
             res.json(loaders);
         } catch (e) { res.status(500).json({ error: 'Failed to fetch Fabric loader versions' }); }
+    });
+
+    app.post('/api/loader/change-version', requireAuth, withInstance, async (req, res) => {
+        const { instDir, instState, instanceId } = req;
+        const { gameVersion, loaderVersion, loaderType } = req.body;
+        if (!gameVersion || !loaderVersion) return res.status(400).json({ error: 'Missing version info' });
+
+        if (instState.process) {
+            return res.status(400).json({ error: 'Server is running. Please stop it before changing version.' });
+        }
+
+        const lt = loaderType || 'fabric';
+        const loaderName = lt === 'neoforge' ? 'NeoForge' : lt.charAt(0).toUpperCase() + lt.slice(1);
+        console.log(`Changing ${loaderName} Server version: MC ${gameVersion}, Loader ${loaderVersion} for instance ${instanceId}`);
+        res.json({ success: true, message: 'Version change started' });
+
+        try {
+            await installLoaderCore(instanceId, instDir, instState, lt, gameVersion, loaderVersion);
+        } catch (e) {
+            console.error(e);
+            appendLog(instanceId, `[错误] ${loaderName} 核心更换失败: ${e.message}\n`);
+        }
     });
 
     app.post('/api/fabric/change-version', requireAuth, withInstance, async (req, res) => {
@@ -2491,53 +2713,13 @@ if (cluster.isPrimary) {
             return res.status(400).json({ error: 'Server is running. Please stop it before changing version.' });
         }
 
-        const instConf = instanceConfig.instances.find(i => i.id === instanceId);
-        const jarName = instConf.jarName || appConfig.jarName;
-        const targetJar = path.join(instDir, jarName);
-        const versionFile = path.join(instDir, 'server-version.json');
-        const oldJarBackup = path.join(instDir, jarName + '.bak');
-
         console.log(`Changing Fabric Server version: MC ${gameVersion}, Loader ${loaderVersion} for instance ${instanceId}`);
         res.json({ success: true, message: 'Version change started' });
 
         try {
-            if (fs.existsSync(targetJar)) {
-                await fs.copy(targetJar, oldJarBackup);
-            }
-
-            const installerUrl = `https://meta.fabricmc.net/v2/versions/loader/${gameVersion}/${loaderVersion}/1.0.1/server/jar`;
-            const writer = fs.createWriteStream(targetJar);
-            const response = await axios({
-                url: installerUrl,
-                method: 'GET',
-                responseType: 'stream'
-            });
-
-            response.data.pipe(writer);
-
-            writer.on('finish', () => {
-                console.log(`Fabric version change download complete for instance ${instanceId}`);
-                fs.writeJsonSync(versionFile, { gameVersion, loaderVersion, installDate: new Date() });
-                if (fs.existsSync(oldJarBackup)) fs.removeSync(oldJarBackup);
-                instState.detectedVersion = { mc: gameVersion, loader: loaderVersion };
-                appendLog(instanceId, `[系统] Fabric 核心已更换为 MC ${gameVersion} / Loader ${loaderVersion}\n`);
-            });
-
-            writer.on('error', (err) => {
-                console.error('Fabric version change download failed', err);
-                if (fs.existsSync(oldJarBackup)) {
-                    fs.copySync(oldJarBackup, targetJar);
-                    fs.removeSync(oldJarBackup);
-                }
-                appendLog(instanceId, `[错误] Fabric 核心更换失败: ${err.message}\n`);
-            });
-
+            await installLoaderCore(instanceId, instDir, instState, 'fabric', gameVersion, loaderVersion);
         } catch (e) {
             console.error(e);
-            if (fs.existsSync(oldJarBackup)) {
-                fs.copySync(oldJarBackup, targetJar);
-                fs.removeSync(oldJarBackup);
-            }
             appendLog(instanceId, `[错误] Fabric 核心更换失败: ${e.message}\n`);
         }
     });
@@ -2789,7 +2971,7 @@ if (cluster.isPrimary) {
     // 2. 保存面板配置
     app.post('/api/panel/config', requireAuth, async (req, res) => {
         try {
-            const { port, defaultLang, theme, consoleInfoPosition, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance } = req.body;
+            const { port, defaultLang, theme, consoleInfoPosition, loaderType, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance } = req.body;
 
             // 验证配置
             if (port && (port < 1024 || port > 65535)) {
@@ -2816,11 +2998,14 @@ if (cluster.isPrimary) {
             if (consoleInfoPosition && !['top', 'sidebar', 'hide'].includes(consoleInfoPosition)) {
                 return res.status(400).json({ error: '无效的控制台信息展示位置' });
             }
+            if (loaderType && !['fabric', 'forge', 'neoforge'].includes(loaderType)) {
+                return res.status(400).json({ error: '无效的加载器类型' });
+            }
 
-            // 更新配置
             if (port !== undefined) appConfig.port = port;
             if (defaultLang !== undefined) appConfig.defaultLang = defaultLang;
             if (theme !== undefined) appConfig.theme = theme;
+            if (loaderType !== undefined) appConfig.loaderType = loaderType;
             if (jarName !== undefined) appConfig.jarName = jarName;
             if (javaArgs !== undefined) appConfig.javaArgs = javaArgs;
             if (sessionTimeout !== undefined) appConfig.sessionTimeout = sessionTimeout;
@@ -3091,7 +3276,40 @@ if (cluster.isPrimary) {
         const rawJavaPath = instConf.javaPath || appConfig.javaPath;
         const javaPath = resolveJavaPath(rawJavaPath);
         const javaArgs = (instConf.javaArgs && instConf.javaArgs.length) ? instConf.javaArgs : appConfig.javaArgs;
-        const jarName = instConf.jarName || appConfig.jarName;
+        const loaderType = instConf.loaderType || 'fabric';
+        let jarName = instConf.jarName || appConfig.jarName;
+
+        if (loaderType === 'forge' || loaderType === 'neoforge') {
+            const vFile = path.join(instDir, 'server-version.json');
+            if (fs.existsSync(vFile)) {
+                try {
+                    const vData = fs.readJsonSync(vFile);
+                    const mc = vData.gameVersion;
+                    const lv = vData.loaderVersion;
+                    if (loaderType === 'forge') {
+                        const forgeJar = path.join(instDir, `forge-${mc}-${lv}.jar`);
+                        const forgeUniversalJar = path.join(instDir, `forge-${mc}-${lv}-universal.jar`);
+                        const mcServerJar = path.join(instDir, `minecraft_server.${mc}.jar`);
+                        if (fs.existsSync(forgeJar)) jarName = `forge-${mc}-${lv}.jar`;
+                        else if (fs.existsSync(forgeUniversalJar)) jarName = `forge-${mc}-${lv}-universal.jar`;
+                        else if (fs.existsSync(mcServerJar)) jarName = `minecraft_server.${mc}.jar`;
+                    } else {
+                        const neoforgeJar = path.join(instDir, `neoforge-${lv}.jar`);
+                        const neoforgeUniversalJar = path.join(instDir, `neoforge-${lv}-universal.jar`);
+                        const mcServerJar = path.join(instDir, `minecraft_server.${mc}.jar`);
+                        if (fs.existsSync(neoforgeJar)) jarName = `neoforge-${lv}.jar`;
+                        else if (fs.existsSync(neoforgeUniversalJar)) jarName = `neoforge-${lv}-universal.jar`;
+                        else if (fs.existsSync(mcServerJar)) jarName = `minecraft_server.${mc}.jar`;
+                    }
+                } catch (e) { }
+            }
+            if (!fs.existsSync(path.join(instDir, jarName))) {
+                const files = fs.readdirSync(instDir).filter(f => f.endsWith('.jar') && !f.includes('installer'));
+                const forgeLike = files.find(f => f.startsWith('forge-') || f.startsWith('neoforge-'));
+                if (forgeLike) jarName = forgeLike;
+                else if (files.length > 0) jarName = files[0];
+            }
+        }
 
         const javaVer = await checkJavaVersion(javaPath);
         if (javaVer === 'Not Installed') {
@@ -3108,7 +3326,26 @@ if (cluster.isPrimary) {
         appendLog(instanceId, `[系统] 使用 Java: ${javaPath} (版本: ${javaVer})\n`);
 
         try {
-            instState.process = spawn(javaPath, [...javaArgs, '-jar', jarName, 'nogui'], { cwd: instDir });
+            let spawnCmd, spawnArgs, spawnOpts = { cwd: instDir };
+
+            const runSh = path.join(instDir, 'run.sh');
+            const userJvmArgs = path.join(instDir, 'user_jvm_args.txt');
+
+            if ((loaderType === 'forge' || loaderType === 'neoforge') && fs.existsSync(runSh)) {
+                const jvmArgsContent = javaArgs.map(a => a.trim()).filter(a => a).join('\n') + '\n';
+                await fs.writeFile(userJvmArgs, jvmArgsContent);
+                appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : 'Forge'} (run.sh 模式)\n`);
+                appendLog(instanceId, `[系统] JVM 参数已写入 user_jvm_args.txt\n`);
+                spawnCmd = '/bin/bash';
+                spawnArgs = [runSh, 'nogui'];
+                try { await fs.chmod(runSh, 0o755); } catch (e) { }
+            } else {
+                appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : loaderType.charAt(0).toUpperCase() + loaderType.slice(1)} (jar 模式)\n`);
+                spawnCmd = javaPath;
+                spawnArgs = [...javaArgs, '-jar', jarName, 'nogui'];
+            }
+
+            instState.process = spawn(spawnCmd, spawnArgs, spawnOpts);
 
             instState.process.stdout.on('data', (data) => {
                 const line = data.toString();
@@ -3132,6 +3369,24 @@ if (cluster.isPrimary) {
                     if (fabricMatch) {
                         instState.detectedVersion.mc = fabricMatch[1];
                         instState.detectedVersion.loader = fabricMatch[2];
+                    }
+                    const forgeMatch = line.match(/Loading Minecraft (\S+) with Forge (\S+)/);
+                    if (forgeMatch) {
+                        instState.detectedVersion.mc = forgeMatch[1];
+                        instState.detectedVersion.loader = forgeMatch[2];
+                    }
+                    const neoforgeMatch = line.match(/Loading Minecraft (\S+) with NeoForge (\S+)/);
+                    if (neoforgeMatch) {
+                        instState.detectedVersion.mc = neoforgeMatch[1];
+                        instState.detectedVersion.loader = neoforgeMatch[2];
+                    }
+                    const forgeAltMatch = line.match(/Forge Mod Loader version (\S+)/);
+                    if (forgeAltMatch && instState.detectedVersion.mc !== 'Unknown') {
+                        instState.detectedVersion.loader = forgeAltMatch[1];
+                    }
+                    const neoforgeAltMatch = line.match(/NeoForge (\S+)/);
+                    if (neoforgeAltMatch && instState.detectedVersion.mc !== 'Unknown') {
+                        instState.detectedVersion.loader = neoforgeAltMatch[1];
                     }
                 }
             });

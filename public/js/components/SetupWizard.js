@@ -16,7 +16,19 @@ export default {
 
             <div class="row justify-content-center">
                 <div class="col-md-8 col-lg-6">
-                    <!-- Step 1: MC Version -->
+                    <!-- Step 1: Loader Type -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">{{ $t('setup.select_loader_type') }}</label>
+                        <div class="row g-2">
+                            <div class="col-4" v-for="lt in loaderTypes" :key="lt.value">
+                                <button class="btn w-100 py-2 fw-bold" :class="selectedLoaderType === lt.value ? 'btn-primary' : 'btn-outline-primary'" @click="selectLoaderType(lt.value)">
+                                    <i :class="lt.icon" class="me-1"></i>{{ lt.label }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: MC Version -->
                     <div class="mb-4">
                         <label class="form-label fw-bold d-flex align-items-center">
                             {{ $t('setup.select_mc') }}
@@ -25,7 +37,7 @@ export default {
                         <CustomSelect v-model="selectedMc" :options="mcVersions" :placeholder="loadingMc ? $t('common.loading') : $t('setup.choose')" :disabled="loadingMc" size="lg" searchable @change="fetchLoaders" />
                     </div>
 
-                     <!-- Step 2: Loader Version -->
+                     <!-- Step 3: Loader Version -->
                     <div class="mb-4" v-if="selectedMc || loadingLoaders">
                         <label class="form-label fw-bold d-flex align-items-center">
                             {{ $t('setup.select_loader') }}
@@ -34,7 +46,7 @@ export default {
                         <CustomSelect v-model="selectedLoader" :options="loaderVersions" :placeholder="loadingLoaders ? $t('common.loading') : $t('setup.choose')" :disabled="loadingLoaders" size="lg" searchable />
                     </div>
 
-                    <!-- Step 3: Install -->
+                    <!-- Step 4: Install -->
                     <div class="d-grid gap-2" v-if="selectedMc && selectedLoader && !loadingLoaders">
                         <button class="btn btn-primary btn-lg" @click="install" :disabled="installing">
                              <span v-if="installing" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -52,14 +64,30 @@ export default {
         const loaderVersions = ref([]);
         const selectedMc = ref('');
         const selectedLoader = ref('');
+        const selectedLoaderType = ref('fabric');
         const loadingMc = ref(false);
         const loadingLoaders = ref(false);
         const installing = ref(false);
 
+        const loaderTypes = computed(() => [
+            { value: 'fabric', label: 'Fabric', icon: 'fa-solid fa-feather' },
+            { value: 'forge', label: 'Forge', icon: 'fa-solid fa-hammer' },
+            { value: 'neoforge', label: 'NeoForge', icon: 'fa-solid fa-fire' }
+        ]);
+
+        const selectLoaderType = (type) => {
+            if (selectedLoaderType.value === type) return;
+            selectedLoaderType.value = type;
+            selectedMc.value = '';
+            selectedLoader.value = '';
+            loaderVersions.value = [];
+            fetchMc();
+        };
+
         const fetchMc = async () => {
             loadingMc.value = true;
             try {
-                const res = await api.get('/api/setup/versions/mc');
+                const res = await api.get('/api/setup/versions/mc', { params: { loaderType: selectedLoaderType.value } });
                 mcVersions.value = res.data;
             } catch (e) {
                 showToast(t('setup.fetch_fail_mc'), 'danger');
@@ -74,7 +102,7 @@ export default {
             selectedLoader.value = '';
             loadingLoaders.value = true;
             try {
-                const res = await api.get(`/api/setup/versions/loader/${selectedMc.value}`);
+                const res = await api.get(`/api/setup/versions/loader/${selectedMc.value}`, { params: { loaderType: selectedLoaderType.value } });
                 loaderVersions.value = res.data;
                 if (res.data.length > 0) selectedLoader.value = res.data[0];
             } catch (e) {
@@ -89,7 +117,8 @@ export default {
             try {
                 await api.post('/api/setup/install', {
                     gameVersion: selectedMc.value,
-                    loaderVersion: selectedLoader.value
+                    loaderVersion: selectedLoader.value,
+                    loaderType: selectedLoaderType.value
                 });
                 showToast(t('setup.install_start_toast'), 'info');
 
@@ -123,8 +152,9 @@ export default {
 
         return {
             mcVersions, loaderVersions, selectedMc, selectedLoader,
+            selectedLoaderType, loaderTypes,
             loadingMc, loadingLoaders, installing,
-            fetchLoaders, install
+            selectLoaderType, fetchLoaders, install
         };
     }
 };

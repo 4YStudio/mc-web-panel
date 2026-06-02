@@ -129,7 +129,7 @@ export default {
             <div class="col-md-6">
                 <div class="card h-100 border-info-subtle shadow-sm">
                     <div class="card-header bg-info-subtle text-info fw-bold py-2 px-3 small text-uppercase">
-                        <i class="fa-solid fa-cube me-2"></i>{{ $t('properties.fabric_version') }}
+                        <i class="fa-solid fa-cube me-2"></i>{{ $t('properties.loader_version') }}
                         <span v-if="fabricChanging" class="spinner-border spinner-border-sm text-info ms-2" role="status"></span>
                     </div>
                     <div class="card-body p-3 d-flex flex-column">
@@ -141,6 +141,10 @@ export default {
                             <div class="flex-fill">
                                 <div class="small text-muted mb-1">{{ $t('properties.current_loader') }}</div>
                                 <div class="fw-bold">{{ currentVersion.loader === 'Unknown' ? $t('common.unknown') : currentVersion.loader }}</div>
+                            </div>
+                            <div class="flex-fill">
+                                <div class="small text-muted mb-1">{{ $t('properties.loader_type') }}</div>
+                                <div class="fw-bold">{{ currentLoaderType === 'neoforge' ? 'NeoForge' : currentLoaderType.charAt(0).toUpperCase() + currentLoaderType.slice(1) }}</div>
                             </div>
                         </div>
                         <button class="btn btn-outline-info w-100 rounded-pill fw-bold mt-auto" @click="openFabricModal" :disabled="fabricChanging">
@@ -188,10 +192,23 @@ export default {
 
                         <div class="mb-3">
                             <label class="form-label fw-bold small">
+                                <i class="fa-solid fa-layer-group me-1"></i>{{ $t('properties.loader_type') }}
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-4" v-for="lt in modalLoaderTypes" :key="lt.value">
+                                    <button class="btn w-100 py-1 fw-bold btn-sm" :class="modalLoaderType === lt.value ? 'btn-primary' : 'btn-outline-primary'" @click="selectModalLoaderType(lt.value)">
+                                        <i :class="lt.icon" class="me-1"></i>{{ lt.label }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">
                                 <i class="fa-solid fa-gamepad me-1"></i>{{ $t('properties.target_mc') }}
                                 <span v-if="loadingMcVersions" class="spinner-border spinner-border-sm text-primary ms-1" role="status"></span>
                             </label>
-                            <CustomSelect v-model="selectedMc" :options="mcVersions" :placeholder="loadingMcVersions ? $t('common.loading') : $t('properties.choose_mc')" :disabled="loadingMcVersions" searchable @change="fetchFabricLoaders" />
+                            <CustomSelect v-model="selectedMc" :options="mcVersions" :placeholder="loadingMcVersions ? $t('common.loading') : $t('properties.choose_mc')" :disabled="loadingMcVersions" searchable @change="fetchLoaderVersions" />
                         </div>
 
                         <div class="mb-3">
@@ -213,7 +230,7 @@ export default {
                     </div>
                     <div class="modal-footer border-0 pt-0">
                         <button type="button" class="btn btn-secondary rounded-pill px-4" @click="closeFabricModal">{{ $t('common.cancel') }}</button>
-                        <button type="button" class="btn btn-primary rounded-pill px-4" @click="changeFabricVersion"
+                        <button type="button" class="btn btn-primary rounded-pill px-4" @click="changeLoaderVersion"
                             :disabled="!selectedMc || !selectedLoader || fabricChanging || store.isRunning">
                             <span v-if="fabricChanging" class="spinner-border spinner-border-sm me-1" role="status"></span>
                             <i v-else class="fa-solid fa-download me-1"></i>{{ $t('properties.apply') }}
@@ -240,6 +257,7 @@ export default {
         const $t = proxy.$t;
 
         const currentVersion = reactive({ mc: 'Unknown', loader: 'Unknown' });
+        const currentLoaderType = ref('fabric');
         const mcVersions = ref([]);
         const loaderVersions = ref([]);
         const selectedMc = ref('');
@@ -248,6 +266,22 @@ export default {
         const loadingLoaderVersions = ref(false);
         const fabricChanging = ref(false);
         const fabricModalVisible = ref(false);
+        const modalLoaderType = ref('fabric');
+
+        const modalLoaderTypes = computed(() => [
+            { value: 'fabric', label: 'Fabric', icon: 'fa-solid fa-feather' },
+            { value: 'forge', label: 'Forge', icon: 'fa-solid fa-hammer' },
+            { value: 'neoforge', label: 'NeoForge', icon: 'fa-solid fa-fire' }
+        ]);
+
+        const selectModalLoaderType = (type) => {
+            if (modalLoaderType.value === type) return;
+            modalLoaderType.value = type;
+            selectedMc.value = '';
+            selectedLoader.value = '';
+            loaderVersions.value = [];
+            fetchMcVersions();
+        };
 
         const rawProperties = ref([]);
         const rawGroups = ref([]);
@@ -430,6 +464,7 @@ export default {
             selectedMc.value = '';
             selectedLoader.value = '';
             loaderVersions.value = [];
+            modalLoaderType.value = currentLoaderType.value;
             fabricModalVisible.value = true;
             if (mcVersions.value.length === 0) fetchMcVersions();
         };
@@ -440,16 +475,17 @@ export default {
 
         const fetchCurrentVersion = async () => {
             try {
-                const res = await api.get('/api/fabric/current-version');
+                const res = await api.get('/api/loader/current-version');
                 currentVersion.mc = res.data.mc;
                 currentVersion.loader = res.data.loader;
+                currentLoaderType.value = res.data.loaderType || 'fabric';
             } catch (e) { }
         };
 
         const fetchMcVersions = async () => {
             loadingMcVersions.value = true;
             try {
-                const res = await api.get('/api/fabric/versions/mc');
+                const res = await api.get('/api/loader/versions/mc', { params: { loaderType: modalLoaderType.value } });
                 mcVersions.value = res.data;
             } catch (e) {
                 showToast($t('properties.fetch_versions_fail'), 'danger');
@@ -458,13 +494,13 @@ export default {
             }
         };
 
-        const fetchFabricLoaders = async () => {
+        const fetchLoaderVersions = async () => {
             if (!selectedMc.value) return;
             loadingLoaderVersions.value = true;
             selectedLoader.value = '';
             loaderVersions.value = [];
             try {
-                const res = await api.get(`/api/fabric/versions/loader?mc=${selectedMc.value}`);
+                const res = await api.get(`/api/loader/versions/loader/${selectedMc.value}`, { params: { loaderType: modalLoaderType.value } });
                 loaderVersions.value = res.data;
             } catch (e) {
                 showToast($t('properties.fetch_versions_fail'), 'danger');
@@ -473,7 +509,7 @@ export default {
             }
         };
 
-        const changeFabricVersion = async () => {
+        const changeLoaderVersion = async () => {
             if (!selectedMc.value || !selectedLoader.value) return;
             openModal({
                 title: $t('properties.change_version'),
@@ -486,7 +522,11 @@ export default {
                     store.task.message = `${selectedMc.value} / ${selectedLoader.value}`;
                     store.task.percent = 0;
                     try {
-                        await api.post('/api/fabric/change-version', { mc: selectedMc.value, loader: selectedLoader.value });
+                        await api.post('/api/loader/change-version', {
+                            gameVersion: selectedMc.value,
+                            loaderVersion: selectedLoader.value,
+                            loaderType: modalLoaderType.value
+                        });
                         fabricChanging.value = false;
                         store.task.visible = false;
                         showToast($t('properties.version_change_success'));
@@ -528,9 +568,10 @@ export default {
             saveConfig, toggleEditMode, iconUrl, iconInput,
             uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon,
             askReinstall, backupStrategy, saveBackupStrategy,
-            currentVersion, mcVersions, loaderVersions, selectedMc, selectedLoader,
+            currentVersion, currentLoaderType, mcVersions, loaderVersions, selectedMc, selectedLoader,
             loadingMcVersions, loadingLoaderVersions, fabricChanging, fabricModalVisible,
-            openFabricModal, closeFabricModal, fetchFabricLoaders, changeFabricVersion, store,
+            modalLoaderType, modalLoaderTypes, selectModalLoaderType,
+            openFabricModal, closeFabricModal, fetchLoaderVersions, changeLoaderVersion, store,
             filterText, visibleGroups, getLabel, saving
         };
     }

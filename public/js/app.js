@@ -318,7 +318,6 @@ const app = createApp({
                     });
                     socket.on(`status:${newId}`, s => {
                         store.isRunning = s.isRunning;
-                        // Update other properties from s
                         store.hasBackupMod = s.hasBackupMod;
                         store.hasEasyAuth = s.hasEasyAuth;
                         store.hasVoicechat = s.hasVoicechat;
@@ -326,6 +325,7 @@ const app = createApp({
                         store.stats.mc.maxPlayers = s.maxPlayers;
                         store.stats.mc.motd = s.motd;
                         store.stats.version = s.version;
+                        store.stats.loaderType = s.loaderType || 'fabric';
                         store.stats.backupStrategy = s.backupStrategy;
                         store.stats.autoBackupEnabled = s.autoBackupEnabled;
                         store.stats.autoBackupInterval = s.autoBackupInterval;

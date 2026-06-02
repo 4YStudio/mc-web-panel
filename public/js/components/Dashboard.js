@@ -133,6 +133,7 @@ export default {
                              <div class="d-flex justify-content-between small text-muted border-top pt-2 mt-2 flex-wrap gap-2" style="font-size: 0.6875rem; border-color: var(--c-border-subtle) !important;">
                                 <span>{{ $t('dashboard.target') }}: {{ store.stats.version?.mc || 'Unknown' }}</span>
                                 <span>{{ $t('dashboard.loader') }}: {{ store.stats.version?.loader || 'Unknown' }}</span>
+                                <span>{{ $t('properties.loader_type') }}: {{ (store.stats.loaderType || 'fabric') === 'neoforge' ? 'NeoForge' : (store.stats.loaderType || 'fabric').charAt(0).toUpperCase() + (store.stats.loaderType || 'fabric').slice(1) }}</span>
                                 <span>{{ $t('dashboard.java_version') }}: <span class="fw-bold">{{ store.stats.javaVersion || 'Checking...' }}</span></span>
                              </div>
                         </div>
@@ -223,6 +224,14 @@ export default {
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('properties.loader_type') }}</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold small">{{ (form.loaderType || 'fabric') === 'neoforge' ? 'NeoForge' : (form.loaderType || 'fabric').charAt(0).toUpperCase() + (form.loaderType || 'fabric').slice(1) }}</span>
+                                <span v-if="form.loaderType && form.loaderType !== 'fabric'" class="badge bg-info-subtle text-info small">{{ $t('instance_manager.run_sh_mode') }}</span>
+                                <span v-else class="badge bg-success-subtle text-success small">{{ $t('instance_manager.jar_mode') }}</span>
+                            </div>
+                        </div>
+                        <div v-if="!form.loaderType || form.loaderType === 'fabric'" class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.jar_name') }}</label>
                             <div class="d-flex gap-2 align-items-center">
                                 <div style="flex:1;min-width:0">
@@ -232,7 +241,12 @@ export default {
                             </div>
                         </div>
                         <div class="mb-0">
-                            <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.java_args_label') }}</label>
+                            <label class="form-label small fw-bold text-muted">
+                                {{ $t('instance_manager.java_args_label') }}
+                            </label>
+                            <div v-if="form.loaderType && form.loaderType !== 'fabric'" class="form-text small mb-1">
+                                <i class="fa-solid fa-circle-info me-1"></i>{{ $t('instance_manager.user_jvm_args_tip') }}
+                            </div>
                             <textarea class="form-control font-monospace small" rows="5" v-model="form.javaArgs" :placeholder="$t('instance_manager.java_args_placeholder')"></textarea>
                         </div>
                     </div>
@@ -253,7 +267,7 @@ export default {
         const startupModal = ref(null);
         const saving = ref(false);
         const jars = ref([]);
-        const form = ref({ jarName: '', javaArgs: '' });
+        const form = ref({ jarName: '', javaArgs: '', loaderType: 'fabric' });
         const showCmdPanel = ref(false);
         const cmdCategory = ref('all');
         const cmdSearch = ref('');
@@ -320,7 +334,8 @@ export default {
             if (inst) {
                 form.value = {
                     jarName: inst.jarName || '',
-                    javaArgs: Array.isArray(inst.javaArgs) ? inst.javaArgs.join('\n') : (inst.javaArgs || '')
+                    javaArgs: Array.isArray(inst.javaArgs) ? inst.javaArgs.join('\n') : (inst.javaArgs || ''),
+                    loaderType: inst.loaderType || 'fabric'
                 };
             }
             fetchJars();

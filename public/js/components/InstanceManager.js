@@ -208,7 +208,13 @@ export default {
                             <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.name_label') }}</label>
                             <input type="text" class="form-control" v-model="form.name" :placeholder="$t('instance_manager.name_placeholder')">
                         </div>
-                        <div v-if="isEditing" class="mb-3 animate-in">
+                        <div v-if="isEditing" class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('properties.loader_type') }}</label>
+                            <div class="form-control-plaintext small fw-bold">
+                                {{ (form.loaderType || 'fabric') === 'neoforge' ? 'NeoForge' : (form.loaderType || 'fabric').charAt(0).toUpperCase() + (form.loaderType || 'fabric').slice(1) }}
+                            </div>
+                        </div>
+                        <div v-if="isEditing && (!form.loaderType || form.loaderType === 'fabric')" class="mb-3 animate-in">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.jar_name') }}</label>
                             <input type="text" class="form-control" v-model="form.jarName" :placeholder="$t('instance_manager.jar_placeholder')">
                         </div>
@@ -278,6 +284,7 @@ export default {
             form.value = {
                 id: inst.id,
                 name: inst.name,
+                loaderType: inst.loaderType || 'fabric',
                 jarName: inst.jarName || '',
                 javaArgs: Array.isArray(inst.javaArgs) ? inst.javaArgs.join('\n') : (inst.javaArgs || ''),
                 javaPath: inst.javaPath || ''

@@ -7,7 +7,7 @@ export const store = reactive({
     // 在线玩家列表
     onlinePlayers: [],
     // 系统状态
-    stats: { cpu: 0, mem: { total: 0, used: 0, percentage: 0 }, mc: { online: 0, maxPlayers: 20, port: '-', motd: '-' } },
+    stats: { cpu: 0, mem: { total: 0, used: 0, percentage: 0 }, mc: { online: 0, maxPlayers: 20, port: '-', motd: '-' }, loaderType: 'fabric' },
     isRunning: false,
     hasBackupMod: false,
     hasEasyAuth: false,

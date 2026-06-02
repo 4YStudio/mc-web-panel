@@ -364,7 +364,7 @@ export default {
         const downloadingId = ref(null);
         const showMobileFilters = ref(false);
         const filterGameVersion = ref('');
-        const filterLoader = ref('fabric');
+        const filterLoader = ref(store.stats.loaderType || 'fabric');
         const offset = ref(0);
         const hasMore = ref(true);
 
@@ -465,7 +465,7 @@ export default {
 
         const filters = reactive({
             versions: [],
-            loaders: ['fabric'],
+            loaders: [store.stats.loaderType || 'fabric'],
             categories: [],
             environment: []
         });
@@ -486,7 +486,7 @@ export default {
 
         const clearFilters = () => {
             filters.versions = [];
-            filters.loaders = ['fabric'];
+            filters.loaders = [store.stats.loaderType || 'fabric'];
             filters.categories = [];
             filters.environment = [];
             modrinthSearch.value = '';
@@ -642,7 +642,7 @@ export default {
                 }
 
                 if (availableLoaders.value.length > 0) {
-                    const defaultLoader = filters.loaders[0] || 'fabric';
+                    const defaultLoader = filters.loaders[0] || store.stats.loaderType || 'fabric';
                     filterLoader.value = availableLoaders.value.includes(defaultLoader)
                         ? defaultLoader
                         : availableLoaders.value[0];

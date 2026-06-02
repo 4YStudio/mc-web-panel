@@ -2,6 +2,35 @@
 
 所有重要的项目变更都会记录在此文件中。
 ---
+## [2.2.0] - 2026-06-02
+
+### ✨ 新功能
+
+- **多加载器支持（Fabric / Forge / NeoForge）**：面板从仅支持 Fabric 扩展为同时支持 Forge 和 NeoForge
+  - 设置向导新增"选择加载器类型"步骤，安装时可选择 Fabric / Forge / NeoForge
+  - 服务器设置页面版本卡片从"Fabric 核心版本"泛化为"加载器核心版本"，显示加载器类型
+  - 版本更换弹窗新增加载器类型选择，支持切换不同加载器
+  - 实例创建/编辑界面新增加载器类型选择（编辑时不可更改）
+  - Modrinth 浏览器默认 loader 过滤根据当前实例的加载器类型自动联动
+  - Dashboard 信息栏新增加载器类型显示
+
+### 🔧 后端变更
+
+- 新增 `loaderType` 字段到实例配置、默认配置和 `server-version.json`
+- 新增 `/api/loader/current-version`、`/api/loader/versions/mc`、`/api/loader/versions/loader/:gameVersion`、`/api/loader/change-version` API
+- 保留旧 `/api/fabric/*` API 向后兼容
+- 设置向导 API `/api/setup/versions/mc` 和 `/api/setup/versions/loader/:gameVersion` 支持 `loaderType` 查询参数
+- Forge/NeoForge 安装流程：下载 installer jar → 运行 `--installServer` → 清理临时文件
+- 服务器启动时根据 `loaderType` 自动检测正确的启动 jar 文件
+- 版本自动检测正则新增 Forge 和 NeoForge 日志匹配模式
+- 实例状态推送新增 `loaderType` 字段
+
+### 🌐 国际化
+
+- 新增翻译键：`loader_version`、`loader_type`、`select_loader_type`
+- 更新翻译：`change_version_confirm`、`version_changing`、`version_change_success` 从"Fabric 核心"改为"加载器核心"
+
+---
 ## [2.1.8] - 2026-05-19
 
 ### ✨ 新功能
