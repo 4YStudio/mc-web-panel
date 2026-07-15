@@ -25,7 +25,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.2.1';
+const APP_VERSION = '2.2.2';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -2630,19 +2630,8 @@ if (cluster.isPrimary) {
         try {
             const instDir = req.instDir;
             const pings = {};
-            const userCachePath = path.join(instDir, 'usercache.json');
-            if (fs.existsSync(userCachePath)) {
-                try {
-                    const userCache = await fs.readJson(userCachePath);
-                    if (Array.isArray(userCache)) {
-                        for (const entry of userCache) {
-                            if (entry.name && entry.expiresOn) {
-                                pings[entry.name] = -1;
-                            }
-                        }
-                    }
-                } catch (_) {}
-            }
+            const playerIps = {};
+            
             const playersSamplePath = path.join(instDir, 'logs');
             const latestLogPath = path.join(playersSamplePath, 'latest.log');
             if (fs.existsSync(latestLogPath)) {
@@ -2656,6 +2645,13 @@ if (cluster.isPrimary) {
                     const tail = buf.toString('utf8');
                     const lines = tail.split('\n');
                     for (const line of lines.slice(-500)) {
+                        // 1. Try to parse join/login IP address: Username[/127.0.0.1:54321] logged in
+                        const ipMatch = line.match(/\[Server thread\/INFO\]:\s+(\w+)\[\/([\d\.]+):\d+\]\s+logged in/);
+                        if (ipMatch) {
+                            playerIps[ipMatch[1]] = ipMatch[2];
+                        }
+                        
+                        // 2. Parse any legacy latency logs: Username ... (35ms)
                         const m = line.match(/\[(\d{2}:\d{2}:\d{2})\].*\[Server thread\/INFO\]:\s+(\w+)\s.*\((\d+)ms\)/);
                         if (m) {
                             pings[m[2]] = parseInt(m[3]);
@@ -2663,32 +2659,36 @@ if (cluster.isPrimary) {
                     }
                 } catch (_) {}
             }
-            if (req.instState.process) {
+            
+            // 3. Try to get RTT from established sockets using ss command (Linux only, instant and non-blocking)
+            if (Object.keys(playerIps).length > 0) {
                 try {
-                    const statusOutput = await new Promise((resolve) => {
-                        let output = '';
-                        const timeout = setTimeout(() => resolve(''), 5000);
-                        const dataHandler = (data) => {
-                            output += data.toString();
-                            if (output.includes('ms]') && output.includes('players online')) {
-                                clearTimeout(timeout);
-                                resolve(output);
+                    await new Promise((resolve) => {
+                        const { exec } = require('child_process');
+                        exec('ss -i -t -n state established', (err, stdout) => {
+                            if (!err && stdout) {
+                                const lines = stdout.split('\n');
+                                for (let i = 0; i < lines.length - 1; i++) {
+                                    const line = lines[i];
+                                    for (const [name, ip] of Object.entries(playerIps)) {
+                                        if (line.includes(ip)) {
+                                            const nextLine = lines[i + 1];
+                                            if (nextLine && nextLine.includes('rtt:')) {
+                                                const rttMatch = nextLine.match(/rtt:([\d\.]+)/);
+                                                if (rttMatch) {
+                                                    pings[name] = Math.round(parseFloat(rttMatch[1]));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        };
-                        req.instState.process.stdout.on('data', dataHandler);
-                        req.instState.process.stdin.write('list\n');
-                        setTimeout(() => {
-                            req.instState.process.stdout.off('data', dataHandler);
-                            clearTimeout(timeout);
-                            resolve(output);
-                        }, 4000);
+                            resolve();
+                        });
                     });
-                    const pingMatches = statusOutput.matchAll(/(\w+)\s*\((\d+)ms\)/g);
-                    for (const m of pingMatches) {
-                        pings[m[1]] = parseInt(m[2]);
-                    }
                 } catch (_) {}
             }
+            
             const result = {};
             for (const name of req.instState.onlinePlayers) {
                 result[name] = pings[name] !== undefined ? pings[name] : -1;
@@ -3048,7 +3048,7 @@ if (cluster.isPrimary) {
             if (!destDir.startsWith(req.instDir)) return res.status(403).json({ error: 'Access Denied' });
 
             const finalPath = path.join(destDir, fileName);
-            await fs.ensureDir(destDir);
+            await fs.ensureDir(path.dirname(finalPath));
 
             const writeStream = fs.createWriteStream(finalPath);
             for (let i = 0; i < totalChunks; i++) {

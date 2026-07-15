@@ -1,0 +1,4223 @@
+[
+    {
+        "no": 1,
+        "id": "minecraft:coal_ore",
+        "namecn": "煤矿石",
+        "nameen": "Coal Ore",
+        "category": "materials"
+    },
+    {
+        "no": 2,
+        "id": "minecraft:iron_ore",
+        "namecn": "铁矿石",
+        "nameen": "Iron Ore",
+        "category": "materials"
+    },
+    {
+        "no": 3,
+        "id": "minecraft:gold_ore",
+        "namecn": "金矿石",
+        "nameen": "Gold Ore",
+        "category": "materials"
+    },
+    {
+        "no": 4,
+        "id": "minecraft:lapis_ore",
+        "namecn": "青金石矿石",
+        "nameen": "Lapis Lazuli Ore",
+        "category": "materials"
+    },
+    {
+        "no": 5,
+        "id": "minecraft:redstone_ore",
+        "namecn": "红石矿石",
+        "nameen": "Redstone Ore",
+        "category": "materials"
+    },
+    {
+        "no": 6,
+        "id": "minecraft:diamond_ore",
+        "namecn": "钻石矿石",
+        "nameen": "Diamond Ore",
+        "category": "materials"
+    },
+    {
+        "no": 7,
+        "id": "minecraft:emerald_ore",
+        "namecn": "绿宝石矿石",
+        "nameen": "Emerald Ore",
+        "category": "materials"
+    },
+    {
+        "no": 8,
+        "id": "minecraft:stone",
+        "namecn": "石头",
+        "nameen": "Stone",
+        "category": "building"
+    },
+    {
+        "no": 9,
+        "id": "minecraft:dirt",
+        "namecn": "泥土",
+        "nameen": "Dirt",
+        "category": "building"
+    },
+    {
+        "no": 10,
+        "id": "minecraft:grass",
+        "namecn": "草方块",
+        "nameen": "Grass Block",
+        "category": "building"
+    },
+    {
+        "no": 13,
+        "id": "minecraft:gravel",
+        "namecn": "沙砾",
+        "nameen": "Gravel",
+        "category": "building"
+    },
+    {
+        "no": 14,
+        "id": "minecraft:stone_bricks",
+        "namecn": "石砖",
+        "nameen": "Stone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 15,
+        "id": "minecraft:chiseled_stone_bricks",
+        "namecn": "錾制石砖",
+        "nameen": "Chiseled Stone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 16,
+        "id": "minecraft:ice",
+        "namecn": "冰",
+        "nameen": "Ice",
+        "category": "building"
+    },
+    {
+        "no": 17,
+        "id": "minecraft:bedrock",
+        "namecn": "基岩",
+        "nameen": "Bedrock",
+        "category": "building"
+    },
+    {
+        "no": 18,
+        "id": "minecraft:clay",
+        "namecn": "黏土块",
+        "nameen": "Clay",
+        "category": "building"
+    },
+    {
+        "no": 19,
+        "id": "minecraft:sand",
+        "namecn": "沙子",
+        "nameen": "Sand",
+        "category": "building"
+    },
+    {
+        "no": 20,
+        "id": "minecraft:sandstone",
+        "namecn": "砂岩",
+        "nameen": "Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 21,
+        "id": "minecraft:obsidian",
+        "namecn": "黑曜石",
+        "nameen": "Obsidian",
+        "category": "building"
+    },
+    {
+        "no": 22,
+        "id": "minecraft:cobweb",
+        "namecn": "蜘蛛网",
+        "nameen": "Cobweb",
+        "category": "building"
+    },
+    {
+        "no": 23,
+        "id": "minecraft:wither_skeleton_skull",
+        "namecn": "凋灵骷髅头颅",
+        "nameen": "Wither Skeleton Skull",
+        "category": "building"
+    },
+    {
+        "no": 24,
+        "id": "minecraft:mob_spawner",
+        "namecn": "刷怪笼",
+        "nameen": "Spawner",
+        "category": "building"
+    },
+    {
+        "no": 25,
+        "id": "minecraft:iron_block",
+        "namecn": "铁块",
+        "nameen": "Block of Iron",
+        "category": "building"
+    },
+    {
+        "no": 26,
+        "id": "minecraft:gold_block",
+        "namecn": "金块",
+        "nameen": "Block of Gold",
+        "category": "building"
+    },
+    {
+        "no": 27,
+        "id": "minecraft:diamond_block",
+        "namecn": "钻石块",
+        "nameen": "Block of Diamond",
+        "category": "building"
+    },
+    {
+        "no": 28,
+        "id": "minecraft:lapis_block",
+        "namecn": "青金石块",
+        "nameen": "Block of Lapis Lazuli",
+        "category": "materials"
+    },
+    {
+        "no": 29,
+        "id": "minecraft:emerald_block",
+        "namecn": "绿宝石块",
+        "nameen": "Block of Emerald",
+        "category": "building"
+    },
+    {
+        "no": 34,
+        "id": "minecraft:flower_pot",
+        "namecn": "花盆",
+        "nameen": "Flower Pot",
+        "category": "building"
+    },
+    {
+        "no": 35,
+        "id": "minecraft:glass",
+        "namecn": "玻璃",
+        "nameen": "Glass",
+        "category": "building"
+    },
+    {
+        "no": 36,
+        "id": "minecraft:glass_pane",
+        "namecn": "玻璃板",
+        "nameen": "Glass Pane",
+        "category": "building"
+    },
+    {
+        "no": 37,
+        "id": "minecraft:iron_bars",
+        "namecn": "铁栏杆",
+        "nameen": "Iron Bars",
+        "category": "building"
+    },
+    {
+        "no": 38,
+        "id": "minecraft:jack_o_lantern",
+        "namecn": "南瓜灯",
+        "nameen": "Jack o'lantern",
+        "category": "building"
+    },
+    {
+        "no": 39,
+        "id": "minecraft:ladder",
+        "namecn": "梯子",
+        "nameen": "Ladder",
+        "category": "building"
+    },
+    {
+        "no": 45,
+        "id": "minecraft:anvil",
+        "namecn": "铁砧",
+        "nameen": "Anvil",
+        "category": "building"
+    },
+    {
+        "no": 46,
+        "id": "minecraft:beacon",
+        "namecn": "信标",
+        "nameen": "Beacon",
+        "category": "building"
+    },
+    {
+        "no": 47,
+        "id": "minecraft:red_bed",
+        "namecn": "床",
+        "nameen": "Bed",
+        "category": "building"
+    },
+    {
+        "no": 48,
+        "id": "minecraft:brewing_stand",
+        "namecn": "酿造台",
+        "nameen": "Brewing Stand",
+        "category": "building"
+    },
+    {
+        "no": 49,
+        "id": "minecraft:cauldron",
+        "namecn": "炼药锅",
+        "nameen": "Cauldron",
+        "category": "building"
+    },
+    {
+        "no": 50,
+        "id": "minecraft:chest",
+        "namecn": "箱子",
+        "nameen": "Chest",
+        "category": "building"
+    },
+    {
+        "no": 51,
+        "id": "minecraft:ender_chest",
+        "namecn": "末影箱",
+        "nameen": "Ender Chest",
+        "category": "building"
+    },
+    {
+        "no": 52,
+        "id": "minecraft:crafting_table",
+        "namecn": "工作台",
+        "nameen": "Crafting Table",
+        "category": "building"
+    },
+    {
+        "no": 53,
+        "id": "minecraft:enchanting_table",
+        "namecn": "附魔台",
+        "nameen": "Enchantment Table",
+        "category": "building"
+    },
+    {
+        "no": 54,
+        "id": "minecraft:furnace",
+        "namecn": "熔炉",
+        "nameen": "Furnace",
+        "category": "building"
+    },
+    {
+        "no": 55,
+        "id": "minecraft:jukebox",
+        "namecn": "唱片机",
+        "nameen": "Jukebox",
+        "category": "building"
+    },
+    {
+        "no": 57,
+        "id": "minecraft:cake",
+        "namecn": "蛋糕",
+        "nameen": "Cake",
+        "category": "food"
+    },
+    {
+        "no": 58,
+        "id": "minecraft:oak_button",
+        "namecn": "按钮",
+        "nameen": "Button",
+        "category": "building"
+    },
+    {
+        "no": 59,
+        "id": "minecraft:dispenser",
+        "namecn": "发射器",
+        "nameen": "Dispenser",
+        "category": "building"
+    },
+    {
+        "no": 61,
+        "id": "minecraft:iron_door",
+        "namecn": "铁门",
+        "nameen": "Iron Door",
+        "category": "building"
+    },
+    {
+        "no": 62,
+        "id": "minecraft:lever",
+        "namecn": "拉杆",
+        "nameen": "Lever",
+        "category": "building"
+    },
+    {
+        "no": 63,
+        "id": "minecraft:noteblock",
+        "namecn": "音符盒",
+        "nameen": "Note Block",
+        "category": "building"
+    },
+    {
+        "no": 64,
+        "id": "minecraft:piston",
+        "namecn": "活塞",
+        "nameen": "Piston",
+        "category": "special"
+    },
+    {
+        "no": 65,
+        "id": "minecraft:sticky_piston",
+        "namecn": "黏性活塞",
+        "nameen": "Sticky Piston",
+        "category": "special"
+    },
+    {
+        "no": 70,
+        "id": "minecraft:redstone",
+        "namecn": "红石粉",
+        "nameen": "Redstone Dust",
+        "category": "materials"
+    },
+    {
+        "no": 71,
+        "id": "minecraft:redstone_torch",
+        "namecn": "红石火把",
+        "nameen": "Redstone Torch",
+        "category": "materials"
+    },
+    {
+        "no": 72,
+        "id": "minecraft:repeater",
+        "namecn": "红石中继器",
+        "nameen": "Redstone Repeater",
+        "category": "special"
+    },
+    {
+        "no": 73,
+        "id": "minecraft:redstone_lamp",
+        "namecn": "红石灯",
+        "nameen": "Redstone Lamp",
+        "category": "materials"
+    },
+    {
+        "no": 75,
+        "id": "minecraft:tripwire_hook",
+        "namecn": "绊线钩",
+        "nameen": "Tripwire Hook",
+        "category": "building"
+    },
+    {
+        "no": 919,
+        "id": "minecraft:wheat_seeds",
+        "namecn": "小麦种子",
+        "nameen": "Seeds",
+        "category": "building"
+    },
+    {
+        "no": 920,
+        "id": "minecraft:vine",
+        "namecn": "藤蔓",
+        "nameen": "Vines",
+        "category": "building"
+    },
+    {
+        "no": 921,
+        "id": "minecraft:reeds",
+        "namecn": "甘蔗",
+        "nameen": "Sugar Canes",
+        "category": "building"
+    },
+    {
+        "no": 923,
+        "id": "minecraft:pumpkin_seeds",
+        "namecn": "南瓜种子",
+        "nameen": "Pumpkin Seeds",
+        "category": "food"
+    },
+    {
+        "no": 924,
+        "id": "minecraft:pumpkin",
+        "namecn": "南瓜",
+        "nameen": "Pumpkin",
+        "category": "food"
+    },
+    {
+        "no": 925,
+        "id": "minecraft:potato",
+        "namecn": "马铃薯",
+        "nameen": "Potato",
+        "category": "food"
+    },
+    {
+        "no": 926,
+        "id": "minecraft:mycelium",
+        "namecn": "菌丝",
+        "nameen": "Mycelium",
+        "category": "building"
+    },
+    {
+        "no": 928,
+        "id": "minecraft:brown_mushroom",
+        "namecn": "棕色蘑菇",
+        "nameen": "Brown Mushroom",
+        "category": "building"
+    },
+    {
+        "no": 929,
+        "id": "minecraft:red_mushroom",
+        "namecn": "红色蘑菇",
+        "nameen": "Red Mushroom",
+        "category": "building"
+    },
+    {
+        "no": 930,
+        "id": "minecraft:melon_seeds",
+        "namecn": "西瓜种子",
+        "nameen": "Melon Seeds",
+        "category": "food"
+    },
+    {
+        "no": 931,
+        "id": "minecraft:melon",
+        "namecn": "西瓜",
+        "nameen": "Melon",
+        "category": "food"
+    },
+    {
+        "no": 932,
+        "id": "minecraft:waterlily",
+        "namecn": "睡莲",
+        "nameen": "Lily Pad",
+        "category": "building"
+    },
+    {
+        "no": 935,
+        "id": "minecraft:yellow_flower",
+        "namecn": "蒲公英",
+        "nameen": "Dandelion",
+        "category": "building"
+    },
+    {
+        "no": 937,
+        "id": "minecraft:deadbush",
+        "namecn": "枯萎的灌木",
+        "nameen": "Dead Bush",
+        "category": "building"
+    },
+    {
+        "no": 938,
+        "id": "minecraft:cocoa",
+        "namecn": "可可果",
+        "nameen": "Cocoa",
+        "category": "building"
+    },
+    {
+        "no": 939,
+        "id": "minecraft:carrot",
+        "namecn": "胡萝卜",
+        "nameen": "Carrot",
+        "category": "food"
+    },
+    {
+        "no": 940,
+        "id": "minecraft:cactus",
+        "namecn": "仙人掌",
+        "nameen": "Cactus",
+        "category": "building"
+    },
+    {
+        "no": 941,
+        "id": "minecraft:water",
+        "namecn": "水",
+        "nameen": "Water",
+        "category": "building"
+    },
+    {
+        "no": 942,
+        "id": "minecraft:water_bucket",
+        "namecn": "水桶",
+        "nameen": "Water Bucket",
+        "category": "building"
+    },
+    {
+        "no": 943,
+        "id": "minecraft:lava",
+        "namecn": "熔岩",
+        "nameen": "Lava",
+        "category": "building"
+    },
+    {
+        "no": 944,
+        "id": "minecraft:lava_bucket",
+        "namecn": "熔岩桶",
+        "nameen": "Lava Bucket",
+        "category": "building"
+    },
+    {
+        "no": 945,
+        "id": "minecraft:fire",
+        "namecn": "火",
+        "nameen": "Fire",
+        "category": "building"
+    },
+    {
+        "no": 946,
+        "id": "minecraft:sign",
+        "namecn": "告示牌",
+        "nameen": "Sign",
+        "category": "building"
+    },
+    {
+        "no": 947,
+        "id": "minecraft:torch",
+        "namecn": "火把",
+        "nameen": "Torch",
+        "category": "building"
+    },
+    {
+        "no": 949,
+        "id": "minecraft:netherrack",
+        "namecn": "下界岩",
+        "nameen": "Netherrack",
+        "category": "building"
+    },
+    {
+        "no": 951,
+        "id": "minecraft:nether_wart",
+        "namecn": "下界疣",
+        "nameen": "Nether Wart",
+        "category": "building"
+    },
+    {
+        "no": 952,
+        "id": "minecraft:soul_sand",
+        "namecn": "灵魂沙",
+        "nameen": "Soul Sand",
+        "category": "building"
+    },
+    {
+        "no": 954,
+        "id": "minecraft:dragon_egg",
+        "namecn": "龙蛋",
+        "nameen": "Dragon Egg",
+        "category": "special"
+    },
+    {
+        "no": 955,
+        "id": "minecraft:end_stone",
+        "namecn": "末地石",
+        "nameen": "End Stone",
+        "category": "building"
+    },
+    {
+        "no": 956,
+        "id": "minecraft:sponge",
+        "namecn": "海绵",
+        "nameen": "Sponge",
+        "category": "building"
+    },
+    {
+        "no": 957,
+        "id": "minecraft:coal",
+        "namecn": "煤炭",
+        "nameen": "Coal",
+        "category": "materials"
+    },
+    {
+        "no": 958,
+        "id": "minecraft:coal",
+        "namecn": "木炭",
+        "nameen": "Charcoal",
+        "category": "materials"
+    },
+    {
+        "no": 960,
+        "id": "minecraft:gold_ingot",
+        "namecn": "金锭",
+        "nameen": "Gold Ingot",
+        "category": "materials"
+    },
+    {
+        "no": 961,
+        "id": "minecraft:gold_nugget",
+        "namecn": "金粒",
+        "nameen": "Gold Nugget",
+        "category": "materials"
+    },
+    {
+        "no": 963,
+        "id": "minecraft:emerald",
+        "namecn": "绿宝石",
+        "nameen": "Emerald",
+        "category": "materials"
+    },
+    {
+        "no": 964,
+        "id": "minecraft:ender_pearl",
+        "namecn": "末影珍珠",
+        "nameen": "Ender Pearl",
+        "category": "building"
+    },
+    {
+        "no": 965,
+        "id": "minecraft:clay_ball",
+        "namecn": "黏土球",
+        "nameen": "Clay Ball",
+        "category": "building"
+    },
+    {
+        "no": 967,
+        "id": "minecraft:blaze_rod",
+        "namecn": "烈焰棒",
+        "nameen": "Blaze Rod",
+        "category": "building"
+    },
+    {
+        "no": 968,
+        "id": "minecraft:ghast_tear",
+        "namecn": "恶魂之泪",
+        "nameen": "Ghast Tear",
+        "category": "building"
+    },
+    {
+        "no": 969,
+        "id": "minecraft:bone",
+        "namecn": "骨头",
+        "nameen": "Bone",
+        "category": "building"
+    },
+    {
+        "no": 972,
+        "id": "minecraft:gunpowder",
+        "namecn": "火药",
+        "nameen": "Gunpowder",
+        "category": "building"
+    },
+    {
+        "no": 973,
+        "id": "minecraft:leather",
+        "namecn": "皮革",
+        "nameen": "Leather",
+        "category": "building"
+    },
+    {
+        "no": 975,
+        "id": "minecraft:slime_ball",
+        "namecn": "黏液球",
+        "nameen": "Slimeball",
+        "category": "special"
+    },
+    {
+        "no": 976,
+        "id": "minecraft:blaze_powder",
+        "namecn": "烈焰粉",
+        "nameen": "Blaze Powder",
+        "category": "building"
+    },
+    {
+        "no": 979,
+        "id": "minecraft:brick",
+        "namecn": "红砖",
+        "nameen": "Brick",
+        "category": "building"
+    },
+    {
+        "no": 980,
+        "id": "minecraft:ender_eye",
+        "namecn": "末影之眼",
+        "nameen": "Eye of Ender",
+        "category": "building"
+    },
+    {
+        "no": 981,
+        "id": "minecraft:fermented_spider_eye",
+        "namecn": "发酵蛛眼",
+        "nameen": "Fermented Spider Eye",
+        "category": "building"
+    },
+    {
+        "no": 984,
+        "id": "minecraft:glass_bottle",
+        "namecn": "玻璃瓶",
+        "nameen": "Glass Bottle",
+        "category": "building"
+    },
+    {
+        "no": 985,
+        "id": "minecraft:glistering_melon_slice",
+        "namecn": "闪烁的西瓜片",
+        "nameen": "Glistering Melon Slice",
+        "category": "food"
+    },
+    {
+        "no": 986,
+        "id": "minecraft:magma_cream",
+        "namecn": "岩浆膏",
+        "nameen": "Magma Cream",
+        "category": "building"
+    },
+    {
+        "no": 988,
+        "id": "minecraft:potion",
+        "namecn": "药水",
+        "nameen": "Potion",
+        "category": "special"
+    },
+    {
+        "no": 989,
+        "id": "minecraft:splash_potion",
+        "namecn": "喷溅型药水",
+        "nameen": "Splash Potions",
+        "category": "special"
+    },
+    {
+        "no": 990,
+        "id": "minecraft:stick",
+        "namecn": "木棍",
+        "nameen": "Stick",
+        "category": "building"
+    },
+    {
+        "no": 992,
+        "id": "minecraft:bread",
+        "namecn": "面包",
+        "nameen": "Bread",
+        "category": "food"
+    },
+    {
+        "no": 993,
+        "id": "minecraft:golden_carrot",
+        "namecn": "金胡萝卜",
+        "nameen": "Golden Carrot",
+        "category": "food"
+    },
+    {
+        "no": 994,
+        "id": "minecraft:cookie",
+        "namecn": "曲奇",
+        "nameen": "Cookie",
+        "category": "food"
+    },
+    {
+        "no": 995,
+        "id": "minecraft:melon_slice",
+        "namecn": "西瓜片",
+        "nameen": "Melon Slice",
+        "category": "food"
+    },
+    {
+        "no": 996,
+        "id": "minecraft:milk_bucket",
+        "namecn": "奶桶",
+        "nameen": "Milk Bucket",
+        "category": "food"
+    },
+    {
+        "no": 997,
+        "id": "minecraft:mushroom_stew",
+        "namecn": "蘑菇煲",
+        "nameen": "Mushroom Stew",
+        "category": "food"
+    },
+    {
+        "no": 998,
+        "id": "minecraft:beef",
+        "namecn": "生牛肉",
+        "nameen": "Raw Beef",
+        "category": "food"
+    },
+    {
+        "no": 999,
+        "id": "minecraft:cooked_beef",
+        "namecn": "牛排",
+        "nameen": "Steak",
+        "category": "food"
+    },
+    {
+        "no": 1000,
+        "id": "minecraft:chicken",
+        "namecn": "生鸡肉",
+        "nameen": "Raw Chicken",
+        "category": "food"
+    },
+    {
+        "no": 1001,
+        "id": "minecraft:cooked_chicken",
+        "namecn": "熟鸡肉",
+        "nameen": "Cooked Chicken",
+        "category": "food"
+    },
+    {
+        "no": 1002,
+        "id": "minecraft:cod",
+        "namecn": "生鱼",
+        "nameen": "Raw Fish",
+        "category": "food"
+    },
+    {
+        "no": 1003,
+        "id": "minecraft:cooked_cod",
+        "namecn": "熟鱼",
+        "nameen": "Cooked Fish",
+        "category": "food"
+    },
+    {
+        "no": 1004,
+        "id": "minecraft:porkchop",
+        "namecn": "生猪排",
+        "nameen": "Raw Porkchop",
+        "category": "food"
+    },
+    {
+        "no": 1005,
+        "id": "minecraft:cooked_porkchop",
+        "namecn": "熟猪排",
+        "nameen": "Cooked Porkchop",
+        "category": "food"
+    },
+    {
+        "no": 1006,
+        "id": "minecraft:baked_potato",
+        "namecn": "烤马铃薯",
+        "nameen": "Baked Potato",
+        "category": "food"
+    },
+    {
+        "no": 1007,
+        "id": "minecraft:poisonous_potato",
+        "namecn": "毒马铃薯",
+        "nameen": "Poisonous Potato",
+        "category": "food"
+    },
+    {
+        "no": 1008,
+        "id": "minecraft:pumpkin_pie",
+        "namecn": "南瓜派",
+        "nameen": "Pumpkin Pie",
+        "category": "food"
+    },
+    {
+        "no": 1009,
+        "id": "minecraft:apple",
+        "namecn": "苹果",
+        "nameen": "Apple",
+        "category": "food"
+    },
+    {
+        "no": 1010,
+        "id": "minecraft:golden_apple",
+        "namecn": "金苹果",
+        "nameen": "Golden Apple",
+        "category": "food"
+    },
+    {
+        "no": 1011,
+        "id": "minecraft:rotten_flesh",
+        "namecn": "腐肉",
+        "nameen": "Rotten Flesh",
+        "category": "building"
+    },
+    {
+        "no": 1012,
+        "id": "minecraft:spider_eye",
+        "namecn": "蜘蛛眼",
+        "nameen": "Spider Eye",
+        "category": "building"
+    },
+    {
+        "no": 1013,
+        "id": "minecraft:wheat",
+        "namecn": "小麦",
+        "nameen": "Wheat",
+        "category": "building"
+    },
+    {
+        "no": 1014,
+        "id": "minecraft:bone_meal",
+        "namecn": "骨粉",
+        "nameen": "Bone Meal",
+        "category": "building"
+    },
+    {
+        "no": 1015,
+        "id": "minecraft:light_gray_dye",
+        "namecn": "淡灰色染料",
+        "nameen": "Light Gray Dye",
+        "category": "building"
+    },
+    {
+        "no": 1016,
+        "id": "minecraft:gray_dye",
+        "namecn": "灰色染料",
+        "nameen": "Gray Dye",
+        "category": "building"
+    },
+    {
+        "no": 1017,
+        "id": "minecraft:ink_sac",
+        "namecn": "墨囊",
+        "nameen": "Ink Sac",
+        "category": "building"
+    },
+    {
+        "no": 1018,
+        "id": "minecraft:pink_dye",
+        "namecn": "粉红色染料",
+        "nameen": "Pink Dye",
+        "category": "building"
+    },
+    {
+        "no": 1019,
+        "id": "minecraft:red_dye",
+        "namecn": "红色染料",
+        "nameen": "Red Dye",
+        "category": "building"
+    },
+    {
+        "no": 1020,
+        "id": "minecraft:orange_dye",
+        "namecn": "橙色染料",
+        "nameen": "Orange Dye",
+        "category": "building"
+    },
+    {
+        "no": 1021,
+        "id": "minecraft:yellow_dye",
+        "namecn": "黄色染料",
+        "nameen": "Yellow Dye",
+        "category": "building"
+    },
+    {
+        "no": 1022,
+        "id": "minecraft:lime_dye",
+        "namecn": "黄绿色染料",
+        "nameen": "Lime Dye",
+        "category": "building"
+    },
+    {
+        "no": 1023,
+        "id": "minecraft:green_dye",
+        "namecn": "绿色染料",
+        "nameen": "Green Dye",
+        "category": "building"
+    },
+    {
+        "no": 1024,
+        "id": "minecraft:light_blue_dye",
+        "namecn": "淡蓝色染料",
+        "nameen": "Light Blue Dye",
+        "category": "building"
+    },
+    {
+        "no": 1025,
+        "id": "minecraft:cyan_dye",
+        "namecn": "青色染料",
+        "nameen": "Cyan Dye",
+        "category": "building"
+    },
+    {
+        "no": 1026,
+        "id": "minecraft:lapis_lazuli",
+        "namecn": "青金石",
+        "nameen": "Lapis Lazuli",
+        "category": "building"
+    },
+    {
+        "no": 1027,
+        "id": "minecraft:purple_dye",
+        "namecn": "紫色染料",
+        "nameen": "Purple Dye",
+        "category": "building"
+    },
+    {
+        "no": 1028,
+        "id": "minecraft:magenta_dye",
+        "namecn": "品红色染料",
+        "nameen": "Magenta Dye",
+        "category": "building"
+    },
+    {
+        "no": 1029,
+        "id": "minecraft:cocoa_beans",
+        "namecn": "可可豆",
+        "nameen": "Cocoa Beans",
+        "category": "building"
+    },
+    {
+        "no": 1030,
+        "id": "minecraft:wooden_axe",
+        "namecn": "木斧",
+        "nameen": "Wooden Axe",
+        "category": "tools"
+    },
+    {
+        "no": 1031,
+        "id": "minecraft:iron_axe",
+        "namecn": "铁斧",
+        "nameen": "Iron Axe",
+        "category": "tools"
+    },
+    {
+        "no": 1032,
+        "id": "minecraft:golden_axe",
+        "namecn": "金斧",
+        "nameen": "Golden Axe",
+        "category": "tools"
+    },
+    {
+        "no": 1033,
+        "id": "minecraft:diamond_axe",
+        "namecn": "钻石斧",
+        "nameen": "Diamond Axe",
+        "category": "tools"
+    },
+    {
+        "no": 1034,
+        "id": "minecraft:wooden_pickaxe",
+        "namecn": "木镐",
+        "nameen": "Wooden Pickaxe",
+        "category": "tools"
+    },
+    {
+        "no": 1035,
+        "id": "minecraft:iron_pickaxe",
+        "namecn": "铁镐",
+        "nameen": "Iron Pickaxe",
+        "category": "tools"
+    },
+    {
+        "no": 1036,
+        "id": "minecraft:golden_pickaxe",
+        "namecn": "金镐",
+        "nameen": "Golden Pickaxe",
+        "category": "tools"
+    },
+    {
+        "no": 1037,
+        "id": "minecraft:diamond_pickaxe",
+        "namecn": "钻石镐",
+        "nameen": "Diamond Pickaxe",
+        "category": "tools"
+    },
+    {
+        "no": 1038,
+        "id": "minecraft:wooden_shovel",
+        "namecn": "木锹",
+        "nameen": "Wooden Shovel",
+        "category": "tools"
+    },
+    {
+        "no": 1039,
+        "id": "minecraft:iron_shovel",
+        "namecn": "铁锹",
+        "nameen": "Iron Shovel",
+        "category": "tools"
+    },
+    {
+        "no": 1040,
+        "id": "minecraft:golden_shovel",
+        "namecn": "金锹",
+        "nameen": "Golden Shovel",
+        "category": "tools"
+    },
+    {
+        "no": 1041,
+        "id": "minecraft:diamond_shovel",
+        "namecn": "钻石锹",
+        "nameen": "Diamond Shovel",
+        "category": "tools"
+    },
+    {
+        "no": 1042,
+        "id": "minecraft:wooden_sword",
+        "namecn": "木剑",
+        "nameen": "Wooden Sword",
+        "category": "combat"
+    },
+    {
+        "no": 1043,
+        "id": "minecraft:iron_sword",
+        "namecn": "铁剑",
+        "nameen": "Iron Sword",
+        "category": "combat"
+    },
+    {
+        "no": 1044,
+        "id": "minecraft:golden_sword",
+        "namecn": "金剑",
+        "nameen": "Golden Sword",
+        "category": "combat"
+    },
+    {
+        "no": 1045,
+        "id": "minecraft:diamond_sword",
+        "namecn": "钻石剑",
+        "nameen": "Diamond Sword",
+        "category": "combat"
+    },
+    {
+        "no": 1046,
+        "id": "minecraft:wooden_hoe",
+        "namecn": "木锄",
+        "nameen": "Wooden Hoe",
+        "category": "tools"
+    },
+    {
+        "no": 1047,
+        "id": "minecraft:iron_hoe",
+        "namecn": "铁锄",
+        "nameen": "Iron Hoe",
+        "category": "tools"
+    },
+    {
+        "no": 1048,
+        "id": "minecraft:golden_hoe",
+        "namecn": "金锄",
+        "nameen": "Golden Hoe",
+        "category": "tools"
+    },
+    {
+        "no": 1050,
+        "id": "minecraft:stone_axe",
+        "namecn": "石斧",
+        "nameen": "Stone Axe",
+        "category": "tools"
+    },
+    {
+        "no": 1051,
+        "id": "minecraft:stone_pickaxe",
+        "namecn": "石镐",
+        "nameen": "Stone Pickaxe",
+        "category": "tools"
+    },
+    {
+        "no": 1052,
+        "id": "minecraft:stone_shovel",
+        "namecn": "石锹",
+        "nameen": "Stone Shovel",
+        "category": "tools"
+    },
+    {
+        "no": 1053,
+        "id": "minecraft:stone_sword",
+        "namecn": "石剑",
+        "nameen": "Stone Sword",
+        "category": "combat"
+    },
+    {
+        "no": 1054,
+        "id": "minecraft:stone_hoe",
+        "namecn": "石锄",
+        "nameen": "Stone Hoe",
+        "category": "tools"
+    },
+    {
+        "no": 1055,
+        "id": "minecraft:bucket",
+        "namecn": "桶",
+        "nameen": "Bucket",
+        "category": "building"
+    },
+    {
+        "no": 1056,
+        "id": "minecraft:fishing_rod",
+        "namecn": "钓鱼竿",
+        "nameen": "Fishing Rod",
+        "category": "tools"
+    },
+    {
+        "no": 1057,
+        "id": "minecraft:flint_and_steel",
+        "namecn": "打火石",
+        "nameen": "Flint and Steel",
+        "category": "tools"
+    },
+    {
+        "no": 1058,
+        "id": "minecraft:shears",
+        "namecn": "剪刀",
+        "nameen": "Shears",
+        "category": "tools"
+    },
+    {
+        "no": 1059,
+        "id": "minecraft:clock",
+        "namecn": "时钟",
+        "nameen": "Clock",
+        "category": "tools"
+    },
+    {
+        "no": 1060,
+        "id": "minecraft:compass",
+        "namecn": "指南针",
+        "nameen": "Compass",
+        "category": "tools"
+    },
+    {
+        "no": 1061,
+        "id": "minecraft:filled_map",
+        "namecn": "地图",
+        "nameen": "Map",
+        "category": "building"
+    },
+    {
+        "no": 1063,
+        "id": "minecraft:written_book",
+        "namecn": "成书",
+        "nameen": "Written Book",
+        "category": "special"
+    },
+    {
+        "no": 1064,
+        "id": "minecraft:bow",
+        "namecn": "弓",
+        "nameen": "Bow",
+        "category": "combat"
+    },
+    {
+        "no": 1065,
+        "id": "minecraft:arrow",
+        "namecn": "箭",
+        "nameen": "Arrow",
+        "category": "building"
+    },
+    {
+        "no": 1066,
+        "id": "minecraft:egg",
+        "namecn": "鸡蛋",
+        "nameen": "Egg",
+        "category": "special"
+    },
+    {
+        "no": 1067,
+        "id": "minecraft:fire_charge",
+        "namecn": "火焰弹",
+        "nameen": "Fire Charge",
+        "category": "building"
+    },
+    {
+        "no": 1069,
+        "id": "minecraft:boat",
+        "namecn": "船",
+        "nameen": "Boat",
+        "category": "building"
+    },
+    {
+        "no": 1070,
+        "id": "minecraft:minecart",
+        "namecn": "矿车",
+        "nameen": "Minecart",
+        "category": "building"
+    },
+    {
+        "no": 1071,
+        "id": "minecraft:furnace_minecart",
+        "namecn": "动力矿车",
+        "nameen": "Minecart with Furnace",
+        "category": "building"
+    },
+    {
+        "no": 1073,
+        "id": "minecraft:experience_bottle",
+        "namecn": "附魔之瓶",
+        "nameen": "Bottle o' Enchanting",
+        "category": "special"
+    },
+    {
+        "no": 1074,
+        "id": "minecraft:enchanted_book",
+        "namecn": "附魔书",
+        "nameen": "Enchanted Book",
+        "category": "special"
+    },
+    {
+        "no": 1075,
+        "id": "minecraft:carrot_on_a_stick",
+        "namecn": "胡萝卜钓竿",
+        "nameen": "Carrot on a Stick",
+        "category": "food"
+    },
+    {
+        "no": 1076,
+        "id": "minecraft:saddle",
+        "namecn": "鞍",
+        "nameen": "Saddle",
+        "category": "special"
+    },
+    {
+        "no": 1077,
+        "id": "minecraft:item_frame",
+        "namecn": "物品展示框",
+        "nameen": "Item Frame",
+        "category": "building"
+    },
+    {
+        "no": 1078,
+        "id": "minecraft:music_disc_otherside",
+        "namecn": "音乐唱片",
+        "nameen": "Music Disc",
+        "category": "building"
+    },
+    {
+        "no": 1079,
+        "id": "minecraft:painting",
+        "namecn": "画",
+        "nameen": "Painting",
+        "category": "building"
+    },
+    {
+        "no": 1084,
+        "id": "minecraft:iron_helmet",
+        "namecn": "铁头盔",
+        "nameen": "Iron Helmet",
+        "category": "combat"
+    },
+    {
+        "no": 1086,
+        "id": "minecraft:diamond_helmet",
+        "namecn": "钻石头盔",
+        "nameen": "Diamond Helmet",
+        "category": "combat"
+    },
+    {
+        "no": 1088,
+        "id": "minecraft:iron_chestplate",
+        "namecn": "铁胸甲",
+        "nameen": "Iron Chestplate",
+        "category": "combat"
+    },
+    {
+        "no": 1090,
+        "id": "minecraft:diamond_chestplate",
+        "namecn": "钻石胸甲",
+        "nameen": "Diamond Chestplate",
+        "category": "combat"
+    },
+    {
+        "no": 1092,
+        "id": "minecraft:iron_leggings",
+        "namecn": "铁护腿",
+        "nameen": "Iron Leggings",
+        "category": "combat"
+    },
+    {
+        "no": 1094,
+        "id": "minecraft:diamond_leggings",
+        "namecn": "钻石护腿",
+        "nameen": "Diamond Leggings",
+        "category": "combat"
+    },
+    {
+        "no": 1095,
+        "id": "minecraft:leather_boots",
+        "namecn": "皮革靴子",
+        "nameen": "Leather Boots",
+        "category": "combat"
+    },
+    {
+        "no": 1096,
+        "id": "minecraft:iron_boots",
+        "namecn": "铁靴子",
+        "nameen": "Iron Boots",
+        "category": "combat"
+    },
+    {
+        "no": 1098,
+        "id": "minecraft:diamond_boots",
+        "namecn": "钻石靴子",
+        "nameen": "Diamond Boots",
+        "category": "combat"
+    },
+    {
+        "no": 1099,
+        "id": "minecraft:chainmail_helmet",
+        "namecn": "锁链头盔",
+        "nameen": "Chain Helmet",
+        "category": "combat"
+    },
+    {
+        "no": 1100,
+        "id": "minecraft:chainmail_chestplate",
+        "namecn": "锁链胸甲",
+        "nameen": "Chain Chestplate",
+        "category": "combat"
+    },
+    {
+        "no": 1101,
+        "id": "minecraft:chainmail_leggings",
+        "namecn": "锁链护腿",
+        "nameen": "Chain Leggings",
+        "category": "combat"
+    },
+    {
+        "no": 1102,
+        "id": "minecraft:chainmail_boots",
+        "namecn": "锁链靴子",
+        "nameen": "Chain Boots",
+        "category": "combat"
+    },
+    {
+        "no": 2194,
+        "id": "minecraft:air",
+        "namecn": "空气",
+        "nameen": "Air",
+        "category": "building"
+    },
+    {
+        "no": 2287,
+        "id": "minecraft:coal_block",
+        "namecn": "煤炭块",
+        "nameen": "Block of Coal",
+        "category": "building"
+    },
+    {
+        "no": 2289,
+        "id": "minecraft:hay_block",
+        "namecn": "干草块",
+        "nameen": "Hay Bale",
+        "category": "building"
+    },
+    {
+        "no": 2290,
+        "id": "minecraft:quartz_block",
+        "namecn": "石英块",
+        "nameen": "Block of Quartz",
+        "category": "building"
+    },
+    {
+        "no": 3092,
+        "id": "minecraft:redstone_block",
+        "namecn": "红石块",
+        "nameen": "Block of Redstone",
+        "category": "materials"
+    },
+    {
+        "no": 3095,
+        "id": "minecraft:activator_rail",
+        "namecn": "激活铁轨",
+        "nameen": "Activator Rail",
+        "category": "building"
+    },
+    {
+        "no": 3096,
+        "id": "minecraft:comparator",
+        "namecn": "红石比较器",
+        "nameen": "Redstone Comparator",
+        "category": "special"
+    },
+    {
+        "no": 3099,
+        "id": "minecraft:dropper",
+        "namecn": "投掷器",
+        "nameen": "Dropper",
+        "category": "building"
+    },
+    {
+        "no": 3100,
+        "id": "minecraft:netherbrick",
+        "namecn": "下界砖",
+        "nameen": "Nether Brick",
+        "category": "building"
+    },
+    {
+        "no": 3101,
+        "id": "minecraft:trapped_chest",
+        "namecn": "陷阱箱",
+        "nameen": "Trapped Chest",
+        "category": "building"
+    },
+    {
+        "no": 3102,
+        "id": "minecraft:hopper",
+        "namecn": "漏斗",
+        "nameen": "Hopper",
+        "category": "building"
+    },
+    {
+        "no": 3164,
+        "id": "minecraft:tnt_minecart",
+        "namecn": "TNT矿车",
+        "nameen": "Minecart with TNT",
+        "category": "special"
+    },
+    {
+        "no": 3165,
+        "id": "minecraft:hopper_minecart",
+        "namecn": "漏斗矿车",
+        "nameen": "Minecart with Hopper",
+        "category": "building"
+    },
+    {
+        "no": 3166,
+        "id": "minecraft:lead",
+        "namecn": "拴绳",
+        "nameen": "Lead",
+        "category": "tools"
+    },
+    {
+        "no": 3167,
+        "id": "minecraft:name_tag",
+        "namecn": "命名牌",
+        "nameen": "Name Tag",
+        "category": "special"
+    },
+    {
+        "no": 7308,
+        "id": "minecraft:tropical_fish",
+        "namecn": "热带鱼",
+        "nameen": "Tropical Fish",
+        "category": "food"
+    },
+    {
+        "no": 7309,
+        "id": "minecraft:cooked_salmon",
+        "namecn": "熟鲑鱼",
+        "nameen": "Cooked Salmon",
+        "category": "food"
+    },
+    {
+        "no": 7310,
+        "id": "minecraft:salmon",
+        "namecn": "生鲑鱼",
+        "nameen": "Raw Salmon",
+        "category": "building"
+    },
+    {
+        "no": 7311,
+        "id": "minecraft:pufferfish",
+        "namecn": "河豚",
+        "nameen": "Pufferfish",
+        "category": "food"
+    },
+    {
+        "no": 7979,
+        "id": "minecraft:sapling",
+        "namecn": "白桦树苗",
+        "nameen": "Birch Sapling",
+        "category": "building"
+    },
+    {
+        "no": 9498,
+        "id": "minecraft:armor_stand",
+        "namecn": "盔甲架",
+        "nameen": "Armor Stand",
+        "category": "building"
+    },
+    {
+        "no": 9499,
+        "id": "minecraft:banner",
+        "namecn": "旗帜",
+        "nameen": "Banner",
+        "category": "building"
+    },
+    {
+        "no": 10959,
+        "id": "minecraft:stone",
+        "namecn": "花岗岩",
+        "nameen": "Granite",
+        "category": "building"
+    },
+    {
+        "no": 10960,
+        "id": "minecraft:stone",
+        "namecn": "磨制花岗岩",
+        "nameen": "Polished Granite",
+        "category": "building"
+    },
+    {
+        "no": 10961,
+        "id": "minecraft:stone",
+        "namecn": "闪长岩",
+        "nameen": "Diorite",
+        "category": "building"
+    },
+    {
+        "no": 10962,
+        "id": "minecraft:stone",
+        "namecn": "磨制闪长岩",
+        "nameen": "Polished Diorite",
+        "category": "building"
+    },
+    {
+        "no": 10963,
+        "id": "minecraft:stone",
+        "namecn": "安山岩",
+        "nameen": "Andesite",
+        "category": "building"
+    },
+    {
+        "no": 10964,
+        "id": "minecraft:stone",
+        "namecn": "磨制安山岩",
+        "nameen": "Polished Andesite",
+        "category": "building"
+    },
+    {
+        "no": 10965,
+        "id": "minecraft:dirt",
+        "namecn": "砂土",
+        "nameen": "Coarse Dirt",
+        "category": "building"
+    },
+    {
+        "no": 10966,
+        "id": "minecraft:dirt",
+        "namecn": "灰化土",
+        "nameen": "Podzol",
+        "category": "building"
+    },
+    {
+        "no": 10972,
+        "id": "minecraft:sapling",
+        "namecn": "橡树树苗",
+        "nameen": "Oak Sapling",
+        "category": "building"
+    },
+    {
+        "no": 10973,
+        "id": "minecraft:sapling",
+        "namecn": "云杉树苗",
+        "nameen": "Spruce Sapling",
+        "category": "building"
+    },
+    {
+        "no": 10975,
+        "id": "minecraft:sapling",
+        "namecn": "丛林树苗",
+        "nameen": "Jungle Sapling",
+        "category": "building"
+    },
+    {
+        "no": 10976,
+        "id": "minecraft:sapling",
+        "namecn": "金合欢树苗",
+        "nameen": "Acacia Sapling",
+        "category": "building"
+    },
+    {
+        "no": 10977,
+        "id": "minecraft:sapling",
+        "namecn": "深色橡树树苗",
+        "nameen": "Dark Oak Sapling",
+        "category": "building"
+    },
+    {
+        "no": 10978,
+        "id": "minecraft:sand",
+        "namecn": "红沙",
+        "nameen": "Red Sand",
+        "category": "building"
+    },
+    {
+        "no": 10981,
+        "id": "minecraft:leaves",
+        "namecn": "橡树树叶",
+        "nameen": "Oak Leaves",
+        "category": "building"
+    },
+    {
+        "no": 10982,
+        "id": "minecraft:leaves",
+        "namecn": "云杉树叶",
+        "nameen": "Spruce Leaves",
+        "category": "building"
+    },
+    {
+        "no": 10983,
+        "id": "minecraft:leaves",
+        "namecn": "白桦树叶",
+        "nameen": "Birch Leaves",
+        "category": "building"
+    },
+    {
+        "no": 10984,
+        "id": "minecraft:leaves",
+        "namecn": "丛林树叶",
+        "nameen": "Jungle Leaves",
+        "category": "building"
+    },
+    {
+        "no": 10985,
+        "id": "minecraft:sponge",
+        "namecn": "湿海绵",
+        "nameen": "Wet Sponge",
+        "category": "building"
+    },
+    {
+        "no": 10986,
+        "id": "minecraft:sandstone",
+        "namecn": "錾制砂岩",
+        "nameen": "Chiseled Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 10987,
+        "id": "minecraft:sandstone",
+        "namecn": "平滑砂岩",
+        "nameen": "Smooth Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 10988,
+        "id": "minecraft:golden_rail",
+        "namecn": "动力铁轨",
+        "nameen": "Powered Rail",
+        "category": "building"
+    },
+    {
+        "no": 10989,
+        "id": "minecraft:detector_rail",
+        "namecn": "探测铁轨",
+        "nameen": "Detector Rail",
+        "category": "building"
+    },
+    {
+        "no": 10990,
+        "id": "minecraft:short_grass",
+        "namecn": "草",
+        "nameen": "Grass",
+        "category": "building"
+    },
+    {
+        "no": 10991,
+        "id": "minecraft:tallgrass",
+        "namecn": "蕨",
+        "nameen": "Fern",
+        "category": "building"
+    },
+    {
+        "no": 10992,
+        "id": "minecraft:red_flower",
+        "namecn": "虞美人",
+        "nameen": "Poppy",
+        "category": "building"
+    },
+    {
+        "no": 10993,
+        "id": "minecraft:red_flower",
+        "namecn": "兰花",
+        "nameen": "Blue Orchid",
+        "category": "building"
+    },
+    {
+        "no": 10994,
+        "id": "minecraft:red_flower",
+        "namecn": "绒球葱",
+        "nameen": "Allium",
+        "category": "building"
+    },
+    {
+        "no": 10995,
+        "id": "minecraft:red_flower",
+        "namecn": "蓝花美耳草",
+        "nameen": "Azure Bluet",
+        "category": "building"
+    },
+    {
+        "no": 10996,
+        "id": "minecraft:red_flower",
+        "namecn": "红色郁金香",
+        "nameen": "Red Tulip",
+        "category": "building"
+    },
+    {
+        "no": 10997,
+        "id": "minecraft:red_flower",
+        "namecn": "橙色郁金香",
+        "nameen": "Orange Tulip",
+        "category": "building"
+    },
+    {
+        "no": 10998,
+        "id": "minecraft:red_flower",
+        "namecn": "白色郁金香",
+        "nameen": "White Tulip",
+        "category": "building"
+    },
+    {
+        "no": 10999,
+        "id": "minecraft:red_flower",
+        "namecn": "粉红色郁金香",
+        "nameen": "Pink Tulip",
+        "category": "building"
+    },
+    {
+        "no": 11000,
+        "id": "minecraft:red_flower",
+        "namecn": "滨菊",
+        "nameen": "Oxeye Daisy",
+        "category": "building"
+    },
+    {
+        "no": 11001,
+        "id": "minecraft:red_mushroom_block",
+        "namecn": "红色蘑菇方块",
+        "nameen": "Red Mushroom Block",
+        "category": "building"
+    },
+    {
+        "no": 11011,
+        "id": "minecraft:rail",
+        "namecn": "铁轨",
+        "nameen": "Rail",
+        "category": "building"
+    },
+    {
+        "no": 11013,
+        "id": "minecraft:stone_pressure_plate",
+        "namecn": "石头压力板",
+        "nameen": "Stone Pressure Plate",
+        "category": "building"
+    },
+    {
+        "no": 11014,
+        "id": "minecraft:oak_pressure_plate",
+        "namecn": "木质压力板",
+        "nameen": "Wooden Pressure Plate",
+        "category": "building"
+    },
+    {
+        "no": 11035,
+        "id": "minecraft:monster_egg",
+        "namecn": "被虫蚀的石头",
+        "nameen": "Infested Stone",
+        "category": "special"
+    },
+    {
+        "no": 11036,
+        "id": "minecraft:monster_egg",
+        "namecn": "被虫蚀的圆石",
+        "nameen": "Infested Cobblestone",
+        "category": "special"
+    },
+    {
+        "no": 11037,
+        "id": "minecraft:monster_egg",
+        "namecn": "被虫蚀的石砖",
+        "nameen": "Infested Stone Bricks",
+        "category": "special"
+    },
+    {
+        "no": 11038,
+        "id": "minecraft:monster_egg",
+        "namecn": "被虫蚀的苔石砖",
+        "nameen": "Infested Mossy Stone Bricks",
+        "category": "special"
+    },
+    {
+        "no": 11039,
+        "id": "minecraft:monster_egg",
+        "namecn": "被虫蚀的裂纹石砖",
+        "nameen": "Infested Cracked Stone Bricks",
+        "category": "special"
+    },
+    {
+        "no": 11040,
+        "id": "minecraft:monster_egg",
+        "namecn": "被虫蚀的錾制石砖",
+        "nameen": "Infested Chiseled Stone Bricks",
+        "category": "special"
+    },
+    {
+        "no": 11041,
+        "id": "minecraft:mossy_stone_bricks",
+        "namecn": "苔石砖",
+        "nameen": "Mossy Stone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 11042,
+        "id": "minecraft:cracked_stone_bricks",
+        "namecn": "裂纹石砖",
+        "nameen": "Cracked Stone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 11048,
+        "id": "minecraft:end_portal_frame",
+        "namecn": "末地传送门框架",
+        "nameen": "End Portal Frame",
+        "category": "building"
+    },
+    {
+        "no": 11059,
+        "id": "minecraft:command_block",
+        "namecn": "命令方块",
+        "nameen": "Command Block",
+        "category": "building"
+    },
+    {
+        "no": 11061,
+        "id": "minecraft:anvil",
+        "namecn": "开裂的铁砧",
+        "nameen": "Chipped Anvil",
+        "category": "building"
+    },
+    {
+        "no": 11062,
+        "id": "minecraft:anvil",
+        "namecn": "损坏的铁砧",
+        "nameen": "Damaged Anvil",
+        "category": "building"
+    },
+    {
+        "no": 11063,
+        "id": "minecraft:light_weighted_pressure_plate",
+        "namecn": "轻质测重压力板",
+        "nameen": "Light Weighted Pressure Plate",
+        "category": "building"
+    },
+    {
+        "no": 11064,
+        "id": "minecraft:heavy_weighted_pressure_plate",
+        "namecn": "重质测重压力板",
+        "nameen": "Heavy Weighted Pressure Plate",
+        "category": "building"
+    },
+    {
+        "no": 11065,
+        "id": "minecraft:daylight_detector",
+        "namecn": "阳光探测器",
+        "nameen": "Daylight Detector",
+        "category": "building"
+    },
+    {
+        "no": 11066,
+        "id": "minecraft:quartz_ore",
+        "namecn": "下界石英矿石",
+        "nameen": "Nether Quartz Ore",
+        "category": "materials"
+    },
+    {
+        "no": 11067,
+        "id": "minecraft:quartz_block",
+        "namecn": "錾制石英块",
+        "nameen": "Chiseled Quartz Block",
+        "category": "building"
+    },
+    {
+        "no": 11068,
+        "id": "minecraft:quartz_block",
+        "namecn": "石英柱",
+        "nameen": "Quartz Pillar",
+        "category": "building"
+    },
+    {
+        "no": 11102,
+        "id": "minecraft:leaves2",
+        "namecn": "金合欢树叶",
+        "nameen": "Acacia Leaves",
+        "category": "building"
+    },
+    {
+        "no": 11103,
+        "id": "minecraft:leaves2",
+        "namecn": "深色橡树树叶",
+        "nameen": "Dark Oak Leaves",
+        "category": "building"
+    },
+    {
+        "no": 11107,
+        "id": "minecraft:slime",
+        "namecn": "黏液块",
+        "nameen": "Slime Block",
+        "category": "special"
+    },
+    {
+        "no": 11108,
+        "id": "minecraft:barrier",
+        "namecn": "屏障",
+        "nameen": "Barrier",
+        "category": "building"
+    },
+    {
+        "no": 11109,
+        "id": "minecraft:iron_trapdoor",
+        "namecn": "铁活板门",
+        "nameen": "Iron Trapdoor",
+        "category": "building"
+    },
+    {
+        "no": 11110,
+        "id": "minecraft:prismarine",
+        "namecn": "海晶石",
+        "nameen": "Prismarine",
+        "category": "building"
+    },
+    {
+        "no": 11111,
+        "id": "minecraft:prismarine",
+        "namecn": "海晶石砖",
+        "nameen": "Prismarine Bricks",
+        "category": "building"
+    },
+    {
+        "no": 11112,
+        "id": "minecraft:prismarine",
+        "namecn": "暗海晶石",
+        "nameen": "Dark Prismarine",
+        "category": "building"
+    },
+    {
+        "no": 11113,
+        "id": "minecraft:sea_lantern",
+        "namecn": "海晶灯",
+        "nameen": "Sea Lantern",
+        "category": "building"
+    },
+    {
+        "no": 11125,
+        "id": "minecraft:packed_ice",
+        "namecn": "浮冰",
+        "nameen": "Packed Ice",
+        "category": "building"
+    },
+    {
+        "no": 11126,
+        "id": "minecraft:double_plant",
+        "namecn": "向日葵",
+        "nameen": "Sunflower",
+        "category": "building"
+    },
+    {
+        "no": 11127,
+        "id": "minecraft:double_plant",
+        "namecn": "丁香",
+        "nameen": "Lilac",
+        "category": "building"
+    },
+    {
+        "no": 11128,
+        "id": "minecraft:double_plant",
+        "namecn": "高草丛",
+        "nameen": "Double Tallgrass",
+        "category": "building"
+    },
+    {
+        "no": 11129,
+        "id": "minecraft:double_plant",
+        "namecn": "大型蕨",
+        "nameen": "Large Fern",
+        "category": "building"
+    },
+    {
+        "no": 11130,
+        "id": "minecraft:double_plant",
+        "namecn": "玫瑰丛",
+        "nameen": "Rose Bush",
+        "category": "building"
+    },
+    {
+        "no": 11131,
+        "id": "minecraft:double_plant",
+        "namecn": "牡丹",
+        "nameen": "Peony",
+        "category": "building"
+    },
+    {
+        "no": 11132,
+        "id": "minecraft:red_sandstone",
+        "namecn": "红砂岩",
+        "nameen": "Red Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 11133,
+        "id": "minecraft:red_sandstone",
+        "namecn": "錾制红砂岩",
+        "nameen": "Chiseled Red Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 11134,
+        "id": "minecraft:red_sandstone",
+        "namecn": "平滑红砂岩",
+        "nameen": "Smooth Red Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 11148,
+        "id": "minecraft:leather_helmet",
+        "namecn": "皮革帽子",
+        "nameen": "Leather Cap",
+        "category": "combat"
+    },
+    {
+        "no": 11149,
+        "id": "minecraft:leather_chestplate",
+        "namecn": "皮革外套",
+        "nameen": "Leather Tunic",
+        "category": "combat"
+    },
+    {
+        "no": 11150,
+        "id": "minecraft:leather_leggings",
+        "namecn": "皮革裤子",
+        "nameen": "Leather Pants",
+        "category": "combat"
+    },
+    {
+        "no": 11151,
+        "id": "minecraft:golden_helmet",
+        "namecn": "金头盔",
+        "nameen": "Golden Helmet",
+        "category": "combat"
+    },
+    {
+        "no": 11152,
+        "id": "minecraft:golden_chestplate",
+        "namecn": "金胸甲",
+        "nameen": "Golden Chestplate",
+        "category": "combat"
+    },
+    {
+        "no": 11153,
+        "id": "minecraft:golden_leggings",
+        "namecn": "金护腿",
+        "nameen": "Golden Leggings",
+        "category": "combat"
+    },
+    {
+        "no": 11154,
+        "id": "minecraft:golden_boots",
+        "namecn": "金靴子",
+        "nameen": "Golden Boots",
+        "category": "combat"
+    },
+    {
+        "no": 11157,
+        "id": "minecraft:chest_minecart",
+        "namecn": "运输矿车",
+        "nameen": "Minecart with Chest",
+        "category": "building"
+    },
+    {
+        "no": 11210,
+        "id": "minecraft:skeleton_skull",
+        "namecn": "骷髅头颅",
+        "nameen": "Skeleton Skull",
+        "category": "building"
+    },
+    {
+        "no": 11212,
+        "id": "minecraft:zombie_head",
+        "namecn": "僵尸的头",
+        "nameen": "Zombie Head",
+        "category": "building"
+    },
+    {
+        "no": 11213,
+        "id": "minecraft:player_head",
+        "namecn": "玩家头颅",
+        "nameen": "Player Head",
+        "category": "building"
+    },
+    {
+        "no": 11214,
+        "id": "minecraft:creeper_head",
+        "namecn": "苦力怕的头",
+        "nameen": "Creeper Head",
+        "category": "building"
+    },
+    {
+        "no": 11215,
+        "id": "minecraft:prismarine_shard",
+        "namecn": "海晶碎片",
+        "nameen": "Prismarine Shard",
+        "category": "materials"
+    },
+    {
+        "no": 11216,
+        "id": "minecraft:prismarine_crystals",
+        "namecn": "海晶砂粒",
+        "nameen": "Prismarine Crystals",
+        "category": "building"
+    },
+    {
+        "no": 11217,
+        "id": "minecraft:rabbit",
+        "namecn": "生兔肉",
+        "nameen": "Raw Rabbit",
+        "category": "food"
+    },
+    {
+        "no": 11218,
+        "id": "minecraft:cooked_rabbit",
+        "namecn": "熟兔肉",
+        "nameen": "Cooked Rabbit",
+        "category": "food"
+    },
+    {
+        "no": 11219,
+        "id": "minecraft:rabbit_stew",
+        "namecn": "兔肉煲",
+        "nameen": "Rabbit Stew",
+        "category": "food"
+    },
+    {
+        "no": 11220,
+        "id": "minecraft:rabbit_foot",
+        "namecn": "兔子脚",
+        "nameen": "Rabbit's Foot",
+        "category": "food"
+    },
+    {
+        "no": 11222,
+        "id": "minecraft:iron_horse_armor",
+        "namecn": "铁马铠",
+        "nameen": "Iron Horse Armor",
+        "category": "building"
+    },
+    {
+        "no": 11223,
+        "id": "minecraft:golden_horse_armor",
+        "namecn": "金马铠",
+        "nameen": "Gold Horse Armor",
+        "category": "building"
+    },
+    {
+        "no": 11224,
+        "id": "minecraft:diamond_horse_armor",
+        "namecn": "钻石马铠",
+        "nameen": "Diamond Horse Armor",
+        "category": "building"
+    },
+    {
+        "no": 11225,
+        "id": "minecraft:command_block_minecart",
+        "namecn": "命令方块矿车",
+        "nameen": "Minecart with Command Block",
+        "category": "building"
+    },
+    {
+        "no": 11226,
+        "id": "minecraft:mutton",
+        "namecn": "生羊肉",
+        "nameen": "Raw Mutton",
+        "category": "food"
+    },
+    {
+        "no": 11227,
+        "id": "minecraft:cooked_mutton",
+        "namecn": "熟羊肉",
+        "nameen": "Cooked Mutton",
+        "category": "food"
+    },
+    {
+        "no": 33801,
+        "id": "minecraft:end_rod",
+        "namecn": "末地烛",
+        "nameen": "End Rod",
+        "category": "building"
+    },
+    {
+        "no": 33808,
+        "id": "minecraft:end_bricks",
+        "namecn": "末地石砖",
+        "nameen": "End Stone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 33809,
+        "id": "minecraft:grass_path",
+        "namecn": "土径",
+        "nameen": "Dirt Path",
+        "category": "building"
+    },
+    {
+        "no": 33810,
+        "id": "minecraft:repeating_command_block",
+        "namecn": "循环型命令方块",
+        "nameen": "Repeating Command Block",
+        "category": "building"
+    },
+    {
+        "no": 33811,
+        "id": "minecraft:chain_command_block",
+        "namecn": "连锁型命令方块",
+        "nameen": "Chain Command Block",
+        "category": "building"
+    },
+    {
+        "no": 33819,
+        "id": "minecraft:dragon_head",
+        "namecn": "龙首",
+        "nameen": "Dragon Head",
+        "category": "building"
+    },
+    {
+        "no": 33821,
+        "id": "minecraft:end_crystal",
+        "namecn": "末影水晶",
+        "nameen": "End Crystal",
+        "category": "building"
+    },
+    {
+        "no": 33824,
+        "id": "minecraft:beetroot",
+        "namecn": "甜菜根",
+        "nameen": "Beetroot",
+        "category": "building"
+    },
+    {
+        "no": 33825,
+        "id": "minecraft:beetroot_seeds",
+        "namecn": "甜菜种子",
+        "nameen": "Beetroot Seeds",
+        "category": "building"
+    },
+    {
+        "no": 33826,
+        "id": "minecraft:beetroot_soup",
+        "namecn": "甜菜汤",
+        "nameen": "Beetroot Soup",
+        "category": "food"
+    },
+    {
+        "no": 33827,
+        "id": "minecraft:dragon_breath",
+        "namecn": "龙息",
+        "nameen": "Dragon's Breath",
+        "category": "building"
+    },
+    {
+        "no": 33847,
+        "id": "minecraft:spectral_arrow",
+        "namecn": "光灵箭",
+        "nameen": "Spectral Arrow",
+        "category": "building"
+    },
+    {
+        "no": 33848,
+        "id": "minecraft:tipped_arrow",
+        "namecn": "药箭",
+        "nameen": "Tipped Arrow",
+        "category": "building"
+    },
+    {
+        "no": 33883,
+        "id": "minecraft:shield",
+        "namecn": "盾牌",
+        "nameen": "Shield",
+        "category": "combat"
+    },
+    {
+        "no": 35462,
+        "id": "minecraft:chorus_plant",
+        "namecn": "紫颂植株",
+        "nameen": "Chorus Plant",
+        "category": "building"
+    },
+    {
+        "no": 35463,
+        "id": "minecraft:chorus_flower",
+        "namecn": "紫颂花",
+        "nameen": "Chorus Flower",
+        "category": "building"
+    },
+    {
+        "no": 35465,
+        "id": "minecraft:nether_wart_block",
+        "namecn": "下界疣块",
+        "nameen": "Nether Wart Block",
+        "category": "building"
+    },
+    {
+        "no": 35466,
+        "id": "minecraft:red_nether_bricks",
+        "namecn": "红色下界砖块",
+        "nameen": "Red Nether Bricks",
+        "category": "building"
+    },
+    {
+        "no": 35467,
+        "id": "minecraft:bone_block",
+        "namecn": "骨块",
+        "nameen": "Bone Block",
+        "category": "building"
+    },
+    {
+        "no": 35468,
+        "id": "minecraft:structure_void",
+        "namecn": "结构空位",
+        "nameen": "Structure Void",
+        "category": "building"
+    },
+    {
+        "no": 35469,
+        "id": "minecraft:structure_block",
+        "namecn": "结构方块",
+        "nameen": "Structure Block",
+        "category": "building"
+    },
+    {
+        "no": 35472,
+        "id": "minecraft:chorus_fruit",
+        "namecn": "紫颂果",
+        "nameen": "Chorus Fruit",
+        "category": "building"
+    },
+    {
+        "no": 35473,
+        "id": "minecraft:popped_chorus_fruit",
+        "namecn": "爆裂紫颂果",
+        "nameen": "Popped Chorus Fruit",
+        "category": "building"
+    },
+    {
+        "no": 35474,
+        "id": "minecraft:elytra",
+        "namecn": "鞘翅",
+        "nameen": "Elytra",
+        "category": "tools"
+    },
+    {
+        "no": 37668,
+        "id": "minecraft:observer",
+        "namecn": "侦测器",
+        "nameen": "Observer",
+        "category": "building"
+    },
+    {
+        "no": 37698,
+        "id": "minecraft:totem_of_undying",
+        "namecn": "不死图腾",
+        "nameen": "Totem of Undying",
+        "category": "special"
+    },
+    {
+        "no": 37699,
+        "id": "minecraft:shulker_shell",
+        "namecn": "潜影壳",
+        "nameen": "Shulker Shell",
+        "category": "building"
+    },
+    {
+        "no": 52578,
+        "id": "minecraft:knowledge_book",
+        "namecn": "知识之书",
+        "nameen": "Knowledge Book",
+        "category": "special"
+    },
+    {
+        "no": 103544,
+        "id": "minecraft:debug_stick",
+        "namecn": "调试棒",
+        "nameen": "Debug Stick",
+        "category": "building"
+    },
+    {
+        "no": 118541,
+        "id": "minecraft:farmland",
+        "namecn": "耕地",
+        "nameen": "Farmland",
+        "category": "building"
+    },
+    {
+        "no": 118545,
+        "id": "minecraft:snow_layer",
+        "namecn": "雪",
+        "nameen": "Snow",
+        "category": "building"
+    },
+    {
+        "no": 118547,
+        "id": "minecraft:brown_mushroom_block",
+        "namecn": "棕色蘑菇方块",
+        "nameen": "Brown Mushroom Block",
+        "category": "building"
+    },
+    {
+        "no": 118549,
+        "id": "minecraft:nether_bricks",
+        "namecn": "下界砖块",
+        "nameen": "Nether Bricks",
+        "category": "building"
+    },
+    {
+        "no": 118550,
+        "id": "minecraft:golden_apple",
+        "namecn": "附魔金苹果",
+        "nameen": "Enchanted Golden Apple",
+        "category": "food"
+    },
+    {
+        "no": 118563,
+        "id": "minecraft:lingering_potion",
+        "namecn": "滞留型药水",
+        "nameen": "Lingering Potion",
+        "category": "special"
+    },
+    {
+        "no": 118564,
+        "id": "minecraft:white_glazed_terracotta",
+        "namecn": "带釉陶瓦",
+        "nameen": "Glazed Terracotta",
+        "category": "building"
+    },
+    {
+        "no": 118566,
+        "id": "minecraft:fence",
+        "namecn": "栅栏",
+        "nameen": "Fence",
+        "category": "building"
+    },
+    {
+        "no": 118567,
+        "id": "minecraft:resin_brick_stairs",
+        "namecn": "楼梯",
+        "nameen": "Stairs",
+        "category": "building"
+    },
+    {
+        "no": 118568,
+        "id": "minecraft:carpet",
+        "namecn": "地毯",
+        "nameen": "Carpet",
+        "category": "building"
+    },
+    {
+        "no": 118569,
+        "id": "minecraft:concrete_powder",
+        "namecn": "混凝土粉末",
+        "nameen": "Concrete Powder",
+        "category": "building"
+    },
+    {
+        "no": 118570,
+        "id": "minecraft:stained_glass",
+        "namecn": "染色玻璃",
+        "nameen": "Stained Glass",
+        "category": "building"
+    },
+    {
+        "no": 118571,
+        "id": "minecraft:stained_glass_pane",
+        "namecn": "染色玻璃板",
+        "nameen": "Stained Glass Pane",
+        "category": "building"
+    },
+    {
+        "no": 118572,
+        "id": "minecraft:shulker_box",
+        "namecn": "潜影盒",
+        "nameen": "Shulker Box",
+        "category": "building"
+    },
+    {
+        "no": 118574,
+        "id": "minecraft:concrete",
+        "namecn": "混凝土",
+        "nameen": "Concrete",
+        "category": "building"
+    },
+    {
+        "no": 118654,
+        "id": "minecraft:bee_spawn_egg",
+        "namecn": "刷怪蛋",
+        "nameen": "Spawn Egg",
+        "category": "special"
+    },
+    {
+        "no": 126413,
+        "id": "minecraft:potion",
+        "namecn": "水瓶",
+        "nameen": "Water Bottle",
+        "category": "special"
+    },
+    {
+        "no": 153861,
+        "id": "minecraft:conduit",
+        "namecn": "潮涌核心",
+        "nameen": "Conduit",
+        "category": "building"
+    },
+    {
+        "no": 154057,
+        "id": "minecraft:heart_of_the_sea",
+        "namecn": "海洋之心",
+        "nameen": "Heart of the Sea",
+        "category": "building"
+    },
+    {
+        "no": 154117,
+        "id": "minecraft:trident",
+        "namecn": "三叉戟",
+        "nameen": "Trident",
+        "category": "combat"
+    },
+    {
+        "no": 155911,
+        "id": "minecraft:phantom_membrane",
+        "namecn": "幻翼膜",
+        "nameen": "Phantom Membrane",
+        "category": "building"
+    },
+    {
+        "no": 156561,
+        "id": "minecraft:blue_ice",
+        "namecn": "蓝冰",
+        "nameen": "Blue Ice",
+        "category": "building"
+    },
+    {
+        "no": 156562,
+        "id": "minecraft:seagrass",
+        "namecn": "海草",
+        "nameen": "Seagrass",
+        "category": "building"
+    },
+    {
+        "no": 157074,
+        "id": "minecraft:kelp",
+        "namecn": "海带",
+        "nameen": "Kelp",
+        "category": "building"
+    },
+    {
+        "no": 157180,
+        "id": "minecraft:dried_kelp",
+        "namecn": "干海带",
+        "nameen": "Dried Kelp",
+        "category": "building"
+    },
+    {
+        "no": 157414,
+        "id": "minecraft:dried_kelp_block",
+        "namecn": "干海带块",
+        "nameen": "Dried Kelp Block",
+        "category": "building"
+    },
+    {
+        "no": 158433,
+        "id": "minecraft:black_dye",
+        "namecn": "黑色染料",
+        "nameen": "Black Dye",
+        "category": "building"
+    },
+    {
+        "no": 158434,
+        "id": "minecraft:blue_dye",
+        "namecn": "蓝色染料",
+        "nameen": "Blue Dye",
+        "category": "building"
+    },
+    {
+        "no": 158435,
+        "id": "minecraft:brown_dye",
+        "namecn": "棕色染料",
+        "nameen": "Brown Dye",
+        "category": "building"
+    },
+    {
+        "no": 158436,
+        "id": "minecraft:white_dye",
+        "namecn": "白色染料",
+        "nameen": "White Dye",
+        "category": "building"
+    },
+    {
+        "no": 158537,
+        "id": "minecraft:bamboo",
+        "namecn": "竹子",
+        "nameen": "Bamboo",
+        "category": "building"
+    },
+    {
+        "no": 158538,
+        "id": "minecraft:barrel",
+        "namecn": "木桶",
+        "nameen": "Barrel",
+        "category": "building"
+    },
+    {
+        "no": 158632,
+        "id": "minecraft:campfire",
+        "namecn": "营火",
+        "nameen": "Campfire",
+        "category": "building"
+    },
+    {
+        "no": 159520,
+        "id": "minecraft:composter",
+        "namecn": "堆肥桶",
+        "nameen": "Composter",
+        "category": "building"
+    },
+    {
+        "no": 206968,
+        "id": "minecraft:ancient_debris",
+        "namecn": "远古残骸",
+        "nameen": "Ancient Debris",
+        "category": "building"
+    },
+    {
+        "no": 206969,
+        "id": "minecraft:netherite_scrap",
+        "namecn": "下界合金碎片",
+        "nameen": "Netherite Scrap",
+        "category": "building"
+    },
+    {
+        "no": 206970,
+        "id": "minecraft:netherite_ingot",
+        "namecn": "下界合金锭",
+        "nameen": "Netherite Ingot",
+        "category": "materials"
+    },
+    {
+        "no": 206971,
+        "id": "minecraft:netherite_sword",
+        "namecn": "下界合金剑",
+        "nameen": "Netherite Sword",
+        "category": "combat"
+    },
+    {
+        "no": 206972,
+        "id": "minecraft:netherite_pickaxe",
+        "namecn": "下界合金镐",
+        "nameen": "Netherite Pickaxe",
+        "category": "tools"
+    },
+    {
+        "no": 206973,
+        "id": "minecraft:netherite_axe",
+        "namecn": "下界合金斧",
+        "nameen": "Netherite Axe",
+        "category": "tools"
+    },
+    {
+        "no": 206974,
+        "id": "minecraft:netherite_shovel",
+        "namecn": "下界合金锹",
+        "nameen": "Netherite Shovel",
+        "category": "tools"
+    },
+    {
+        "no": 206975,
+        "id": "minecraft:netherite_hoe",
+        "namecn": "下界合金锄",
+        "nameen": "Netherite Hoe",
+        "category": "tools"
+    },
+    {
+        "no": 206976,
+        "id": "minecraft:netherite_helmet",
+        "namecn": "下界合金头盔",
+        "nameen": "Netherite Helmet",
+        "category": "combat"
+    },
+    {
+        "no": 206977,
+        "id": "minecraft:netherite_chestplate",
+        "namecn": "下界合金胸甲",
+        "nameen": "Netherite Chestplate",
+        "category": "combat"
+    },
+    {
+        "no": 206978,
+        "id": "minecraft:netherite_leggings",
+        "namecn": "下界合金护腿",
+        "nameen": "Netherite Leggings",
+        "category": "combat"
+    },
+    {
+        "no": 206979,
+        "id": "minecraft:netherite_boots",
+        "namecn": "下界合金靴子",
+        "nameen": "Netherite Boots",
+        "category": "combat"
+    },
+    {
+        "no": 207851,
+        "id": "minecraft:netherite_block",
+        "namecn": "下界合金块",
+        "nameen": "Block of Netherite",
+        "category": "building"
+    },
+    {
+        "no": 209862,
+        "id": "minecraft:crossbow",
+        "namecn": "弩",
+        "nameen": "Crossbow",
+        "category": "combat"
+    },
+    {
+        "no": 209863,
+        "id": "minecraft:grindstone",
+        "namecn": "砂轮",
+        "nameen": "Grindstone",
+        "category": "building"
+    },
+    {
+        "no": 209864,
+        "id": "minecraft:stonecutter",
+        "namecn": "切石机",
+        "nameen": "Stonecutter",
+        "category": "building"
+    },
+    {
+        "no": 209866,
+        "id": "minecraft:honey_bottle",
+        "namecn": "蜂蜜瓶",
+        "nameen": "Honey Bottle",
+        "category": "food"
+    },
+    {
+        "no": 209867,
+        "id": "minecraft:honey_block",
+        "namecn": "蜂蜜块",
+        "nameen": "Honey Block",
+        "category": "building"
+    },
+    {
+        "no": 209868,
+        "id": "minecraft:bee_nest",
+        "namecn": "蜂巢",
+        "nameen": "Bee Nest",
+        "category": "building"
+    },
+    {
+        "no": 209869,
+        "id": "minecraft:beehive",
+        "namecn": "蜂箱",
+        "nameen": "Beehive",
+        "category": "building"
+    },
+    {
+        "no": 209870,
+        "id": "minecraft:honeycomb",
+        "namecn": "蜜脾",
+        "nameen": "Honeycomb",
+        "category": "building"
+    },
+    {
+        "no": 209871,
+        "id": "minecraft:honeycomb_block",
+        "namecn": "蜜脾块",
+        "nameen": "Honeycomb Block",
+        "category": "building"
+    },
+    {
+        "no": 209876,
+        "id": "minecraft:smoker",
+        "namecn": "烟熏炉",
+        "nameen": "Smoker",
+        "category": "building"
+    },
+    {
+        "no": 209877,
+        "id": "minecraft:blast_furnace",
+        "namecn": "高炉",
+        "nameen": "Blast Furnace",
+        "category": "building"
+    },
+    {
+        "no": 210366,
+        "id": "minecraft:lectern",
+        "namecn": "讲台",
+        "nameen": "Lectern",
+        "category": "building"
+    },
+    {
+        "no": 210367,
+        "id": "minecraft:fletching_table",
+        "namecn": "制箭台",
+        "nameen": "Fletching Table",
+        "category": "building"
+    },
+    {
+        "no": 210368,
+        "id": "minecraft:smithing_table",
+        "namecn": "锻造台",
+        "nameen": "Smithing Table",
+        "category": "building"
+    },
+    {
+        "no": 210369,
+        "id": "minecraft:cartography_table",
+        "namecn": "制图台",
+        "nameen": "Cartography Table",
+        "category": "building"
+    },
+    {
+        "no": 210370,
+        "id": "minecraft:loom",
+        "namecn": "织布机",
+        "nameen": "Loom",
+        "category": "building"
+    },
+    {
+        "no": 210381,
+        "id": "minecraft:smooth_stone",
+        "namecn": "平滑石头",
+        "nameen": "Smooth Stone",
+        "category": "building"
+    },
+    {
+        "no": 210385,
+        "id": "minecraft:basalt",
+        "namecn": "玄武岩",
+        "nameen": "Basalt",
+        "category": "building"
+    },
+    {
+        "no": 210386,
+        "id": "minecraft:crimson_fungus",
+        "namecn": "下界菌",
+        "nameen": "Fungus",
+        "category": "building"
+    },
+    {
+        "no": 210389,
+        "id": "minecraft:lantern",
+        "namecn": "灯笼",
+        "nameen": "Lantern",
+        "category": "building"
+    },
+    {
+        "no": 210390,
+        "id": "minecraft:soul_lantern",
+        "namecn": "灵魂灯笼",
+        "nameen": "Soul Lantern",
+        "category": "building"
+    },
+    {
+        "no": 210391,
+        "id": "minecraft:soul_fire_torch",
+        "namecn": "灵魂火把",
+        "nameen": "Soul Torch",
+        "category": "building"
+    },
+    {
+        "no": 210392,
+        "id": "minecraft:soul_fire",
+        "namecn": "灵魂火",
+        "nameen": "Soul Fire",
+        "category": "building"
+    },
+    {
+        "no": 210672,
+        "id": "minecraft:shroomlight",
+        "namecn": "菌光体",
+        "nameen": "Shroomlight",
+        "category": "building"
+    },
+    {
+        "no": 210680,
+        "id": "minecraft:crimson_stem",
+        "namecn": "绯红菌柄",
+        "nameen": "Crimson Stem",
+        "category": "building"
+    },
+    {
+        "no": 210681,
+        "id": "minecraft:warped_stem",
+        "namecn": "诡异菌柄",
+        "nameen": "Warped Stem",
+        "category": "building"
+    },
+    {
+        "no": 210683,
+        "id": "minecraft:warped_wart_block",
+        "namecn": "诡异疣块",
+        "nameen": "Warped Wart Block",
+        "category": "building"
+    },
+    {
+        "no": 210692,
+        "id": "minecraft:crimson_nylium",
+        "namecn": "绯红菌岩",
+        "nameen": "Crimson Nylium",
+        "category": "building"
+    },
+    {
+        "no": 210693,
+        "id": "minecraft:warped_nylium",
+        "namecn": "诡异菌岩",
+        "nameen": "Warped Nylium",
+        "category": "building"
+    },
+    {
+        "no": 210706,
+        "id": "minecraft:wither_rose",
+        "namecn": "凋灵玫瑰",
+        "nameen": "Wither Rose",
+        "category": "building"
+    },
+    {
+        "no": 210707,
+        "id": "minecraft:lily_of_the_valley",
+        "namecn": "铃兰",
+        "nameen": "Lily of the Valley",
+        "category": "building"
+    },
+    {
+        "no": 210708,
+        "id": "minecraft:cornflower",
+        "namecn": "矢车菊",
+        "nameen": "Cornflower",
+        "category": "building"
+    },
+    {
+        "no": 210709,
+        "id": "minecraft:suspicious_stew",
+        "namecn": "谜之炖菜",
+        "nameen": "Suspicious Stew",
+        "category": "food"
+    },
+    {
+        "no": 210710,
+        "id": "minecraft:weeping_vines",
+        "namecn": "垂泪藤",
+        "nameen": "Weeping Vines",
+        "category": "building"
+    },
+    {
+        "no": 210711,
+        "id": "minecraft:nether_sprouts",
+        "namecn": "下界苗",
+        "nameen": "Nether Sprouts",
+        "category": "building"
+    },
+    {
+        "no": 210712,
+        "id": "minecraft:crimson_roots",
+        "namecn": "绯红菌索",
+        "nameen": "Crimson Roots",
+        "category": "building"
+    },
+    {
+        "no": 210713,
+        "id": "minecraft:warped_roots",
+        "namecn": "诡异菌索",
+        "nameen": "Warped Roots",
+        "category": "building"
+    },
+    {
+        "no": 214588,
+        "id": "minecraft:crying_obsidian",
+        "namecn": "哭泣的黑曜石",
+        "nameen": "Crying Obsidian",
+        "category": "building"
+    },
+    {
+        "no": 214589,
+        "id": "minecraft:target",
+        "namecn": "标靶",
+        "nameen": "Target",
+        "category": "building"
+    },
+    {
+        "no": 215367,
+        "id": "minecraft:scaffolding",
+        "namecn": "脚手架",
+        "nameen": "Scaffolding",
+        "category": "building"
+    },
+    {
+        "no": 215370,
+        "id": "minecraft:bell",
+        "namecn": "钟",
+        "nameen": "Bell",
+        "category": "building"
+    },
+    {
+        "no": 215371,
+        "id": "minecraft:crimson_hyphae",
+        "namecn": "绯红菌核",
+        "nameen": "Crimson Hyphae",
+        "category": "building"
+    },
+    {
+        "no": 215372,
+        "id": "minecraft:warped_hyphae",
+        "namecn": "诡异菌核",
+        "nameen": "Warped Hyphae",
+        "category": "building"
+    },
+    {
+        "no": 215373,
+        "id": "minecraft:stripped_crimson_hyphae",
+        "namecn": "去皮绯红菌核",
+        "nameen": "Stripped Crimson Hyphae",
+        "category": "building"
+    },
+    {
+        "no": 215374,
+        "id": "minecraft:stripped_warped_hyphae",
+        "namecn": "去皮诡异菌核",
+        "nameen": "Stripped Warped Hyphae",
+        "category": "building"
+    },
+    {
+        "no": 215375,
+        "id": "minecraft:soul_soil",
+        "namecn": "灵魂土",
+        "nameen": "Soul Soil",
+        "category": "building"
+    },
+    {
+        "no": 215639,
+        "id": "minecraft:twisting_vines",
+        "namecn": "缠怨藤",
+        "nameen": "Twisting Vines",
+        "category": "building"
+    },
+    {
+        "no": 215653,
+        "id": "minecraft:nether_gold_ore",
+        "namecn": "下界金矿石",
+        "nameen": "Nether Gold Ore",
+        "category": "materials"
+    },
+    {
+        "no": 222723,
+        "id": "minecraft:oak_door",
+        "namecn": "木门",
+        "nameen": "Door",
+        "category": "building"
+    },
+    {
+        "no": 222724,
+        "id": "minecraft:oak_trapdoor",
+        "namecn": "木质活板门",
+        "nameen": "Trapdoor",
+        "category": "building"
+    },
+    {
+        "no": 222725,
+        "id": "minecraft:fence_gate",
+        "namecn": "栅栏门",
+        "nameen": "Fence Gate",
+        "category": "building"
+    },
+    {
+        "no": 222728,
+        "id": "minecraft:smooth_quartz",
+        "namecn": "平滑石英块",
+        "nameen": "Smooth Quartz",
+        "category": "building"
+    },
+    {
+        "no": 222729,
+        "id": "minecraft:stripped_oak_wood",
+        "namecn": "去皮木头",
+        "nameen": "Stripped Wood",
+        "category": "building"
+    },
+    {
+        "no": 222730,
+        "id": "minecraft:oak_wood",
+        "namecn": "木头",
+        "nameen": "Wood",
+        "category": "building"
+    },
+    {
+        "no": 222731,
+        "id": "minecraft:log",
+        "namecn": "原木",
+        "nameen": "Log",
+        "category": "building"
+    },
+    {
+        "no": 222732,
+        "id": "minecraft:planks",
+        "namecn": "木板",
+        "nameen": "Planks",
+        "category": "building"
+    },
+    {
+        "no": 222745,
+        "id": "minecraft:stripped_crimson_stem",
+        "namecn": "去皮绯红菌柄",
+        "nameen": "Stripped Crimson Stem",
+        "category": "building"
+    },
+    {
+        "no": 222746,
+        "id": "minecraft:stripped_warped_stem",
+        "namecn": "去皮诡异菌柄",
+        "nameen": "Stripped Warped Stem",
+        "category": "building"
+    },
+    {
+        "no": 222747,
+        "id": "minecraft:stripped_oak_log",
+        "namecn": "去皮原木",
+        "nameen": "Stripped Log",
+        "category": "building"
+    },
+    {
+        "no": 222756,
+        "id": "minecraft:cut_red_sandstone",
+        "namecn": "切制红砂岩",
+        "nameen": "Cut Red Sandstone",
+        "category": "building"
+    },
+    {
+        "no": 222793,
+        "id": "minecraft:stone_brick_wall",
+        "namecn": "墙",
+        "nameen": "Wall",
+        "category": "building"
+    },
+    {
+        "no": 222840,
+        "id": "minecraft:polished_basalt",
+        "namecn": "磨制玄武岩",
+        "nameen": "Polished Basalt",
+        "category": "building"
+    },
+    {
+        "no": 222841,
+        "id": "minecraft:respawn_anchor",
+        "namecn": "重生锚",
+        "nameen": "Respawn Anchor",
+        "category": "building"
+    },
+    {
+        "no": 224273,
+        "id": "minecraft:jigsaw",
+        "namecn": "拼图方块",
+        "nameen": "Jigsaw Block",
+        "category": "building"
+    },
+    {
+        "no": 224303,
+        "id": "minecraft:sea_pickle",
+        "namecn": "海泡菜",
+        "nameen": "Sea Pickle",
+        "category": "building"
+    },
+    {
+        "no": 224305,
+        "id": "minecraft:scute",
+        "namecn": "海龟鳞甲",
+        "nameen": "Scute",
+        "category": "building"
+    },
+    {
+        "no": 224308,
+        "id": "minecraft:turtle_helmet",
+        "namecn": "海龟壳",
+        "nameen": "Turtle Shell",
+        "category": "combat"
+    },
+    {
+        "no": 224309,
+        "id": "minecraft:turtle_egg",
+        "namecn": "海龟蛋",
+        "nameen": "Turtle Egg",
+        "category": "special"
+    },
+    {
+        "no": 224312,
+        "id": "minecraft:dead_horn_coral_block",
+        "namecn": "失活的珊瑚块",
+        "nameen": "Dead Coral Block",
+        "category": "building"
+    },
+    {
+        "no": 224313,
+        "id": "minecraft:horn_coral_block",
+        "namecn": "珊瑚块",
+        "nameen": "Coral Block",
+        "category": "building"
+    },
+    {
+        "no": 224314,
+        "id": "minecraft:tube_coral",
+        "namecn": "珊瑚",
+        "nameen": "Corals",
+        "category": "building"
+    },
+    {
+        "no": 224315,
+        "id": "minecraft:dead_tube_coral",
+        "namecn": "失活的珊瑚",
+        "nameen": "Dead Corals",
+        "category": "building"
+    },
+    {
+        "no": 224316,
+        "id": "minecraft:fire_coral_fan",
+        "namecn": "珊瑚扇",
+        "nameen": "Coral Fans",
+        "category": "building"
+    },
+    {
+        "no": 224317,
+        "id": "minecraft:dead_fire_coral_fan",
+        "namecn": "失活的珊瑚扇",
+        "nameen": "Dead Coral Fans",
+        "category": "building"
+    },
+    {
+        "no": 224432,
+        "id": "minecraft:lodestone",
+        "namecn": "磁石",
+        "nameen": "Lodestone",
+        "category": "building"
+    },
+    {
+        "no": 224433,
+        "id": "minecraft:warped_fungus_on_a_stick",
+        "namecn": "诡异菌钓竿",
+        "nameen": "Warped Fungus on a Stick",
+        "category": "building"
+    },
+    {
+        "no": 224434,
+        "id": "minecraft:leather_horse_armor",
+        "namecn": "皮革马铠",
+        "nameen": "Leather Horse Armor",
+        "category": "building"
+    },
+    {
+        "no": 224584,
+        "id": "minecraft:sweet_berries",
+        "namecn": "甜浆果",
+        "nameen": "Sweet Berries",
+        "category": "food"
+    },
+    {
+        "no": 232755,
+        "id": "minecraft:soul_campfire",
+        "namecn": "灵魂营火",
+        "nameen": "Soul Campfire",
+        "category": "building"
+    },
+    {
+        "no": 232762,
+        "id": "minecraft:blackstone",
+        "namecn": "黑石",
+        "nameen": "Blackstone",
+        "category": "building"
+    },
+    {
+        "no": 233108,
+        "id": "minecraft:polished_blackstone",
+        "namecn": "磨制黑石",
+        "nameen": "Polished Blackstone",
+        "category": "building"
+    },
+    {
+        "no": 233110,
+        "id": "minecraft:chiseled_polished_blackstone",
+        "namecn": "錾制磨制黑石",
+        "nameen": "Chiseled Polished Blackstone",
+        "category": "building"
+    },
+    {
+        "no": 233116,
+        "id": "minecraft:gilded_blackstone",
+        "namecn": "镶金黑石",
+        "nameen": "Gilded Blackstone",
+        "category": "building"
+    },
+    {
+        "no": 233117,
+        "id": "minecraft:cracked_nether_bricks",
+        "namecn": "裂纹下界砖块",
+        "nameen": "Cracked Nether Brick",
+        "category": "building"
+    },
+    {
+        "no": 233118,
+        "id": "minecraft:chiseled_nether_bricks",
+        "namecn": "錾制下界砖块",
+        "nameen": "Chiseled Nether Brick",
+        "category": "building"
+    },
+    {
+        "no": 233119,
+        "id": "minecraft:polished_blackstone_bricks",
+        "namecn": "磨制黑石砖",
+        "nameen": "Polished Blackstone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 233120,
+        "id": "minecraft:cracked_polished_blackstone_bricks",
+        "namecn": "裂纹磨制黑石砖",
+        "nameen": "Cracked Polished Blackstone Bricks",
+        "category": "building"
+    },
+    {
+        "no": 233121,
+        "id": "minecraft:quartz_bricks",
+        "namecn": "石英砖",
+        "nameen": "Quartz Brick",
+        "category": "building"
+    },
+    {
+        "no": 233123,
+        "id": "minecraft:polished_blackstone_pressure_plate",
+        "namecn": "磨制黑石压力板",
+        "nameen": "Polished Blackstone Pressure Plate",
+        "category": "building"
+    },
+    {
+        "no": 236469,
+        "id": "minecraft:chain",
+        "namecn": "锁链",
+        "nameen": "Chain",
+        "category": "building"
+    },
+    {
+        "no": 282982,
+        "id": "minecraft:cod",
+        "namecn": "生鳕鱼",
+        "nameen": "Raw Cod",
+        "category": "building"
+    },
+    {
+        "no": 282983,
+        "id": "minecraft:cooked_cod",
+        "namecn": "熟鳕鱼",
+        "nameen": "Cooked Cod",
+        "category": "food"
+    },
+    {
+        "no": 313524,
+        "id": "minecraft:petrified_oak_slab",
+        "namecn": "石化橡木台阶",
+        "nameen": "Petrified Oak Slab",
+        "category": "building"
+    },
+    {
+        "no": 390868,
+        "id": "minecraft:mushroom_stem",
+        "namecn": "蘑菇柄",
+        "nameen": "Mushroom Stem",
+        "category": "building"
+    },
+    {
+        "no": 390869,
+        "id": "minecraft:pufferfish_bucket",
+        "namecn": "河豚桶",
+        "nameen": "Bucket of Pufferfish",
+        "category": "food"
+    },
+    {
+        "no": 390870,
+        "id": "minecraft:salmon_bucket",
+        "namecn": "鲑鱼桶",
+        "nameen": "Bucket of Salmon",
+        "category": "building"
+    },
+    {
+        "no": 390871,
+        "id": "minecraft:cod_bucket",
+        "namecn": "鳕鱼桶",
+        "nameen": "Bucket of Cod",
+        "category": "building"
+    },
+    {
+        "no": 390872,
+        "id": "minecraft:tropical_fish_bucket",
+        "namecn": "热带鱼桶",
+        "nameen": "Bucket of Tropical Fish",
+        "category": "food"
+    },
+    {
+        "no": 424595,
+        "id": "minecraft:deny",
+        "namecn": "拒绝方块",
+        "nameen": "Deny",
+        "category": "building"
+    },
+    {
+        "no": 424596,
+        "id": "minecraft:allow",
+        "namecn": "允许方块",
+        "nameen": "Allow",
+        "category": "building"
+    },
+    {
+        "no": 424607,
+        "id": "border_block",
+        "namecn": "边界方块",
+        "nameen": "Border Block",
+        "category": "building"
+    },
+    {
+        "no": 426857,
+        "id": "minecraft:netherreactor",
+        "namecn": "下界反应核",
+        "nameen": "Nether Reactor Core",
+        "category": "building"
+    },
+    {
+        "no": 430140,
+        "id": "minecraft:glowingobsidian",
+        "namecn": "发光的黑曜石",
+        "nameen": "Glowing Obsidian",
+        "category": "building"
+    },
+    {
+        "no": 462293,
+        "id": "minecraft:small_amethyst_bud",
+        "namecn": "小型紫晶芽",
+        "nameen": "Small Amethyst Bud",
+        "category": "building"
+    },
+    {
+        "no": 462294,
+        "id": "minecraft:medium_amethyst_bud",
+        "namecn": "中型紫晶芽",
+        "nameen": "Medium Amethyst Bud",
+        "category": "building"
+    },
+    {
+        "no": 462295,
+        "id": "minecraft:large_amethyst_bud",
+        "namecn": "大型紫晶芽",
+        "nameen": "Large Amethyst Bud",
+        "category": "building"
+    },
+    {
+        "no": 462296,
+        "id": "minecraft:amethyst_cluster",
+        "namecn": "紫水晶簇",
+        "nameen": "Amethyst Cluster",
+        "category": "building"
+    },
+    {
+        "no": 462342,
+        "id": "minecraft:budding_amethyst",
+        "namecn": "紫水晶母岩",
+        "nameen": "Budding Amethyst",
+        "category": "building"
+    },
+    {
+        "no": 462364,
+        "id": "minecraft:spyglass",
+        "namecn": "望远镜",
+        "nameen": "Spyglass",
+        "category": "building"
+    },
+    {
+        "no": 462367,
+        "id": "minecraft:deepslate_coal_ore",
+        "namecn": "深层煤矿石",
+        "nameen": "Deepslate Coal Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462368,
+        "id": "minecraft:deepslate_iron_ore",
+        "namecn": "深层铁矿石",
+        "nameen": "Deepslate Iron Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462659,
+        "id": "minecraft:copper_ore",
+        "namecn": "铜矿石",
+        "nameen": "Copper Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462660,
+        "id": "minecraft:deepslate_copper_ore",
+        "namecn": "深层铜矿石",
+        "nameen": "Deepslate Copper Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462661,
+        "id": "minecraft:deepslate_gold_ore",
+        "namecn": "深层金矿石",
+        "nameen": "Deepslate Gold Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462777,
+        "id": "minecraft:deepslate_redstone_ore",
+        "namecn": "深层红石矿石",
+        "nameen": "Deepslate Redstone Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462778,
+        "id": "minecraft:deepslate_lapis_ore",
+        "namecn": "深层青金石矿石",
+        "nameen": "Deepslate Lapis Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462779,
+        "id": "minecraft:deepslate_diamond_ore",
+        "namecn": "深层钻石矿石",
+        "nameen": "Deepslate Diamond Ore",
+        "category": "materials"
+    },
+    {
+        "no": 462780,
+        "id": "minecraft:deepslate_emerald_ore",
+        "namecn": "深层绿宝石矿石",
+        "nameen": "Deepslate Emerald Ore",
+        "category": "materials"
+    },
+    {
+        "no": 463061,
+        "id": "minecraft:tinted_glass",
+        "namecn": "遮光玻璃",
+        "nameen": "Tinted Glass",
+        "category": "building"
+    },
+    {
+        "no": 463074,
+        "id": "minecraft:amethyst_block",
+        "namecn": "紫水晶块",
+        "nameen": "Block of Amethyst",
+        "category": "building"
+    },
+    {
+        "no": 463075,
+        "id": "minecraft:calcite",
+        "namecn": "方解石",
+        "nameen": "Calcite",
+        "category": "building"
+    },
+    {
+        "no": 463076,
+        "id": "minecraft:smooth_basalt",
+        "namecn": "平滑玄武岩",
+        "nameen": "Smooth Basalt",
+        "category": "building"
+    },
+    {
+        "no": 463077,
+        "id": "minecraft:tuff",
+        "namecn": "凝灰岩",
+        "nameen": "Tuff",
+        "category": "building"
+    },
+    {
+        "no": 463078,
+        "id": "minecraft:copper_block",
+        "namecn": "铜块",
+        "nameen": "Block of Copper",
+        "category": "building"
+    },
+    {
+        "no": 463079,
+        "id": "minecraft:cut_copper",
+        "namecn": "切制铜块",
+        "nameen": "Cut Copper",
+        "category": "building"
+    },
+    {
+        "no": 463082,
+        "id": "minecraft:lightning_rod",
+        "namecn": "避雷针",
+        "nameen": "Lightning Rod",
+        "category": "building"
+    },
+    {
+        "no": 463083,
+        "id": "minecraft:pointed_dripstone",
+        "namecn": "滴水石锥",
+        "nameen": "Pointed Dripstone",
+        "category": "building"
+    },
+    {
+        "no": 463084,
+        "id": "minecraft:dripstone_block",
+        "namecn": "滴水石块",
+        "nameen": "Dripstone Block",
+        "category": "building"
+    },
+    {
+        "no": 463085,
+        "id": "minecraft:glow_lichen",
+        "namecn": "发光地衣",
+        "nameen": "Glow Lichen",
+        "category": "building"
+    },
+    {
+        "no": 463086,
+        "id": "minecraft:waxed_copper_block",
+        "namecn": "涂蜡铜块",
+        "nameen": "Waxed Block of Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463087,
+        "id": "minecraft:waxed_cut_copper",
+        "namecn": "涂蜡切制铜块",
+        "nameen": "Waxed Cut Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463090,
+        "id": "minecraft:exposed_copper",
+        "namecn": "斑驳的铜块",
+        "nameen": "Exposed Copper",
+        "category": "building"
+    },
+    {
+        "no": 463091,
+        "id": "minecraft:exposed_cut_copper",
+        "namecn": "斑驳的切制铜块",
+        "nameen": "Exposed Cut Copper",
+        "category": "building"
+    },
+    {
+        "no": 463094,
+        "id": "minecraft:waxed_exposed_copper",
+        "namecn": "斑驳的涂蜡铜块",
+        "nameen": "Waxed Exposed Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463095,
+        "id": "minecraft:waxed_exposed_cut_copper",
+        "namecn": "斑驳的涂蜡切制铜块",
+        "nameen": "Waxed Exposed Cut Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463098,
+        "id": "minecraft:oxidized_copper",
+        "namecn": "氧化的铜块",
+        "nameen": "Oxidized Copper",
+        "category": "building"
+    },
+    {
+        "no": 463099,
+        "id": "minecraft:oxidized_cut_copper",
+        "namecn": "氧化的切制铜块",
+        "nameen": "Oxidized Cut Copper",
+        "category": "building"
+    },
+    {
+        "no": 463102,
+        "id": "minecraft:waxed_oxidized_copper",
+        "namecn": "氧化的涂蜡铜块",
+        "nameen": "Waxed Oxidized Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463103,
+        "id": "minecraft:waxed_oxidized_cut_copper",
+        "namecn": "氧化的涂蜡切制铜块",
+        "nameen": "Waxed Oxidized Cut Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463106,
+        "id": "minecraft:weathered_copper",
+        "namecn": "锈蚀的铜块",
+        "nameen": "Weathered Copper",
+        "category": "building"
+    },
+    {
+        "no": 463107,
+        "id": "minecraft:weathered_cut_copper",
+        "namecn": "锈蚀的切制铜块",
+        "nameen": "Weathered Cut Copper",
+        "category": "building"
+    },
+    {
+        "no": 463110,
+        "id": "minecraft:waxed_weathered_copper",
+        "namecn": "锈蚀的涂蜡铜块",
+        "nameen": "Waxed Weathered Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463111,
+        "id": "minecraft:waxed_weathered_cut_copper",
+        "namecn": "锈蚀的涂蜡切制铜块",
+        "nameen": "Waxed Weathered Cut Copper",
+        "category": "tools"
+    },
+    {
+        "no": 463115,
+        "id": "minecraft:flowering_azalea",
+        "namecn": "盛开的杜鹃花丛",
+        "nameen": "Flowering Azalea",
+        "category": "building"
+    },
+    {
+        "no": 463116,
+        "id": "minecraft:copper_ingot",
+        "namecn": "铜锭",
+        "nameen": "Copper Ingot",
+        "category": "materials"
+    },
+    {
+        "no": 463183,
+        "id": "minecraft:amethyst_shard",
+        "namecn": "紫水晶碎片",
+        "nameen": "Amethyst Shard",
+        "category": "materials"
+    },
+    {
+        "no": 463218,
+        "id": "minecraft:powder_snow_bucket",
+        "namecn": "细雪桶",
+        "nameen": "Powder Snow Bucket",
+        "category": "building"
+    },
+    {
+        "no": 464823,
+        "id": "minecraft:azalea_leaves",
+        "namecn": "杜鹃树叶",
+        "nameen": "Azalea Leaves",
+        "category": "building"
+    },
+    {
+        "no": 464824,
+        "id": "minecraft:flowering_azalea_leaves",
+        "namecn": "盛开的杜鹃树叶",
+        "nameen": "Flowering Azalea Leaves",
+        "category": "building"
+    },
+    {
+        "no": 464825,
+        "id": "minecraft:moss_block",
+        "namecn": "苔藓块",
+        "nameen": "Moss Block",
+        "category": "building"
+    },
+    {
+        "no": 464826,
+        "id": "minecraft:moss_carpet",
+        "namecn": "覆地苔藓",
+        "nameen": "Moss Carpet",
+        "category": "building"
+    },
+    {
+        "no": 464827,
+        "id": "minecraft:small_dripleaf",
+        "namecn": "小型垂滴叶",
+        "nameen": "Small Dripleaf",
+        "category": "building"
+    },
+    {
+        "no": 464828,
+        "id": "minecraft:big_dripleaf",
+        "namecn": "大型垂滴叶",
+        "nameen": "Big Dripleaf",
+        "category": "building"
+    },
+    {
+        "no": 464829,
+        "id": "minecraft:cave_vines",
+        "namecn": "洞穴藤蔓",
+        "nameen": "Cave Vines",
+        "category": "building"
+    },
+    {
+        "no": 465085,
+        "id": "minecraft:rooted_dirt",
+        "namecn": "缠根泥土",
+        "nameen": "Rooted Dirt",
+        "category": "building"
+    },
+    {
+        "no": 465086,
+        "id": "minecraft:hanging_roots",
+        "namecn": "垂根",
+        "nameen": "Hanging Roots",
+        "category": "building"
+    },
+    {
+        "no": 465087,
+        "id": "minecraft:spore_blossom",
+        "namecn": "孢子花",
+        "nameen": "Spore Blossom",
+        "category": "materials"
+    },
+    {
+        "no": 465088,
+        "id": "minecraft:deepslate",
+        "namecn": "深板岩",
+        "nameen": "Deepslate",
+        "category": "building"
+    },
+    {
+        "no": 465089,
+        "id": "minecraft:cobbled_deepslate",
+        "namecn": "深板岩圆石",
+        "nameen": "Cobbled Deepslate",
+        "category": "building"
+    },
+    {
+        "no": 465090,
+        "id": "minecraft:polished_deepslate",
+        "namecn": "磨制深板岩",
+        "nameen": "Polished Deepslate",
+        "category": "building"
+    },
+    {
+        "no": 465092,
+        "id": "minecraft:infested_deepslate",
+        "namecn": "虫蚀深板岩",
+        "nameen": "Infested Deepslate",
+        "category": "building"
+    },
+    {
+        "no": 465093,
+        "id": "minecraft:deepslate_bricks",
+        "namecn": "深板岩砖",
+        "nameen": "Deepslate Bricks",
+        "category": "building"
+    },
+    {
+        "no": 465094,
+        "id": "minecraft:cracked_deepslate_bricks",
+        "namecn": "裂纹深板岩砖",
+        "nameen": "Cracked Deepslate Bricks",
+        "category": "building"
+    },
+    {
+        "no": 465095,
+        "id": "minecraft:deepslate_tiles",
+        "namecn": "深板岩瓦",
+        "nameen": "Deepslate Tiles",
+        "category": "building"
+    },
+    {
+        "no": 465096,
+        "id": "minecraft:cracked_deepslate_tiles",
+        "namecn": "裂纹深板岩瓦",
+        "nameen": "Cracked Deepslate Tiles",
+        "category": "building"
+    },
+    {
+        "no": 465097,
+        "id": "minecraft:chiseled_deepslate",
+        "namecn": "錾制深板岩",
+        "nameen": "Chiseled Deepslate",
+        "category": "building"
+    },
+    {
+        "no": 465110,
+        "id": "minecraft:candle",
+        "namecn": "蜡烛",
+        "nameen": "Candle",
+        "category": "building"
+    },
+    {
+        "no": 465128,
+        "id": "minecraft:powder_snow",
+        "namecn": "细雪",
+        "nameen": "Powder Snow",
+        "category": "building"
+    },
+    {
+        "no": 465129,
+        "id": "minecraft:raw_iron",
+        "namecn": "粗铁",
+        "nameen": "Raw Iron",
+        "category": "building"
+    },
+    {
+        "no": 465130,
+        "id": "minecraft:raw_copper",
+        "namecn": "粗铜",
+        "nameen": "Raw Copper",
+        "category": "building"
+    },
+    {
+        "no": 465131,
+        "id": "minecraft:raw_gold",
+        "namecn": "粗金",
+        "nameen": "Raw Gold",
+        "category": "building"
+    },
+    {
+        "no": 465132,
+        "id": "minecraft:raw_iron_block",
+        "namecn": "粗铁块",
+        "nameen": "Block of Raw Iron",
+        "category": "building"
+    },
+    {
+        "no": 465133,
+        "id": "minecraft:raw_copper_block",
+        "namecn": "粗铜块",
+        "nameen": "Block of Raw Copper",
+        "category": "building"
+    },
+    {
+        "no": 465134,
+        "id": "minecraft:raw_gold_block",
+        "namecn": "粗金块",
+        "nameen": "Block of Raw Gold",
+        "category": "building"
+    },
+    {
+        "no": 465135,
+        "id": "minecraft:sculk_sensor",
+        "namecn": "幽匿感测体",
+        "nameen": "Sculk Sensor",
+        "category": "building"
+    },
+    {
+        "no": 465136,
+        "id": "minecraft:light",
+        "namecn": "光",
+        "nameen": "Light",
+        "category": "building"
+    },
+    {
+        "no": 465137,
+        "id": "minecraft:axolotl_bucket",
+        "namecn": "美西螈桶",
+        "nameen": "Bucket of Axolotl",
+        "category": "building"
+    },
+    {
+        "no": 465141,
+        "id": "minecraft:glow_ink_sac",
+        "namecn": "荧光墨囊",
+        "nameen": "Glow Ink Sac",
+        "category": "building"
+    },
+    {
+        "no": 465142,
+        "id": "minecraft:glow_berries",
+        "namecn": "发光浆果",
+        "nameen": "Glow Berries",
+        "category": "building"
+    },
+    {
+        "no": 465143,
+        "id": "minecraft:bundle",
+        "namecn": "收纳袋",
+        "nameen": "Bundle",
+        "category": "building"
+    },
+    {
+        "no": 783936,
+        "id": "minecraft:end_gateway",
+        "namecn": "末地折跃门",
+        "nameen": "End Gateway",
+        "category": "building"
+    },
+    {
+        "no": 784498,
+        "id": "minecraft:end_portal",
+        "namecn": "末地传送门",
+        "nameen": "End Portal",
+        "category": "building"
+    },
+    {
+        "no": 816431,
+        "id": "minecraft:netherite_stairs",
+        "namecn": "史上最炫楼梯",
+        "nameen": "Swaggiest stairs ever",
+        "category": "building"
+    },
+    {
+        "no": 818791,
+        "id": "minecraft:neither_portal",
+        "namecn": "不界传送门",
+        "nameen": "Neither Portal",
+        "category": "building"
+    },
+    {
+        "no": 822263,
+        "id": "minecraft:other_portal",
+        "namecn": "异界传送门方块",
+        "nameen": "Other Portal",
+        "category": "building"
+    },
+    {
+        "no": 823703,
+        "id": "minecraft:potato_portal",
+        "namecn": "马铃薯传送门",
+        "nameen": "Potato Portal",
+        "category": "food"
+    },
+    {
+        "no": 823704,
+        "id": "minecraft:pedestal",
+        "namecn": "传送门底座",
+        "nameen": "Pedestal",
+        "category": "building"
+    },
+    {
+        "no": 823997,
+        "id": "minecraft:potato_slab",
+        "namecn": "马铃薯木台阶",
+        "nameen": "Potato Slab",
+        "category": "food"
+    },
+    {
+        "no": 823998,
+        "id": "minecraft:potato_stairs",
+        "namecn": "马铃薯木楼梯",
+        "nameen": "Potato Stairs",
+        "category": "food"
+    },
+    {
+        "no": 824014,
+        "id": "minecraft:potato_fence",
+        "namecn": "马铃薯木栅栏",
+        "nameen": "Potato Fence",
+        "category": "food"
+    },
+    {
+        "no": 824015,
+        "id": "minecraft:potato_fence_gate",
+        "namecn": "马铃薯木栅栏门",
+        "nameen": "Potato Fence Gate",
+        "category": "food"
+    },
+    {
+        "no": 824016,
+        "id": "minecraft:potato_door",
+        "namecn": "马铃薯木门",
+        "nameen": "Potato Door",
+        "category": "food"
+    },
+    {
+        "no": 824017,
+        "id": "minecraft:potato_trapdoor",
+        "namecn": "马铃薯木活板门",
+        "nameen": "Potato Trapdoor",
+        "category": "food"
+    },
+    {
+        "no": 824018,
+        "id": "minecraft:potato_button",
+        "namecn": "马铃薯木按钮",
+        "nameen": "Potato Button",
+        "category": "food"
+    },
+    {
+        "no": 824019,
+        "id": "minecraft:potato_pressure_plate",
+        "namecn": "马铃薯木压力板",
+        "nameen": "Potato Pressure Plate",
+        "category": "food"
+    },
+    {
+        "no": 824020,
+        "id": "minecraft:potato_sign",
+        "namecn": "马铃薯木告示牌",
+        "nameen": "Potato Sign",
+        "category": "food"
+    },
+    {
+        "no": 824021,
+        "id": "minecraft:potato_hanging_sign",
+        "namecn": "悬挂式马铃薯木告示牌",
+        "nameen": "Potato Hanging Sign",
+        "category": "food"
+    },
+    {
+        "no": 828115,
+        "id": "minecraft:portal",
+        "namecn": "下界传送门",
+        "nameen": "Nether Portal",
+        "category": "building"
+    },
+    {
+        "no": 862615,
+        "id": "minecraft:shimmering_door",
+        "namecn": "微光之门",
+        "nameen": "Shimmering Door",
+        "category": "building"
+    }
+]

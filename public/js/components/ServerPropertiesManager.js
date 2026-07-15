@@ -102,8 +102,7 @@ export default {
             </div>
         </template>
 
-
-
+        <div class="row g-4 mt-3">
             <div class="col-md-6">
                 <div class="card h-100 border-info-subtle shadow-sm">
                     <div class="card-header bg-info-subtle text-info fw-bold py-2 px-3 small text-uppercase">

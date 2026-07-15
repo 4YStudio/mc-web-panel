@@ -172,6 +172,7 @@ export const uploadFileWithChunk = async (file, options = {}) => {
         completeUrl,
         cancelUrl = '/api/files/chunk/cancel',
         fieldName = 'chunk',
+        fileName = file.name,
         extraInitData = {},
         onProgress = () => {},
     } = options;
@@ -187,7 +188,7 @@ export const uploadFileWithChunk = async (file, options = {}) => {
 
     try {
         const initRes = await axios.post(initUrl, {
-            fileName: file.name,
+            fileName,
             fileSize: file.size,
             totalChunks,
             ...extraInitData,

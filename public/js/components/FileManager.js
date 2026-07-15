@@ -62,7 +62,7 @@ export default {
                             <button class="btn btn-sm btn-outline-success" @click="askNewFolder" :title="$t('files.new_folder')"><i class="fa-solid fa-folder-plus"></i></button>
                         </div>
                         <input type="file" ref="fileUp" multiple class="d-none" @change="(e)=>uploadFiles(e)">
-                        <input type="file" ref="folderUp" webkitdirectory class="d-none" @change="(e)=>uploadFiles(e)">
+                        <input type="file" ref="folderUp" webkitdirectory multiple class="d-none" @change="(e)=>uploadFiles(e)">
                         <div class="ms-auto d-flex gap-2">
                         </div>
                     </div>
@@ -415,6 +415,7 @@ export default {
                     await uploadFileWithChunk(entry.file, {
                         initUrl: '/api/files/chunk/init',
                         completeUrl: '/api/files/chunk/complete',
+                        fileName: entry.relativePath,
                         extraInitData: { targetPath: currentPath.value },
                         onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
                             const currentUploaded = uploadedSize + bytesDone;
@@ -521,6 +522,7 @@ export default {
                     const chunkResult = await uploadFileWithChunk(file, {
                         initUrl: '/api/files/chunk/init',
                         completeUrl: '/api/files/chunk/complete',
+                        fileName: file.webkitRelativePath || file.name,
                         extraInitData: { targetPath: currentPath.value },
                         onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
                             const currentUploaded = uploadedSize + bytesDone;
