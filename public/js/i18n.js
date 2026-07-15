@@ -558,12 +558,7 @@ export const messages = {
             change_version_confirm: '确定要将加载器核心更换为 MC {mc} / Loader {loader} 吗？',
             version_changing: '正在下载并更换加载器核心...',
             version_change_success: '加载器核心版本更换成功',
-            version_change_timeout: '版本更换超时，请检查服务器日志确认状态',
-            map_backup: {
-                strategy: '备份策略',
-                strategy_panel: '使用面板备份',
-                panel_tips: '提示: 面板自带备份功能，支持全量、增量和定时自动备份。推荐用于日常存档保护。'
-            }
+            version_change_timeout: '版本更换超时，请检查服务器日志确认状态'
         },
         panel_settings: {
             title: '面板设置',
@@ -705,6 +700,7 @@ export const messages = {
             update_success: '插件更新成功',
             update_button: '更新',
             guide_button: '开发指南',
+            market_button: '插件商店',
             guide_title: '插件开发指南',
             guide_desc: '学习如何为云语面板开发自定义插件',
             guide_step1_title: '快速创建',
@@ -1439,12 +1435,7 @@ export const messages = {
             change_version_confirm: 'Are you sure you want to change the loader core to MC {mc} / Loader {loader}?',
             version_changing: 'Downloading and changing loader core...',
             version_change_success: 'Loader core version changed successfully',
-            version_change_timeout: 'Version change timed out, please check server logs for status',
-            map_backup: {
-                strategy: 'Backup Strategy',
-                strategy_panel: 'Use Panel Backup',
-                panel_tips: 'Tips: Native panel backup supports full, incremental and scheduled auto backups. Recommended for daily protection.'
-            }
+            version_change_timeout: 'Version change timed out, please check server logs for status'
         },
         panel_settings: {
             title: 'Panel Settings',
@@ -1582,6 +1573,7 @@ export const messages = {
             update_success: 'Plugin updated successfully',
             update_button: 'Update',
             guide_button: 'Dev Guide',
+            market_button: 'Plugin Store',
             guide_title: 'Plugin Dev Guide',
             guide_desc: 'Learn how to build custom plugins for Cloud Language Panel',
             guide_step1_title: 'Quick Start',

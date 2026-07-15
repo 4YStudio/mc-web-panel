@@ -104,7 +104,22 @@ export const confirmModalAction = () => {
  * @returns {Promise<void>}
  */
 export const waitForPanel = (targetPort = null) => {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
+        let oldStartupTime = null;
+        const currentPort = window.location.port || '80';
+        const isSameOrigin = !targetPort || targetPort.toString() === currentPort.toString();
+
+        // 1. 如果是同源重启，先获取当前服务器的 startupTime 作为参照物
+        if (isSameOrigin) {
+            try {
+                const res = await fetch('/api/system/version', { cache: 'no-store' });
+                const data = await res.json();
+                oldStartupTime = data.startupTime;
+            } catch (e) {
+                // 如果获取失败，就不进行对比
+            }
+        }
+
         const check = async () => {
             try {
                 let url = '/api/system/version';
@@ -117,22 +132,33 @@ export const waitForPanel = (targetPort = null) => {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 2000);
                 
-                // 使用 fetch 探测。由于重启过程会有连接重置，所以 catch 错误并重试
-                await fetch(url, { 
+                const fetchOptions = { 
                     cache: 'no-store', 
-                    mode: 'no-cors', 
                     signal: controller.signal 
-                });
+                };
+                if (!isSameOrigin) {
+                    fetchOptions.mode = 'no-cors';
+                }
+
+                const response = await fetch(url, fetchOptions);
                 clearTimeout(timeoutId);
                 
-                // 只要 fetch 没有抛出错误 (即使是 opaque 响应) 都说明服务已启动
-                resolve();
+                if (isSameOrigin && oldStartupTime) {
+                    const data = await response.json();
+                    if (data.startupTime && data.startupTime !== oldStartupTime) {
+                        resolve();
+                        return;
+                    }
+                    setTimeout(check, 500);
+                } else {
+                    resolve();
+                }
             } catch (e) {
-                setTimeout(check, 1000);
+                setTimeout(check, 500);
             }
         };
-        // 初始等待 1.5s 确保旧进程已经开始关闭
-        setTimeout(check, 1500);
+        // 缩短初始等待，因为我们有了 startupTime 的动态对比，不需要长等
+        setTimeout(check, 500);
     });
 };
 

@@ -102,29 +102,7 @@ export default {
             </div>
         </template>
 
-        <div class="row g-4 mt-1">
-            <div class="col-md-6">
-                <div class="card h-100 border-primary-subtle shadow-sm">
-                    <div class="card-header bg-primary-subtle text-primary fw-bold py-2 px-3 small text-uppercase">
-                        <i class="fa-solid fa-clock-rotate-left me-2"></i>{{ $t('properties.map_backup.strategy') }}
-                    </div>
-                    <div class="card-body p-3 d-flex flex-column">
-                        <div class="mb-3 flex-grow-1">
-                            <div class="form-check form-switch d-flex justify-content-between p-0 mb-3">
-                                <label class="form-check-label fw-bold text-muted">{{ $t('properties.map_backup.strategy_panel') }}</label>
-                                <input class="form-check-input ms-0" type="checkbox" :checked="backupStrategy === 'panel'" @change="backupStrategy = $event.target.checked ? 'panel' : 'mod'">
-                            </div>
-                            <div class="form-text small mt-2 opacity-75" style="font-size: 0.75rem;">
-                                <i class="fa-solid fa-circle-info me-1"></i>
-                                {{ $t('properties.map_backup.panel_tips') }}
-                            </div>
-                        </div>
-                        <button class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm mt-auto" @click="saveBackupStrategy">
-                            <i class="fa-solid fa-save me-2"></i>{{ $t('common.save') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
+
 
             <div class="col-md-6">
                 <div class="card h-100 border-info-subtle shadow-sm">
@@ -252,7 +230,7 @@ export default {
         const iconUrl = ref('/api/server/icon');
         const iconInput = ref(null);
         const hasCustomIcon = ref(false);
-        const backupStrategy = ref(store.stats?.backupStrategy || 'panel');
+
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
 
@@ -409,9 +387,7 @@ export default {
         };
 
         watch(() => store.serverIconVersion, updateIconPreview);
-        watch(() => store.stats?.backupStrategy, (val) => {
-            if (val) backupStrategy.value = val;
-        });
+
 
         const uploadIcon = async (e) => {
             const file = e.target.files[0];
@@ -540,22 +516,7 @@ export default {
             });
         };
 
-        const saveBackupStrategy = async () => {
-            try {
-                await api.post('/api/instances/update', {
-                    id: store.currentInstanceId,
-                    backupStrategy: backupStrategy.value
-                });
-                store.stats.backupStrategy = backupStrategy.value;
-                if (backupStrategy.value !== 'panel') {
-                    store.stats.autoBackupEnabled = false;
-                    if (store.view === 'backups') store.view = 'dashboard';
-                }
-                showToast($t('common.success'));
-            } catch (err) {
-                showToast($t('common.error'), 'danger');
-            }
-        };
+
 
         onMounted(() => {
             loadProperties();
@@ -567,7 +528,7 @@ export default {
             editMode, fileContent, formModel, notFound,
             saveConfig, toggleEditMode, iconUrl, iconInput,
             uploadIcon, deleteIcon, updateIconPreview, iconLoadError, hasCustomIcon,
-            askReinstall, backupStrategy, saveBackupStrategy,
+            askReinstall,
             currentVersion, currentLoaderType, mcVersions, loaderVersions, selectedMc, selectedLoader,
             loadingMcVersions, loadingLoaderVersions, fabricChanging, fabricModalVisible,
             modalLoaderType, modalLoaderTypes, selectModalLoaderType,

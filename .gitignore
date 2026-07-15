@@ -16,7 +16,6 @@ dist_build/
 MWP-*
 node-*
 *.exe
-*.zip
 *.tar.gz
 *.tar.xz
 *.7z

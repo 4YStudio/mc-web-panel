@@ -1,0 +1,110 @@
+[
+    {
+        "id": "mc-panel-plugin-api-test",
+        "name": "插件系统测试",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "用于测试自动安装 Node 包和开放 API 接口功能的插件。",
+        "category": "tools",
+        "permissions": [
+            "http",
+            "http.public"
+        ],
+        "icon": "fa-flask",
+        "fileSize": 638947,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-api-test.zip"
+    },
+    {
+        "id": "mc-panel-plugin-backup-instance",
+        "name": "地图备份",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "提供实例地图的备份、还原与管理功能。",
+        "category": "backups",
+        "permissions": [
+            "http"
+        ],
+        "icon": "fa-clock-rotate-left",
+        "fileSize": 12665,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-backup-instance.zip"
+    },
+    {
+        "id": "mc-panel-plugin-backup-mod",
+        "name": "高级备份",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "基于 Advanced Backups 模组的专业备份管理插件。",
+        "category": "backups",
+        "permissions": [],
+        "icon": "fa-clock-rotate-left",
+        "fileSize": 6625,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-backup-mod.zip"
+    },
+    {
+        "id": "mc-panel-plugin-backup",
+        "name": "面板备份管理器",
+        "version": "1.0.2",
+        "author": "4YStudio",
+        "description": "提供面板配置与实例的全局备份、还原与管理功能。",
+        "category": "backups",
+        "permissions": [
+            "http"
+        ],
+        "icon": "fa-box-archive",
+        "fileSize": 9110,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-backup.zip"
+    },
+    {
+        "id": "mc-panel-plugin-easyauth",
+        "name": "认证管理",
+        "version": "1.1.0",
+        "author": "4YStudio",
+        "description": "基于 EasyAuth 模组的玩家登录认证管理插件。",
+        "category": "security",
+        "permissions": [
+            "http"
+        ],
+        "icon": "fa-user-shield",
+        "fileSize": 6338550,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-easyauth.zip"
+    },
+    {
+        "id": "mc-panel-plugin-frp",
+        "name": "FRP 内网穿透",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "FRP 内网穿透管理插件，支持多配置管理、进程监控和自动安装",
+        "category": "network",
+        "permissions": [
+            "http",
+            "process"
+        ],
+        "icon": "fa-network-wired",
+        "fileSize": 14462,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-frp.zip"
+    },
+    {
+        "id": "mc-panel-plugin-system-status",
+        "name": "系统状态卡片",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "在实例列表上方显示系统的 CPU 和内存状态卡片",
+        "category": "tools",
+        "permissions": [],
+        "icon": "fa-chart-line",
+        "fileSize": 2498,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-system-status.zip"
+    },
+    {
+        "id": "mc-panel-plugin-voicechat",
+        "name": "语音设置",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "基于 Simple Voice Chat 模组的语音通信管理插件。",
+        "category": "tools",
+        "permissions": [],
+        "icon": "fa-microphone",
+        "fileSize": 3582,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-voicechat.zip"
+    }
+]

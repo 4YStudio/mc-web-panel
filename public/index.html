@@ -117,7 +117,7 @@
                             <mods-manager v-else-if="store.view === 'mods'" key="mods"></mods-manager>
                             <modrinth-browser v-else-if="store.view === 'modrinth'" key="modrinth"></modrinth-browser>
                             <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
-                            <backup-manager v-else-if="store.view === 'backups'" key="backups"></backup-manager>
+
                             <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
                             <about v-else-if="store.view === 'about'" key="about"></about>
                             <div v-else-if="isPluginView" :key="'plugin-' + store.view" class="animate-in">

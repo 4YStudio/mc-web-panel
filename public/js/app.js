@@ -10,7 +10,7 @@ import Dashboard from './components/Dashboard.js';
 import ModsManager from './components/ModsManager.js';
 import FileManager from './components/FileManager.js';
 import PlayerManager from './components/PlayerManager.js';
-import BackupManager from './components/BackupManager.js';
+
 import PluginManager from './components/PluginManager.js';
 import ProgressModal from './components/ProgressModal.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
@@ -33,7 +33,7 @@ const app = createApp({
         ModsManager,
         FileManager,
         PlayerManager,
-        BackupManager,
+
         ProgressModal,
         ServerPropertiesManager,
         Avatar,

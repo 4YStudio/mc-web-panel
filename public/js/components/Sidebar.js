@@ -8,7 +8,7 @@ const BUILTIN_ITEMS = [
     { id: 'mods', view: 'mods', icon: 'fa-microchip', labelKey: 'sidebar.mods' },
     { id: 'modrinth', view: 'modrinth', icon: 'fa-cloud-arrow-down', labelKey: 'sidebar.modrinth' },
     { id: 'files', view: 'files', icon: 'fa-folder-open', labelKey: 'sidebar.files' },
-    { id: 'backups', view: 'backups', icon: 'fa-clock-rotate-left', labelKey: 'sidebar.backups' },
+
     { id: 'players', view: 'players', icon: 'fa-users', labelKey: 'sidebar.players' }
 ];
 
@@ -202,7 +202,7 @@ export default {
             }
             return ordered.filter(i => {
                 if ((configState.hiddenItems || []).includes(i.id)) return false;
-                if (i.id === 'backups' && store.stats?.backupStrategy !== 'panel') return false;
+
                 return true;
             });
         });

@@ -1,13 +1,14 @@
 {
   "name": "mc-web-panel",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "A web panel for Minecraft servers.",
   "main": "index.js",
   "bin": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "build": "node build.js"
+    "build": "node build.js",
+    "build:market": "node docs/plugins_shop/update.js"
   },
   "keywords": [],
   "author": "",

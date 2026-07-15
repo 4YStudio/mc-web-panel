@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    <title>MC Web Panel - 插件市场</title>
+    <meta name="description" content="浏览、搜索和获取 MC Web Panel 扩展插件，提升你的 Minecraft 服务器管理体验。">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/landing.css">
+    <link rel="stylesheet" href="css/market.css">
+</head>
+<body>
+    <nav class="navbar scrolled" id="navbar">
+        <div class="container nav-container">
+            <a href="./index.html" class="nav-brand">
+                <div class="nav-logo">
+                    <i class="fa-solid fa-cube"></i>
+                </div>
+                <span class="nav-brand-text">MC Web Panel</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="./index.html#features">特性</a>
+                <a href="./index.html#screenshots">截图</a>
+                <a href="./index.html#quickstart">快速开始</a>
+                <a href="./market.html" class="active">
+                    <i class="fa-solid fa-store"></i> 插件市场
+                </a>
+                <a href="./dev-guide/" class="nav-link-doc">
+                    <i class="fa-solid fa-book"></i> 开发文档
+                </a>
+                <a href="https://github.com/4ystudio/mc-web-panel" target="_blank" class="nav-link-github">
+                    <i class="fa-brands fa-github"></i> GitHub
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero / Header Area -->
+    <header class="market-hero">
+        <div class="market-hero-bg">
+            <div class="market-hero-grid"></div>
+            <div class="market-hero-glow"></div>
+        </div>
+        <div class="container market-hero-content">
+            <div class="market-hero-badge">
+                <i class="fa-solid fa-store"></i>
+                <span>官方与社区插件市场</span>
+            </div>
+            <h1 class="market-hero-title">扩展您的面板能力</h1>
+            <p class="market-hero-desc">浏览和发现各种专为 MC Web Panel 开发的插件，帮助您实现更好的自动化、安全性及系统监控。</p>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="market-main container">
+        <!-- Controls: Search & Category Filters & Order -->
+        <section class="controls-panel">
+            <div class="search-wrapper">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="searchInput" placeholder="搜索插件名称、描述或作者..." aria-label="搜索插件">
+            </div>
+            <div class="filters-and-sort">
+                <div class="category-filters" id="categoryFilters">
+                    <button class="filter-btn active" data-category="all">全部</button>
+                    <button class="filter-btn" data-category="tools">系统工具</button>
+                    <button class="filter-btn" data-category="backups">备份管理</button>
+                    <button class="filter-btn" data-category="network">网络穿透</button>
+                    <button class="filter-btn" data-category="security">安全管理</button>
+                </div>
+                <div class="sort-wrapper">
+                    <label for="sortSelect" class="sort-label">排序方式</label>
+                    <div class="select-container">
+                        <select id="sortSelect">
+                            <option value="default">默认推荐</option>
+                            <option value="name">按名称 (A-Z)</option>
+                            <option value="category">按分类排序</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down select-chevron"></i>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading Indicator / Empty State -->
+        <div class="market-status" id="marketStatus" style="display: none;">
+            <div class="empty-state">
+                <i class="fa-solid fa-cubes-stacked empty-icon"></i>
+                <p>未找到符合条件的插件</p>
+                <button class="btn btn-outline btn-sm" id="resetFiltersBtn">重置过滤条件</button>
+            </div>
+        </div>
+
+        <!-- Plugins Grid -->
+        <section class="plugins-grid-container" id="pluginsGrid">
+            <!-- Cards will be populated by JavaScript -->
+        </section>
+    </main>
+
+    <!-- Plugin Details Dialog -->
+    <dialog class="details-modal" id="detailsModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalCloseBtn" aria-label="关闭">&times;</button>
+            <div class="modal-body" id="modalBody">
+                <!-- Modal content will be generated dynamically -->
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer">
+        <!-- Toast will float here -->
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="nav-logo">
+                        <i class="fa-solid fa-cube"></i>
+                    </div>
+                    <span class="footer-brand-text">MC Web Panel</span>
+                </div>
+                <div class="footer-links">
+                    <a href="./index.html#features">特性</a>
+                    <a href="./index.html#screenshots">截图</a>
+                    <a href="./index.html#quickstart">快速开始</a>
+                    <a href="./market.html">插件市场</a>
+                    <a href="./dev-guide/">开发文档</a>
+                    <a href="https://github.com/4ystudio/mc-web-panel" target="_blank">GitHub</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>Released under the <a href="https://github.com/4ystudio/mc-web-panel/blob/main/LICENSE" target="_blank">MIT License</a></p>
+                <p>Made with <i class="fa-solid fa-heart" style="color: #ef4444;"></i> by <a href="https://github.com/4ystudio" target="_blank">4ystudio</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/landing.js"></script>
+    <script src="js/market.js"></script>
+</body>
+</html>
