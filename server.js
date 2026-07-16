@@ -17,6 +17,7 @@ const QRCode = require('qrcode');
 const fs = require('fs-extra');
 const multer = require('multer');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const os = require('os');
 const si = require('systeminformation');
 const PropertiesReader = require('properties-reader');
@@ -25,10 +26,116 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.2.2';
+const APP_VERSION = '2.2.3';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
+
+// ==================== NBT Reader for Player Data ====================
+class NBTReader {
+    constructor(buffer) {
+        this.buffer = buffer;
+        this.offset = 0;
+    }
+    readTag() {
+        if (this.offset >= this.buffer.length) return { type: 0, name: '', value: null };
+        const type = this.buffer[this.offset++];
+        if (type === 0) return { type, name: '', value: null };
+        const nameLen = this.buffer.readUInt16BE(this.offset);
+        this.offset += 2;
+        const name = this.buffer.toString('utf8', this.offset, this.offset + nameLen);
+        this.offset += nameLen;
+        return { type, name, value: this.readValue(type) };
+    }
+    readValue(type) {
+        switch (type) {
+            case 1: return this.buffer.readInt8(this.offset++);
+            case 2: { const s = this.buffer.readInt16BE(this.offset); this.offset += 2; return s; }
+            case 3: { const i = this.buffer.readInt32BE(this.offset); this.offset += 4; return i; }
+            case 4: { const l = this.buffer.readBigInt64BE(this.offset); this.offset += 8; return l; }
+            case 5: { const f = this.buffer.readFloatBE(this.offset); this.offset += 4; return f; }
+            case 6: { const d = this.buffer.readDoubleBE(this.offset); this.offset += 8; return d; }
+            case 7: { const baLen = this.buffer.readInt32BE(this.offset); this.offset += 4; const ba = this.buffer.subarray(this.offset, this.offset + baLen); this.offset += baLen; return ba; }
+            case 8: { const strLen = this.buffer.readUInt16BE(this.offset); this.offset += 2; const str = this.buffer.toString('utf8', this.offset, this.offset + strLen); this.offset += strLen; return str; }
+            case 9: { const elemType = this.buffer[this.offset++]; const listLen = this.buffer.readInt32BE(this.offset); this.offset += 4; const list = []; for (let k = 0; k < listLen; k++) list.push(this.readValue(elemType)); return { type: elemType, value: list }; }
+            case 10: { const comp = {}; while (true) { const tag = this.readTag(); if (tag.type === 0) break; comp[tag.name] = tag.value; } return comp; }
+            case 11: { const iaLen = this.buffer.readInt32BE(this.offset); this.offset += 4; const ia = []; for (let k = 0; k < iaLen; k++) { ia.push(this.buffer.readInt32BE(this.offset)); this.offset += 4; } return ia; }
+            case 12: { const laLen = this.buffer.readInt32BE(this.offset); this.offset += 4; const la = []; for (let k = 0; k < laLen; k++) { la.push(this.buffer.readBigInt64BE(this.offset)); this.offset += 8; } return la; }
+            default: return null;
+        }
+    }
+}
+
+function parsePlayerInventory(buffer) {
+    try {
+        const nbt = new NBTReader(buffer).readTag().value;
+        if (!nbt) { console.log('[PlayerInventory] NBT root is null'); return null; }
+        // Check all top-level keys for debugging
+        const keys = Object.keys(nbt);
+        console.log('[PlayerInventory] Top-level NBT keys:', keys.join(', '));
+
+        let inventory = nbt.Inventory;
+        if (!inventory) { console.log('[PlayerInventory] No Inventory tag found'); return null; }
+        console.log('[PlayerInventory] Inventory type:', typeof inventory, Array.isArray(inventory) ? 'is array' : 'is not array',
+            inventory.type !== undefined ? `list type=${inventory.type}` : '',
+            inventory.value !== undefined ? `has .value (array=${Array.isArray(inventory.value)}, len=${inventory.value?.length})` : '');
+
+        // Handle both array and {type, value} structures
+        let items;
+        if (Array.isArray(inventory)) {
+            items = inventory;
+        } else if (inventory.value && Array.isArray(inventory.value)) {
+            items = inventory.value;
+        } else {
+            console.log('[PlayerInventory] Cannot find items array in Inventory');
+            return null;
+        }
+
+        console.log('[PlayerInventory] Found', items.length, 'inventory entries');
+        if (items.length > 0) {
+            console.log('[PlayerInventory] First item type:', typeof items[0], 'keys:', items[0] ? Object.keys(items[0]).join(',') : 'null');
+        }
+
+        const result = [];
+        for (const item of items) {
+            if (!item) continue;
+            // item could be a plain object from compound parsing, or {type, value} from list parsing
+            const tag = (item.value && typeof item.value === 'object' && !Array.isArray(item.value)) ? item.value : item;
+            if (!tag || typeof tag !== 'object') continue;
+            const id = tag.id || 'minecraft:air';
+            if (id === 'minecraft:air') continue;
+            const count = tag.Count || 1;
+            // Slot 可能是 byte/int/bigint 类型, 确保返回数字
+            const rawSlot = tag.Slot !== undefined ? tag.Slot : -1;
+            const slot = typeof rawSlot === 'bigint' ? Number(rawSlot) : Number(rawSlot) || 0;
+            const damage = tag.Damage || 0;
+            const tagData = tag.tag || null;
+            let displayName = null;
+            let enchantments = [];
+            if (tagData) {
+                if (tagData.display && tagData.display.Name) displayName = tagData.display.Name;
+                if (tagData.Enchantments && Array.isArray(tagData.Enchantments)) {
+                    enchantments = tagData.Enchantments.map(e => ({
+                        id: e.id || '',
+                        lvl: e.lvl || 0
+                    }));
+                }
+            }
+            result.push({ id, count, slot, damage, displayName, enchantments });
+        }
+        // 调试: 打印装备槽和副手槽信息
+        const armorItems = result.filter(i => i.slot >= 100 && i.slot <= 103);
+        const offhandItem = result.find(i => i.slot === -106);
+        console.log('[PlayerInventory] Parsed', result.length, 'items');
+        console.log('[PlayerInventory] Armor slots:', armorItems.map(i => `slot=${i.slot}(type=${typeof i.slot}) id=${i.id}`));
+        console.log('[PlayerInventory] Offhand:', offhandItem ? `slot=${offhandItem.slot}(type=${typeof offhandItem.slot}) id=${offhandItem.id}` : 'empty');
+        console.log('[PlayerInventory] All slots:', result.map(i => `${i.slot}:${i.id}`).join(', '));
+        return result;
+    } catch (e) {
+        console.error('[PlayerInventory] Parse error:', e.message, e.stack);
+        return null;
+    }
+}
 
 // --- 配置区域 ---
 // detect if running in compressed environment (pkg or caxa)
@@ -768,13 +875,16 @@ if (cluster.isPrimary) {
 
         // Emit to instance-specific channel
         io.emit(`console:${instanceId}`, msg);
-        // For backward compatibility with single-instance frontend (temp) 
+        // For backward compatibility with single-instance frontend (temp)
         if (instanceId === instanceConfig.activeInstanceId) io.emit('console', msg);
 
         const instDir = getInstanceDir(instanceId);
         if (instDir) {
             fs.appendFile(path.join(instDir, 'panel.log'), msg, () => { });
         }
+
+        // Notify plugin system's log handlers
+        if (pluginLoader.notifyLogHandlers) pluginLoader.notifyLogHandlers(instanceId, msg);
     };
 
 
@@ -2625,7 +2735,83 @@ if (cluster.isPrimary) {
     // 服务器控制
     app.get('/api/server/status', requireAuth, withInstance, (req, res) => res.json({ running: !!req.instState.process, onlinePlayers: Array.from(req.instState.onlinePlayers) }));
 
-    // Player Pings API
+    // Player Inventory API
+    app.get('/api/server/player-inventory/:name', requireAuth, withInstance, async (req, res) => {
+        try {
+            const playerName = req.params.name;
+            const instDir = req.instDir;
+
+            // Get level-name from server.properties
+            let levelName = 'world';
+            const propPath = path.join(instDir, 'server.properties');
+            if (fs.existsSync(propPath)) {
+                try {
+                    const propContent = fs.readFileSync(propPath, 'utf8');
+                    for (const line of propContent.split('\n')) {
+                        if (line.trim().startsWith('level-name=')) {
+                            levelName = line.split('=')[1].trim();
+                            break;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            // Get UUID from usercache.json
+            let uuid = null;
+            const userCachePath = path.join(instDir, 'usercache.json');
+            if (fs.existsSync(userCachePath)) {
+                try {
+                    const userCache = fs.readJsonSync(userCachePath);
+                    const entry = userCache.find(u => u.name === playerName);
+                    if (entry) uuid = entry.uuid;
+                } catch (e) {}
+            }
+
+            if (!uuid) {
+                return res.status(404).json({ error: 'Player not found in usercache' });
+            }
+
+            // Read player .dat file
+            const playerDataPath = path.join(instDir, levelName, 'playerdata', `${uuid}.dat`);
+            if (!fs.existsSync(playerDataPath)) {
+                return res.status(404).json({ error: 'Player data file not found' });
+            }
+
+            const compressed = fs.readFileSync(playerDataPath);
+            const decompressed = zlib.gunzipSync(compressed);
+            const inventory = parsePlayerInventory(decompressed);
+
+            if (!inventory) {
+                return res.status(500).json({ error: 'Failed to parse player inventory' });
+            }
+
+            res.json({ player: playerName, uuid, items: inventory });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Skin Proxy API - 解决前端 CORS 问题
+    app.get('/api/skin-proxy', requireAuth, async (req, res) => {
+        try {
+            const url = req.query.url;
+            if (!url) return res.status(400).json({ error: 'Missing url parameter' });
+            // 只允许已知的皮肤域名
+            const allowedHosts = ['crafatar.com', 'littleskin.cn', 'textures.minecraft.net'];
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch { return res.status(400).json({ error: 'Invalid url' }); }
+            if (!allowedHosts.some(h => parsedUrl.hostname.endsWith(h))) {
+                return res.status(403).json({ error: 'Domain not allowed' });
+            }
+            const axios = require('axios');
+            const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+            res.set('Content-Type', response.headers['content-type'] || 'image/png');
+            res.set('Cache-Control', 'public, max-age=3600');
+            res.send(response.data);
+        } catch (e) {
+            res.status(502).json({ error: 'Failed to fetch skin: ' + e.message });
+        }
+    });
     app.get('/api/server/player-pings', requireAuth, withInstance, async (req, res) => {
         try {
             const instDir = req.instDir;

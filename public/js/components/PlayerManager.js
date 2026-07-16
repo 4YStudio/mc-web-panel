@@ -305,6 +305,8 @@ export default {
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end" :class="{show: activeMenu === p}">
+                                        <li><a class="dropdown-item" @click="openInventory(p)"><i class="fa-solid fa-box-open me-2" style="color:#8b5cf6"></i>{{ $t('players.inventory') }}</a></li>
+                                        <li><hr class="dropdown-divider"></li>
                                         <li><a class="dropdown-item" @click="askTeleport(p)"><i class="fa-solid fa-location-dot me-2 text-primary"></i>{{ $t('players.teleport') }}</a></li>
                                         <li><a class="dropdown-item" @click="askGamemode(p)"><i class="fa-solid fa-gamepad me-2 text-info"></i>{{ $t('players.gamemode') }}</a></li>
                                         <li><a class="dropdown-item" @click="askGiveItem(p)"><i class="fa-solid fa-gift me-2 text-success"></i>{{ $t('players.give_item') }}</a></li>
@@ -414,13 +416,6 @@ export default {
                                     <div class="position-relative">
                                         <i class="fa-solid fa-magnifying-glass position-absolute text-muted" style="left: 14px; top: 50%; transform: translateY(-50%); z-index: 10;"></i>
                                         <input type="text" class="form-control ps-5 py-2 rounded-pill" :placeholder="$t('players.search_item_placeholder')" v-model="itemSearchQuery">
-                                    </div>
-                                </div>
-                                <div class="mc-tabs-container mb-3">
-                                    <div class="mc-tabs d-flex gap-2 overflow-auto no-scrollbar py-1">
-                                        <button v-for="tab in tabs" :key="tab.id" class="mc-tab-btn flex-shrink-0" :class="{active: activeTab === tab.id}" @click="activeTab = tab.id; itemSearchQuery=''">
-                                            {{ tab.icon }} <span class="ms-1">{{ $t('players.tab_' + tab.id) }}</span>
-                                        </button>
                                     </div>
                                 </div>
 
@@ -627,6 +622,85 @@ export default {
                 </div>
             </Transition>
         </Teleport>
+
+        <!-- 玩家背包查看弹窗 -->
+        <Teleport to="body">
+            <Transition name="modal-fade">
+                <div class="modal fade show" v-if="showInventoryModal" style="display: block; z-index: 1050;">
+                    <div class="modal-backdrop fade show" @click="closeInventoryModal" style="z-index: -1;"></div>
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+                            <div class="modal-header border-bottom pb-3 pt-3 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="modal-title fw-bold text-body">
+                                    <i class="fa-solid fa-box-open me-2" style="color:#8b5cf6"></i>
+                                    <span>{{ $t('players.inventory') }}: {{ inventoryPlayer }}</span>
+                                </h5>
+                                <button type="button" class="btn-close" @click="closeInventoryModal"></button>
+                            </div>
+                            <div class="modal-body px-4 py-3">
+                                <div v-if="inventoryLoading" class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <div class="mt-2 text-muted">{{ $t('common.loading') }}</div>
+                                </div>
+                                <div v-else-if="inventoryError" class="text-center py-5">
+                                    <i class="fa-solid fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                                    <div class="text-muted">{{ inventoryError }}</div>
+                                </div>
+                                <div v-else>
+                                    <!-- 主背包 (槽位 9-35, 共27格) -->
+                                    <div class="mb-2">
+                                        <div class="small text-muted mb-1">{{ $t('players.inventory') || '背包' }}</div>
+                                        <div class="inventory-grid">
+                                            <div v-for="slot in 27" :key="'main'+slot" class="inventory-slot" :class="{'has-item': getInventoryItem(8 + slot)}">
+                                                <div v-if="getInventoryItem(8 + slot)" class="inventory-item">
+                                                    <img v-if="getItemIcon(getInventoryItem(8 + slot).id)" :src="getItemIcon(getInventoryItem(8 + slot).id)" class="inventory-item-img">
+                                                    <span v-else class="inventory-item-text">{{ getInventoryItem(8 + slot).id.replace('minecraft:', '').split('_')[0][0].toUpperCase() }}</span>
+                                                    <span v-if="getInventoryItem(8 + slot).count > 1" class="inventory-item-count">{{ getInventoryItem(8 + slot).count }}</span>
+                                                    <div class="inventory-item-tooltip">
+                                                        <div class="fw-bold">{{ getItemName(getInventoryItem(8 + slot)) }}</div>
+                                                        <div class="small text-muted">{{ getInventoryItem(8 + slot).id }}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 快捷栏 (槽位 0-8) -->
+                                    <div>
+                                        <div class="small text-muted mb-1">{{ $t('players.hotbar') || '快捷栏' }}</div>
+                                        <div class="inventory-grid hotbar-grid">
+                                            <div v-for="slot in 9" :key="'hotbar'+slot" class="inventory-slot" :class="{'has-item': getInventoryItem(slot - 1)}">
+                                                <div v-if="getInventoryItem(slot - 1)" class="inventory-item">
+                                                    <img v-if="getItemIcon(getInventoryItem(slot - 1).id)" :src="getItemIcon(getInventoryItem(slot - 1).id)" class="inventory-item-img">
+                                                    <span v-else class="inventory-item-text">{{ getInventoryItem(slot - 1).id.replace('minecraft:', '').split('_')[0][0].toUpperCase() }}</span>
+                                                    <span v-if="getInventoryItem(slot - 1).count > 1" class="inventory-item-count">{{ getInventoryItem(slot - 1).count }}</span>
+                                                    <div class="inventory-item-tooltip">
+                                                        <div class="fw-bold">{{ getItemName(getInventoryItem(slot - 1)) }}</div>
+                                                        <div class="small text-muted">{{ getInventoryItem(slot - 1).id }}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 统计信息 -->
+                                    <div class="mt-3 d-flex justify-content-between align-items-center text-muted small">
+                                        <span>{{ $t('players.total_items') }}: {{ inventoryItems.length }}</span>
+                                        <span>{{ $t('players.unique_items') }}: {{ new Set(inventoryItems.map(i => i.id)).size }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-top pt-3 px-4 pb-4">
+                                <button class="btn btn-outline-secondary rounded-pill px-4" @click="closeInventoryModal">{{ $t('close') }}</button>
+                                <button class="btn btn-outline-danger rounded-pill px-4" @click="confirmClearInventory" v-if="!inventoryLoading && inventoryItems.length > 0">
+                                    <i class="fa-solid fa-trash me-1"></i> {{ $t('players.clear_inv') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
     `,
     setup() {
@@ -646,7 +720,6 @@ export default {
         const selectedItem = ref(null);
         const giveQuantity = ref(64);
         const itemSearchQuery = ref('');
-        const activeTab = ref('building');
         const customItemId = ref('');
         const creativeItems = ref([]);
 
@@ -657,6 +730,17 @@ export default {
         const effectDuration = ref(600);
         const effectLevel = ref(1);
         const hideParticles = ref(false);
+
+        // 玩家背包查看状态
+        const showInventoryModal = ref(false);
+        const inventoryPlayer = ref('');
+        const inventoryItems = ref([]);
+        const inventoryLoading = ref(false);
+        const inventoryError = ref(null);
+        const inventoryPlayerUuid = ref('');
+
+        // 物品 ID 到图片编号的映射（从 items.json 加载）
+        const itemIconMap = ref(new Map());
 
         const selectedEnchantment = ref('minecraft:protection');
         const enchantmentLevel = ref(1);
@@ -714,14 +798,10 @@ export default {
             }
         });
 
-        const tabs = [
-            { id: 'building', name: '建筑', icon: '🧱' },
-            { id: 'combat', name: '战斗', icon: '⚔️' },
-            { id: 'tools', name: '工具', icon: '🛠️' },
-            { id: 'food', name: '食品', icon: '🍕' },
-            { id: 'materials', name: '材料', icon: '💎' },
-            { id: 'special', name: '特殊', icon: '🧪' }
-        ];
+        const VALID_CATEGORIES = new Set([
+            'building_blocks', 'decorations', 'redstone', 'transportation',
+            'materials', 'food', 'tools', 'combat', 'brewing', 'misc'
+        ]);
 
         const filteredOnline = computed(() => {
             const f = onlineFilter.value.toLowerCase().trim();
@@ -736,29 +816,95 @@ export default {
         });
 
         // 动态加载 items.json
+        let itemsLoaded = false;
         const loadCreativeItems = async () => {
             try {
                 const response = await fetch('/js/items.json');
-                creativeItems.value = await response.json();
+                const items = await response.json();
+                creativeItems.value = items;
+                // Build item ID to icon number mapping
+                const map = new Map();
+                for (const item of items) {
+                    map.set(item.id, item.no);
+                }
+                itemIconMap.value = map;
+                itemsLoaded = true;
             } catch (e) {
                 console.error("Failed to load items.json:", e);
             }
+        };
+
+        // 玩家背包查看
+        const openInventory = async (player) => {
+            inventoryPlayer.value = player;
+            inventoryItems.value = [];
+            inventoryError.value = null;
+            inventoryLoading.value = true;
+            showInventoryModal.value = true;
+            activeMenu.value = null;
+            inventoryPlayerUuid.value = '';
+
+            // Ensure items.json is loaded before fetching inventory
+            if (!itemsLoaded) await loadCreativeItems();
+
+            try {
+                const res = await api.get(`/api/server/player-inventory/${player}`);
+                inventoryItems.value = res.data.items || [];
+                inventoryPlayerUuid.value = res.data.uuid || '';
+                console.log('[Inventory] Loaded items:', inventoryItems.value.length);
+                console.log('[Inventory] All slots:', inventoryItems.value.map(i => `slot=${i.slot} id=${i.id}`));
+            } catch (e) {
+                inventoryError.value = e.response?.data?.error || e.message || 'Failed to load inventory';
+            } finally {
+                inventoryLoading.value = false;
+            }
+        };
+
+        const closeInventoryModal = () => {
+            showInventoryModal.value = false;
+        };
+
+        const getInventoryItem = (slot) => {
+            return inventoryItems.value.find(item => Number(item.slot) === slot);
+        };
+
+        const getItemIcon = (itemId) => {
+            const no = itemIconMap.value.get(itemId);
+            if (no) return `/img/items/${no}.png`;
+            // No mapping found - return null to indicate fallback text icon
+            return null;
+        };
+
+        const getItemName = (item) => {
+            // Try to find name from creativeItems
+            const found = creativeItems.value.find(i => i.id === item.id);
+            if (found) {
+                return store.lang === 'zh' ? found.namecn : found.nameen;
+            }
+            // Fallback to ID
+            return item.id.replace('minecraft:', '').replace(/_/g, ' ');
+        };
+
+        const confirmClearInventory = async () => {
+            if (!inventoryPlayer.value) return;
+            await sendCmd(`clear ${inventoryPlayer.value}`);
+            showInventoryModal.value = false;
+            setTimeout(() => openInventory(inventoryPlayer.value), 500);
         };
 
         // 创造模式过滤
         const filteredItems = computed(() => {
             const query = itemSearchQuery.value.toLowerCase().trim();
             let list = creativeItems.value;
-            // Filter out ungiveable items
             list = list.filter(item => !UNGIVEABLE_IDS.has(item.id));
             if (query) {
-                return list.filter(item => 
-                    item.namecn.toLowerCase().includes(query) || 
-                    item.nameen.toLowerCase().includes(query) || 
+                return list.filter(item =>
+                    item.namecn.toLowerCase().includes(query) ||
+                    item.nameen.toLowerCase().includes(query) ||
                     item.id.toLowerCase().includes(query)
                 );
             }
-            return list.filter(item => item.category === activeTab.value);
+            return list;
         });
 
         // 空网格数量填充，使其呈现完美的 MC 方格布局
@@ -832,7 +978,7 @@ export default {
             targetPlayer.value = player;
             if (creativeItems.value.length > 0) {
                 // 默认选择第一个建筑方块
-                const firstBuilding = creativeItems.value.find(i => i.category === 'building') || creativeItems.value[0];
+                const firstBuilding = creativeItems.value.find(i => i.category === 'building_blocks') || creativeItems.value[0];
                 selectedItem.value = firstBuilding;
                 customItemId.value = firstBuilding.id;
             } else {
@@ -841,7 +987,7 @@ export default {
             }
             giveQuantity.value = 64;
             itemSearchQuery.value = '';
-            activeTab.value = 'building';
+            activeTab.value = 'building_blocks';
             skullOwner.value = '';
             attachEnchantment.value = false;
             showGiveModal.value = true;
@@ -1064,45 +1210,6 @@ export default {
                 const style = document.createElement('style');
                 style.id = 'mc-creative-inv-style';
                 style.innerHTML = `
-                    .mc-tabs-container {
-                        width: 100%;
-                        overflow: hidden;
-                    }
-                    .mc-tabs {
-                        background: var(--c-bg-base);
-                        border: 1px solid var(--c-border);
-                        border-radius: 8px;
-                        padding: 4px;
-                        display: flex;
-                        gap: 6px;
-                        overflow-x: auto;
-                        white-space: nowrap;
-                        width: 100%;
-                        -webkit-overflow-scrolling: touch;
-                    }
-                    .mc-tabs::-webkit-scrollbar {
-                        display: none;
-                    }
-                    .mc-tab-btn {
-                        background: transparent;
-                        border: none;
-                        color: var(--c-text-secondary);
-                        padding: 6px 12px;
-                        border-radius: 6px;
-                        font-weight: 600;
-                        font-size: 0.85rem;
-                        transition: all 0.15s ease;
-                        white-space: nowrap;
-                    }
-                    .mc-tab-btn:hover {
-                        color: var(--c-text-primary);
-                        background: rgba(var(--c-primary-rgb), 0.05);
-                    }
-                    .mc-tab-btn.active {
-                        background: var(--c-primary) !important;
-                        color: #ffffff !important;
-                        box-shadow: var(--focus-ring);
-                    }
                     .mc-slots-container {
                         background: var(--c-bg-base) !important;
                         border: 1px solid var(--c-border) !important;
@@ -1201,6 +1308,116 @@ export default {
                             grid-template-columns: repeat(4, 1fr);
                         }
                     }
+                    /* 玩家背包查看样式 */
+                    .inv-top-area {
+                        background: var(--c-bg-base);
+                        border: 1px solid var(--c-border);
+                        border-radius: 8px;
+                        padding: 12px;
+                    }
+                    .inventory-grid {
+                        display: grid;
+                        grid-template-columns: repeat(9, 1fr);
+                        gap: 4px;
+                        background: var(--c-bg-base);
+                        padding: 8px;
+                        border-radius: 8px;
+                        border: 1px solid var(--c-border);
+                    }
+                    .inventory-grid.hotbar-grid {
+                        background: rgba(var(--c-primary-rgb), 0.05);
+                    }
+                    .inventory-slot {
+                        aspect-ratio: 1;
+                        background: var(--c-surface);
+                        border: 1px solid var(--c-border);
+                        border-radius: 4px;
+                        position: relative;
+                    }
+                    .inventory-slot.armor-slot {
+                        width: 40px;
+                        height: 40px;
+                        aspect-ratio: unset;
+                    }
+                    .inventory-slot.has-item {
+                        background: rgba(var(--c-primary-rgb), 0.05);
+                    }
+                    .inventory-item {
+                        width: 100%;
+                        height: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        position: relative;
+                    }
+                    .inventory-item-img {
+                        width: 30px;
+                        height: 30px;
+                        object-fit: contain;
+                        image-rendering: pixelated;
+                        filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.35));
+                        transition: transform 0.15s ease, filter 0.15s ease;
+                    }
+                    .inventory-item:hover .inventory-item-img {
+                        transform: scale(1.15) translateY(-1px);
+                        filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.45));
+                    }
+                    .inventory-item-text {
+                        width: 30px;
+                        height: 30px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                        font-weight: bold;
+                        color: #fff;
+                        background: rgba(80,80,80,0.8);
+                        border-radius: 3px;
+                    }
+                    .inventory-item-count {
+                        position: absolute;
+                        bottom: 1px;
+                        right: 2px;
+                        font-size: 10px;
+                        font-weight: bold;
+                        color: #fff;
+                        text-shadow: 1px 1px 1px #000;
+                    }
+                    .inventory-item .inventory-item-tooltip {
+                        visibility: hidden;
+                        position: absolute;
+                        background: var(--c-surface-elevated);
+                        border: 1px solid var(--c-border);
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        bottom: 100%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        z-index: 1100;
+                        white-space: nowrap;
+                        box-shadow: var(--card-shadow-hover);
+                        font-size: 0.75rem;
+                    }
+                    .inventory-item:hover .inventory-item-tooltip {
+                        visibility: visible;
+                    }
+                    /* 3D 皮肤查看器 canvas */
+                    #inventory-skin-viewer {
+                        image-rendering: pixelated;
+                        border-radius: 8px;
+                    }
+                    /* 给予物品弹窗中的物品图标3D增强 */
+                    .mc-item-slot .mc-item-img {
+                        filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.3));
+                        transition: transform 0.15s ease, filter 0.15s ease;
+                    }
+                    .mc-item-slot:hover .mc-item-img {
+                        transform: scale(1.12) translateY(-1px);
+                        filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.4));
+                    }
+                    .mc-selected-icon-box .mc-item-img {
+                        filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.3));
+                    }
                 `;
                 document.head.appendChild(style);
             }
@@ -1221,8 +1438,8 @@ export default {
             activeMenu, toggleMenu, playerPings, pingClass,
             
             // 创造背包相关返回
-            showGiveModal, targetPlayer, selectedItem, giveQuantity, itemSearchQuery, activeTab,
-            customItemId, tabs, filteredItems, emptySlotsCount, closeGiveModal, selectItem,
+            showGiveModal, targetPlayer, selectedItem, giveQuantity, itemSearchQuery,
+            customItemId, filteredItems, emptySlotsCount, closeGiveModal, selectItem,
             onCustomIdInput, confirmGiveItem,
             selectedEnchantment, enchantmentLevel, selectedPotionEffect, selectedPotionVariant, 
             ENCHANTMENTS, POTION_EFFECTS, currentEnchantmentLevels, currentPotionVariants, romanize,
@@ -1230,7 +1447,12 @@ export default {
 
             // 状态效果相关返回
             STATUS_EFFECTS, showEffectModal, effectTargetPlayer, selectedEffect, effectDuration,
-            effectLevel, hideParticles, closeEffectModal, confirmGiveEffect, clearAllEffects
+            effectLevel, hideParticles, closeEffectModal, confirmGiveEffect, clearAllEffects,
+
+            // 玩家背包查看相关返回
+            showInventoryModal, inventoryPlayer, inventoryItems, inventoryLoading, inventoryError,
+            openInventory, closeInventoryModal, getInventoryItem, getItemIcon, getItemName, confirmClearInventory,
+            inventoryPlayerUuid
         };
     }
 };

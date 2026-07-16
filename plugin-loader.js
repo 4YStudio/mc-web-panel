@@ -557,6 +557,13 @@ class PluginLoader {
         console.log(`[PluginLoader] Unloaded plugin: ${getDisplayName(plugin.manifest.name)}`);
     }
 
+    notifyLogHandlers(instanceId, msg) {
+        if (!this._logHandlers || !this._logHandlers.length) return;
+        for (const { handler } of this._logHandlers) {
+            try { handler(instanceId, msg); } catch (e) { /* ignore */ }
+        }
+    }
+
     async enable(pluginId) {
         const plugin = this.plugins.get(pluginId);
         if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
@@ -1096,6 +1103,31 @@ class PluginLoader {
                     pluginId,
                     reportedAt: new Date().toISOString()
                 });
+            },
+
+            sendCommand(instanceId, command) {
+                self._requirePermission(pluginId, 'command');
+                const iid = instanceId || self.getActiveInstanceId();
+                const state = self.options.instancesState ? (self.options.instancesState.get ? self.options.instancesState.get(iid) : self.options.instancesState[iid]) : null;
+                if (!state || !state.process) return false;
+                state.process.stdin.write(command + '\n');
+                if (self.options.appendLog) self.options.appendLog(iid, `> ${command}\n`);
+                return true;
+            },
+
+            getOnlinePlayers(instanceId) {
+                const iid = instanceId || self.getActiveInstanceId();
+                const state = self.options.instancesState ? (self.options.instancesState.get ? self.options.instancesState.get(iid) : self.options.instancesState[iid]) : null;
+                return state?.onlinePlayers ? Array.from(state.onlinePlayers) : [];
+            },
+
+            onLog(handler) {
+                self._requirePermission(pluginId, 'command');
+                if (!self._logHandlers) self._logHandlers = [];
+                self._logHandlers.push({ pluginId, handler });
+                return () => {
+                    self._logHandlers = self._logHandlers.filter(h => h.handler !== handler);
+                };
             },
 
             registerTask(name, options) {

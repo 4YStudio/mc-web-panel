@@ -1,9 +1,10 @@
 const https = require('https');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
-const MAX_ITEMS_TO_CRAWL = 600; // Increase to 600 items for a truly comprehensive inventory!
-const CONCURRENCY = 15; // Concurrency limit
+const MAX_ITEMS_TO_CRAWL = 2500; // Increase to cover all vanilla items
+const CONCURRENCY = 20; // Increased concurrency
 
 const LEGACY_MAP = {
     '14': 'minecraft:stone_bricks',
@@ -69,7 +70,13 @@ function fetchUrl(url) {
     return new Promise((resolve) => {
         const req = https.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Cache-Control': 'max-age=0'
             }
         }, (res) => {
             if (res.statusCode !== 200) {
@@ -77,9 +84,13 @@ function fetchUrl(url) {
                 return;
             }
             let chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-            res.on('error', (err) => {
+            const stream = res.headers['content-encoding'] === 'gzip' ? zlib.createGunzip() : res;
+            if (res.headers['content-encoding'] === 'gzip') {
+                res.pipe(stream);
+            }
+            stream.on('data', chunk => chunks.push(chunk));
+            stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+            stream.on('error', (err) => {
                 console.error(`[Crawler] Response stream error for ${url}:`, err.message);
                 resolve(null);
             });
@@ -95,7 +106,10 @@ function downloadImage(url, destPath) {
     return new Promise((resolve) => {
         const req = https.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Connection': 'keep-alive'
             }
         }, (res) => {
             if (res.statusCode !== 200) {
@@ -223,8 +237,8 @@ async function run() {
     const priorityItems = new Map();
     const normalItems = new Map();
     
-    // We scan categories 1 to 10
-    for (let cat = 1; cat <= 10; cat++) {
+    // We scan categories 1 to 15 (expanded range for more items)
+    for (let cat = 1; cat <= 15; cat++) {
         try {
             const html = await fetchUrl(`https://www.mcmod.cn/item/list/1-${cat}.html`);
             if (!html) continue;
@@ -237,17 +251,106 @@ async function run() {
                 const name = match[2].replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' ');
                 if (!name) continue;
                 
-                // If it is a stair, slab, fence, door, wall, gate, button, pressure plate, etc.
-                const isPriority = name.includes('门') || 
-                                   name.includes('活板') || 
-                                   name.includes('栅栏') || 
-                                   name.includes('楼梯') || 
-                                   name.includes('台阶') || 
-                                   name.includes('墙') || 
-                                   name.includes('告示牌') || 
-                                   name.includes('纽扣') || 
-                                   name.includes('按钮') || 
-                                   name.includes('压力板');
+                // If it is a stair, slab, fence, door, wall, gate, button, pressure plate, log, plank, stone, etc.
+                const isPriority = name.includes('门') ||
+                                   name.includes('活板') ||
+                                   name.includes('栅栏') ||
+                                   name.includes('楼梯') ||
+                                   name.includes('台阶') ||
+                                   name.includes('墙') ||
+                                   name.includes('告示牌') ||
+                                   name.includes('纽扣') ||
+                                   name.includes('按钮') ||
+                                   name.includes('压力板') ||
+                                   name.includes('原木') ||
+                                   name.includes('木头') ||
+                                   name.includes('木板') ||
+                                   name.includes('木材') ||
+                                   name.includes('石头') ||
+                                   name.includes('圆石') ||
+                                   name.includes('安山') ||
+                                   name.includes('闪长') ||
+                                   name.includes('花岗') ||
+                                   name.includes('沙砾') ||
+                                   name.includes('泥土') ||
+                                   name.includes('草方块') ||
+                                   name.includes('砂土') ||
+                                   name.includes('灰化土') ||
+                                   name.includes('矿') ||
+                                   name.includes('锭') ||
+                                   name.includes('粒') ||
+                                   name.includes('块') ||
+                                   name.includes('玻璃') ||
+                                   name.includes('沙子') ||
+                                   name.includes('红沙') ||
+                                   name.includes('卵石') ||
+                                   name.includes('砖') ||
+                                   name.includes('板岩') ||
+                                   name.includes('凝灰岩') ||
+                                   name.includes('玄武岩') ||
+                                   name.includes('黑石') ||
+                                   name.includes('深板岩') ||
+                                   name.includes('叶子') ||
+                                   name.includes('树叶') ||
+                                   name.includes('树苗') ||
+                                   name.includes('花') ||
+                                   name.includes('蘑菇') ||
+                                   name.includes('作物') ||
+                                   name.includes('种子') ||
+                                   name.includes('农作物') ||
+                                   name.includes('农作物') ||
+                                   name.includes('胡萝卜') ||
+                                   name.includes('马铃薯') ||
+                                   name.includes('小麦') ||
+                                   name.includes('西瓜') ||
+                                   name.includes('南瓜') ||
+                                   name.includes('甜菜') ||
+                                   name.includes('甘蔗') ||
+                                   name.includes('仙人掌') ||
+                                   name.includes('竹子') ||
+                                   name.includes('可可果') ||
+                                   name.includes('浆果') ||
+                                   name.includes('灯笼') ||
+                                   name.includes('火把') ||
+                                   name.includes('红石灯') ||
+                                   name.includes('海晶灯') ||
+                                   name.includes('末地烛') ||
+                                   name.includes('萤石') ||
+                                   name.includes('工作台') ||
+                                   name.includes('熔炉') ||
+                                   name.includes('高炉') ||
+                                   name.includes('烟熏炉') ||
+                                   name.includes('箱子') ||
+                                   name.includes('木桶') ||
+                                   name.includes('发射器') ||
+                                   name.includes('投掷器') ||
+                                   name.includes('漏斗') ||
+                                   name.includes('铁砧') ||
+                                   name.includes('砂轮') ||
+                                   name.includes('锻造台') ||
+                                   name.includes('织布机') ||
+                                   name.includes('制图台') ||
+                                   name.includes('制箭台') ||
+                                   name.includes('讲台') ||
+                                   name.includes('烟熏炉') ||
+                                   name.includes('切石机') ||
+                                   name.includes('木棍') ||
+                                   name.includes('线') ||
+                                   name.includes('羽毛') ||
+                                   name.includes('燧石') ||
+                                   name.includes('煤炭') ||
+                                   name.includes('木炭') ||
+                                   name.includes('钻石') ||
+                                   name.includes('绿宝石') ||
+                                   name.includes('青金石') ||
+                                   name.includes('红石') ||
+                                   name.includes('石英') ||
+                                   name.includes('紫水晶') ||
+                                   name.includes('铜') ||
+                                   name.includes('铁') ||
+                                   name.includes('金') ||
+                                   name.includes('下界') ||
+                                   name.includes('末地');
                 
                 if (isPriority) {
                     priorityItems.set(id, name);
