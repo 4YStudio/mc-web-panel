@@ -6,7 +6,6 @@ const BUILTIN_ITEMS = [
     { id: 'dashboard', view: 'dashboard', icon: 'fa-terminal', labelKey: 'sidebar.dashboard' },
     { id: 'properties', view: 'properties', icon: 'fa-sliders', labelKey: 'sidebar.settings' },
     { id: 'mods', view: 'mods', icon: 'fa-microchip', labelKey: 'sidebar.mods' },
-    { id: 'modrinth', view: 'modrinth', icon: 'fa-cloud-arrow-down', labelKey: 'sidebar.modrinth' },
     { id: 'files', view: 'files', icon: 'fa-folder-open', labelKey: 'sidebar.files' },
 
     { id: 'players', view: 'players', icon: 'fa-users', labelKey: 'sidebar.players' }

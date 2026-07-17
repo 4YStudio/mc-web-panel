@@ -1,4 +1,9 @@
 (function () {
+    // 注册 Service Worker 实现网络优先策略，解决 GitHub Pages 缓存问题
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
     var navbar = document.getElementById('navbar');
     var navToggle = document.getElementById('navToggle');
     var navLinks = document.getElementById('navLinks');

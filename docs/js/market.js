@@ -2,6 +2,11 @@
  * MC Web Panel - 插件市场 JavaScript 交互逻辑
  */
 (function () {
+    // 注册 Service Worker 实现网络优先策略，解决 GitHub Pages 缓存问题
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
     let PLUGINS_DATA = [];
 
     // 分类字典

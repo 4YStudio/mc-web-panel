@@ -16,7 +16,6 @@ import ProgressModal from './components/ProgressModal.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
 import PanelSettings from './components/PanelSettings.js';
-import ModrinthBrowser from './components/ModrinthBrowser.js';
 import About from './components/About.js?v=1.5.0';
 import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
@@ -38,7 +37,6 @@ const app = createApp({
         ServerPropertiesManager,
         Avatar,
         PanelSettings,
-        ModrinthBrowser,
         About,
         JavaManager,
         InstanceManager,

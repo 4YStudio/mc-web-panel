@@ -106,9 +106,6 @@ export default {
         <template v-else>
             <div class="page-header d-flex justify-content-between align-items-center">
                 <h3 class="m-0 fw-bold">{{ $t('mods.title') }}</h3>
-                <button class="btn btn-sm btn-outline-primary rounded-pill px-2 px-md-3" @click="store.view = 'modrinth'">
-                    <i class="fa-solid fa-globe"></i><span class="d-none d-md-inline ms-1">{{ $t('mods.browse_modrinth') }}</span>
-                </button>
             </div>
             
             <div class="card shadow-sm d-flex flex-column border-0 overflow-hidden" style="flex: 1; min-height: 0; border-radius: 16px;">

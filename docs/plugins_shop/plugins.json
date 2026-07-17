@@ -86,7 +86,7 @@
     {
         "id": "mc-panel-plugin-map",
         "name": "服务器地图",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "4YStudio",
         "description": "渲染服务器地图并显示玩家的实时坐标雷达。",
         "category": "tools",
@@ -96,8 +96,24 @@
             "command"
         ],
         "icon": "fa-map-location-dot",
-        "fileSize": 201722,
+        "fileSize": 730370,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-map.zip"
+    },
+    {
+        "id": "mc-panel-plugin-modrinth",
+        "name": "模组下载",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "浏览 Modrinth 并下载模组到服务器。",
+        "category": "tools",
+        "permissions": [
+            "http",
+            "storage",
+            "command"
+        ],
+        "icon": "fa-cloud-arrow-down",
+        "fileSize": 9953,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-modrinth.zip"
     },
     {
         "id": "mc-panel-plugin-system-status",

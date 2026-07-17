@@ -987,7 +987,6 @@ export default {
             }
             giveQuantity.value = 64;
             itemSearchQuery.value = '';
-            activeTab.value = 'building_blocks';
             skullOwner.value = '';
             attachEnchantment.value = false;
             showGiveModal.value = true;
