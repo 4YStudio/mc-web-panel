@@ -84,6 +84,22 @@
         "downloadUrl": "./plugins_shop/mc-panel-plugin-frp.zip"
     },
     {
+        "id": "mc-panel-plugin-map",
+        "name": "服务器地图",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "渲染服务器地图并显示玩家的实时坐标雷达。",
+        "category": "tools",
+        "permissions": [
+            "http",
+            "storage",
+            "command"
+        ],
+        "icon": "fa-map-location-dot",
+        "fileSize": 201722,
+        "downloadUrl": "./plugins_shop/mc-panel-plugin-map.zip"
+    },
+    {
         "id": "mc-panel-plugin-system-status",
         "name": "系统状态卡片",
         "version": "1.0.0",
