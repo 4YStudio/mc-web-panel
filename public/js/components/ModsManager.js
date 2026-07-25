@@ -1,4 +1,4 @@
-import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal, uploadFileWithChunk, isLargeFile } from '../utils.js';
@@ -97,7 +97,11 @@ const LazyModRow = {
 export default {
     components: { LazyModRow },
     template: `
-    <div class="h-100 d-flex flex-column overflow-hidden">
+    <div class="h-100 d-flex flex-column overflow-hidden"
+         @dragenter.prevent="dragCounter++; isDragging = true" 
+         @dragleave.prevent="dragCounter--; if (dragCounter <= 0) { isDragging = false; dragCounter = 0; }" 
+         @dragover.prevent 
+         @drop.prevent="dragCounter = 0; isDragging = false; handleDrop($event)">
         <div v-if="notFound" class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
             <i class="fa-solid fa-folder-open fa-4x mb-3 opacity-25"></i>
             <h4>{{ $t('files.folder_not_found', { name: 'mods' }) }}</h4>
@@ -108,8 +112,9 @@ export default {
                 <h3 class="m-0 fw-bold">{{ $t('mods.title') }}</h3>
             </div>
             
+
             <div class="card shadow-sm d-flex flex-column border-0 overflow-hidden" style="flex: 1; min-height: 0; border-radius: 16px;">
-                <div class="card-header d-flex flex-wrap gap-2 p-2 align-items-center bg-body-tertiary border-0 overflow-hidden">
+                <div class="card-header d-flex flex-wrap gap-2 p-2 align-items-center bg-body-tertiary border-0" style="z-index: 5;">
                     <div class="input-group input-group-sm mb-0 flex-shrink-0" style="width: 120px;">
                         <span class="input-group-text border-0 bg-body shadow-sm"><i class="fa-solid fa-search"></i></span>
                         <input type="text" class="form-control border-0 bg-body shadow-sm px-1" v-model="searchQuery" :placeholder="$t('common.search')">
@@ -126,14 +131,49 @@ export default {
                             <i class="fa-solid fa-trash me-1"></i><span class="d-none d-md-inline">{{ $t('common.delete') }}</span><span class="d-inline d-md-none">{{ $t('common.delete') }}</span>
                         </button>
                     </div>
-                    <div class="ms-auto flex-shrink-0">
-                        <input type="file" ref="modInput" multiple class="d-none" @change="(e)=>uploadFiles(e)">
-                        <button class="btn btn-sm btn-primary rounded-pill px-2 px-md-3 shadow-sm fw-bold" @click="$refs.modInput.click()">
-                            <i class="fa-solid fa-upload"></i>
+                    <div class="ms-auto flex-shrink-0 d-flex align-items-center gap-2">
+                        <!-- 冲突模组按钮 -->
+                        <button v-if="duplicateModGroups.length > 0" class="btn btn-sm btn-outline-warning rounded-pill px-2.5 px-md-3 shadow-sm fw-bold d-flex align-items-center gap-1.5" @click="openConflictModal" type="button">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>{{ $t('mods.conflict_btn') }}</span>
+                            <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.65rem; padding: 0.25em 0.55em; line-height: 1;">{{ duplicateModGroups.length }}</span>
                         </button>
+                        
+                        <!-- 上传模组下拉 -->
+                        <div class="dropdown">
+                            <input type="file" ref="modInput" multiple class="d-none" @change="(e)=>uploadFiles(e)">
+                            <input type="file" ref="modFolderInput" webkitdirectory multiple class="d-none" @change="(e)=>uploadFiles(e)">
+                            <button class="btn btn-sm btn-primary rounded-pill px-2 px-md-3 shadow-sm fw-bold d-flex align-items-center gap-1 dropdown-toggle"
+                                :class="{ show: uploadDropdownVisible }"
+                                @click="toggleUploadDropdown($event)"
+                                type="button">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>{{ $t('mods.upload_mod') }}</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-3 py-1 mt-1"
+                                :class="{ show: uploadDropdownVisible }"
+                                style="background: var(--c-surface); border: 1px solid var(--c-border) !important; right: 0; left: auto;">
+                                <li>
+                                    <a class="dropdown-item py-2 px-3 small fw-semibold cursor-pointer d-flex align-items-center gap-2" @click="$refs.modInput.click(); uploadDropdownVisible = false;" style="color: var(--c-text-primary);">
+                                        <i class="fa-solid fa-file text-primary"></i>{{ $t('mods.upload_file') }}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item py-2 px-3 small fw-semibold cursor-pointer d-flex align-items-center gap-2" @click="$refs.modFolderInput.click(); uploadDropdownVisible = false;" style="color: var(--c-text-primary);">
+                                        <i class="fa-solid fa-folder text-warning"></i>{{ $t('mods.upload_folder') }}
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
-                <div class="card-body p-0 overflow-hidden d-flex flex-column" style="flex: 1; min-height: 0;">
+                <div class="card-body p-0 overflow-hidden d-flex flex-column position-relative" style="flex: 1; min-height: 0;">
+                    <div v-if="isDragging" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="z-index: 10; background: rgba(var(--bs-primary-rgb), 0.15); backdrop-filter: blur(2px); border-radius: 12px; border: 3px dashed var(--bs-primary);">
+                        <div class="text-center text-primary">
+                            <i class="fa-solid fa-cloud-arrow-up fa-3x mb-2"></i>
+                            <h5 class="fw-bold">拖拽模组文件到此处上传</h5>
+                        </div>
+                    </div>
                     <div class="table-responsive h-100 custom-scrollbar">
                         <table class="table table-hover align-middle mb-0">
                             <thead>
@@ -248,6 +288,194 @@ export default {
                 </div>
             </Transition>
         </Teleport>
+
+        <!-- Upload Confirmation Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="uploadConfirmModal.visible" class="modal-backdrop fade show" style="z-index: 2060; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);"></div>
+            </Transition>
+
+            <Transition name="scale">
+                <div v-if="uploadConfirmModal.visible" class="modal show d-block" @click.self="uploadConfirmModal.visible = false" style="z-index: 2070;">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border);">
+                            <div class="modal-header border-0 bg-primary text-white py-3 shadow-sm">
+                                <h5 class="modal-title fw-bold">
+                                    <i class="fa-solid fa-triangle-exclamation me-2 text-warning"></i>{{ $t('mods.upload_confirm_title') }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" @click="uploadConfirmModal.visible = false"></button>
+                            </div>
+                            
+                            <div class="modal-body p-4" style="background: var(--c-surface); color: var(--c-text-primary);">
+                                <p class="small mb-3" style="color: var(--c-text-secondary);">
+                                    {{ $t('mods.upload_confirm_desc') }}
+                                </p>
+                                
+                                <div class="row g-3">
+                                    <!-- Left column: Compliant files (.jar) -->
+                                    <div class="col-12 col-md-6">
+                                        <div class="card h-100 border rounded-3 overflow-hidden" style="background: var(--c-surface-elevated, bg-body-tertiary); border-color: var(--c-border) !important;">
+                                            <div class="card-header bg-success bg-opacity-10 text-success fw-bold d-flex justify-content-between align-items-center py-2 px-3 border-0">
+                                                <span><i class="fa-solid fa-circle-check me-2"></i>{{ $t('mods.compliant_files') }}</span>
+                                                <span class="badge bg-success bg-opacity-20 text-success rounded-pill small">{{ compliantCheckedCount }} / {{ uploadConfirmModal.compliantFiles.length }}</span>
+                                            </div>
+                                            <div class="card-body p-2 overflow-auto custom-scrollbar" style="max-height: 250px;">
+                                                <div v-if="uploadConfirmModal.compliantFiles.length === 0" class="text-center text-muted py-4 small">
+                                                    {{ $t('mods.no_compliant') }}
+                                                </div>
+                                                <div v-else class="list-group list-group-flush">
+                                                    <label v-for="(item, idx) in uploadConfirmModal.compliantFiles" :key="idx" class="list-group-item bg-transparent border-0 d-flex align-items-start gap-2 py-1.5 px-2 cursor-pointer">
+                                                        <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" v-model="item.selected">
+                                                        <div class="min-width-0">
+                                                            <div class="text-truncate fw-semibold small" style="color: var(--c-text-primary);" :title="item.relativePath">{{ item.file.name }}</div>
+                                                            <div class="font-monospace" style="font-size: 0.65rem; color: var(--c-text-secondary);">{{ formatSize(item.file.size) }}</div>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+ 
+                                    <!-- Right column: Non-compliant files (others) -->
+                                    <div class="col-12 col-md-6">
+                                        <div class="card h-100 border rounded-3 overflow-hidden" style="background: var(--c-surface-elevated, bg-body-tertiary); border-color: var(--c-border) !important;">
+                                            <div class="card-header bg-warning bg-opacity-10 text-warning-emphasis fw-bold d-flex justify-content-between align-items-center py-2 px-3 border-0">
+                                                <span><i class="fa-solid fa-triangle-exclamation me-2"></i>{{ $t('mods.non_compliant_files') }}</span>
+                                                <span class="badge bg-warning bg-opacity-20 text-warning-emphasis rounded-pill small">{{ nonCompliantCheckedCount }} / {{ uploadConfirmModal.nonCompliantFiles.length }}</span>
+                                            </div>
+                                            <div class="card-body p-2 overflow-auto custom-scrollbar" style="max-height: 250px;">
+                                                <div v-if="uploadConfirmModal.nonCompliantFiles.length === 0" class="text-center text-muted py-4 small">
+                                                    {{ $t('mods.no_non_compliant') }}
+                                                </div>
+                                                <div v-else class="list-group list-group-flush">
+                                                    <label v-for="(item, idx) in uploadConfirmModal.nonCompliantFiles" :key="idx" class="list-group-item bg-transparent border-0 d-flex align-items-start gap-2 py-1.5 px-2 cursor-pointer">
+                                                        <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" v-model="item.selected">
+                                                        <div class="min-width-0 flex-grow-1">
+                                                            <div class="text-truncate fw-semibold small" style="color: var(--c-text-primary);" :title="item.relativePath">{{ item.relativePath }}</div>
+                                                            <div class="font-monospace d-flex justify-content-between align-items-center mt-0.5" style="font-size: 0.65rem; color: var(--c-text-secondary);">
+                                                                <span>{{ formatSize(item.file.size) }}</span>
+                                                                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill px-1" style="font-size: 0.6rem;">
+                                                                    {{ item.isDir ? $t('mods.is_folder') : $t('mods.is_non_jar') }}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-footer border-0 px-4 py-3 d-flex justify-content-end gap-2" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
+                                <button type="button" class="btn btn-secondary px-3 py-1.5 rounded-pill shadow-sm fw-bold small" @click="uploadConfirmModal.visible = false">{{ $t('common.cancel') }}</button>
+                                <button type="button" class="btn btn-primary px-3 py-1.5 rounded-pill shadow-sm fw-bold small" @click="confirmUploadFromModal" :disabled="!hasAnySelectedFiles">{{ $t('common.confirm') }}{{ $t('common.upload') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- Conflict Resolution Modal -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="conflictModal.visible" class="modal-backdrop fade show" style="z-index: 2060; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);"></div>
+            </Transition>
+
+            <Transition name="scale">
+                <div v-if="conflictModal.visible" class="modal show d-block" @click.self="conflictModal.visible = false" style="z-index: 2070;">
+                    <div class="modal-dialog modal-dialog-centered modal-xl">
+                        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border); height: 80vh; max-height: 700px;">
+                            <div class="modal-header border-0 bg-warning text-dark py-3 shadow-sm d-flex justify-content-between align-items-center">
+                                <h5 class="modal-title fw-bold m-0 d-flex align-items-center gap-2">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>{{ $t('mods.conflict_title') }}
+                                </h5>
+                                <button type="button" class="btn-close" @click="conflictModal.visible = false"></button>
+                            </div>
+                            
+                            <!-- 二栏布局主体 -->
+                            <div class="modal-body p-0 d-flex flex-row overflow-hidden" style="flex: 1; min-height: 0;">
+                                <!-- 左侧栏：冲突模组列表 -->
+                                <div class="border-end d-flex flex-column custom-scrollbar overflow-auto" style="width: 320px; flex-shrink: 0; background: var(--c-surface-elevated, rgba(0,0,0,0.02)); border-color: var(--c-border) !important;">
+                                    <div class="p-3 border-bottom text-muted small fw-bold bg-body-tertiary" style="border-color: var(--c-border) !important;">
+                                        {{ $t('mods.conflict_list', { count: duplicateModGroups.length }) }}
+                                    </div>
+                                    <div class="list-group list-group-flush flex-grow-1">
+                                        <button v-for="(group, idx) in duplicateModGroups" :key="idx"
+                                            class="list-group-item list-group-item-action border-0 py-3 px-3 d-flex flex-column align-items-start gap-1 cursor-pointer"
+                                            :class="{ active: conflictModal.selectedGroupIdx === idx }"
+                                            @click="conflictModal.selectedGroupIdx = idx"
+                                            style="background: transparent; color: var(--c-text-primary);">
+                                            <div class="w-100 d-flex justify-content-between align-items-start gap-2">
+                                                <span class="fw-bold text-truncate" :class="{ 'text-primary': conflictModal.selectedGroupIdx === idx }" style="font-size: 0.85rem;">{{ group.name }}</span>
+                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.65rem; flex-shrink: 0;">
+                                                    {{ $t('mods.versions_count', { count: group.files.length }) }}
+                                                </span>
+                                            </div>
+                                            <span class="text-muted text-truncate w-100" style="font-size: 0.7rem; text-align: left;">
+                                                {{ $t('mods.earliest_time', { time: new Date(Math.min(...group.files.map(f => f.mtime))).toLocaleDateString() }) }}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- 右侧栏：冲突模组详情 -->
+                                <div class="flex-grow-1 p-4 d-flex flex-column overflow-auto custom-scrollbar" style="min-width: 0; background: var(--c-surface);">
+                                    <div v-if="duplicateModGroups[conflictModal.selectedGroupIdx]" class="d-flex flex-column h-100">
+                                        <div class="mb-4 pb-3 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--c-border) !important;">
+                                            <div>
+                                                <h5 class="fw-bold mb-1" style="color: var(--c-text-primary);">{{ duplicateModGroups[conflictModal.selectedGroupIdx].name }}</h5>
+                                                <div class="small text-muted">{{ $t('mods.conflict_desc') }}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 版本卡片列表 -->
+                                        <div class="d-flex flex-column gap-3 overflow-auto custom-scrollbar flex-grow-1 pr-1 pb-3">
+                                            <div v-for="(mod, mIdx) in duplicateModGroups[conflictModal.selectedGroupIdx].files" :key="mIdx"
+                                                class="card border rounded-3 p-3 shadow-sm d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3"
+                                                style="background: var(--c-surface-elevated, rgba(0,0,0,0.01)); border-color: var(--c-border) !important;">
+                                                <div class="min-width-0 flex-grow-1">
+                                                    <div class="d-flex align-items-center gap-2 mb-1.5">
+                                                        <i class="fa-solid fa-cube text-success fa-lg"></i>
+                                                        <span class="fw-bold text-truncate small" style="color: var(--c-text-primary); max-width: 320px;" :title="mod.name">{{ mod.name }}</span>
+                                                        <span v-if="mod.isDisabled" class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill" style="font-size: 0.65rem;">{{ $t('common.disabled') }}</span>
+                                                    </div>
+                                                    <div class="font-monospace text-muted mt-1 d-flex flex-wrap gap-x-3 gap-y-1" style="font-size: 0.7rem;">
+                                                        <span>{{ $t('mods.file_size', { size: formatSize(mod.size) }) }}</span>
+                                                        <span>{{ $t('mods.mtime', { time: new Date(mod.mtime).toLocaleString() }) }}</span>
+                                                        <span v-if="mod.metadata?.version" class="text-primary fw-bold">{{ $t('mods.metadata_version', { version: mod.metadata.version }) }}</span>
+                                                    </div>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-success px-3.5 py-1.5 rounded-pill shadow-sm fw-bold small flex-shrink-0"
+                                                    @click="resolveConflictKeep(duplicateModGroups[conflictModal.selectedGroupIdx], mod)">
+                                                    {{ $t('mods.keep_this_version') }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div v-else class="h-100 d-flex flex-column align-items-center justify-content-center text-muted">
+                                        <i class="fa-solid fa-circle-check fa-3x mb-2 text-success"></i>
+                                        <span>{{ $t('mods.no_conflicts') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 对话框底部 -->
+                            <div class="modal-footer border-0 px-4 py-3 d-flex justify-content-between align-items-center" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input cursor-pointer" type="checkbox" id="skipConfirmCheck" v-model="conflictModal.skipConfirm">
+                                    <label class="form-check-label text-muted small cursor-pointer fw-semibold" for="skipConfirmCheck">
+                                        {{ $t('mods.skip_confirm') }}
+                                    </label>
+                                </div>
+                                <button type="button" class="btn btn-secondary px-3 py-1.5 rounded-pill shadow-sm fw-bold small" @click="conflictModal.visible = false">{{ $t('common.close') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
     `,
     setup() {
@@ -257,9 +485,50 @@ export default {
         const selectAll = ref(false);
         const searchQuery = ref('');
         const modInput = ref(null);
+        const modFolderInput = ref(null);
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
         const loadingList = ref(false);
+
+        // Drag & Drop State
+        const isDragging = ref(false);
+        const dragCounter = ref(0);
+
+        // Upload Confirm State
+        const uploadConfirmModal = reactive({
+            visible: false,
+            compliantFiles: [],
+            nonCompliantFiles: [],
+            targetPath: 'mods'
+        });
+        // Conflict Resolution Modal State
+        const conflictModal = reactive({
+            visible: false,
+            selectedGroupIdx: 0,
+            skipConfirm: localStorage.getItem('mc_skip_mod_conflict_confirm') === 'true'
+        });
+
+        watch(() => conflictModal.skipConfirm, (val) => {
+            localStorage.setItem('mc_skip_mod_conflict_confirm', val ? 'true' : 'false');
+        });
+
+        const openConflictModal = () => {
+            conflictModal.selectedGroupIdx = 0;
+            conflictModal.visible = true;
+        };
+
+        const compliantCheckedCount = computed(() => {
+            return uploadConfirmModal.compliantFiles.filter(f => f.selected).length;
+        });
+
+        const nonCompliantCheckedCount = computed(() => {
+            return uploadConfirmModal.nonCompliantFiles.filter(f => f.selected).length;
+        });
+
+        const hasAnySelectedFiles = computed(() => {
+            return uploadConfirmModal.compliantFiles.some(f => f.selected) || 
+                   uploadConfirmModal.nonCompliantFiles.some(f => f.selected);
+        });
 
         // Mod Details State
         const selectedMod = ref(null);
@@ -332,7 +601,6 @@ export default {
 
         const renderMarkdown = (text) => {
             if (!text) return '';
-            // Basic markdown simulation
             return text
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -355,65 +623,199 @@ export default {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         };
 
+        const handleDrop = async (e) => {
+            isDragging.value = false;
+            const items = e.dataTransfer.items;
+            const files = [];
+            if (items && items.length > 0) {
+                const entries = [];
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].kind !== 'file') continue;
+                    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                    if (entry) {
+                        entries.push(entry);
+                    } else {
+                        const f = items[i].getAsFile();
+                        if (f) files.push({ file: f, relativePath: f.name });
+                    }
+                }
+                for (const entry of entries) {
+                    await collectFilesFromEntry(entry, '', files);
+                }
+            } else {
+                for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                    const f = e.dataTransfer.files[i];
+                    files.push({ file: f, relativePath: f.webkitRelativePath || f.name });
+                }
+            }
+            if (!files.length) return;
+            processFilesForUpload(files);
+        };
+
+        const collectFilesFromEntry = async (entry, basePath, files) => {
+            if (entry.isFile) {
+                const file = await new Promise((resolve) => entry.file(resolve));
+                files.push({ file, relativePath: basePath + file.name });
+            } else if (entry.isDirectory) {
+                const reader = entry.createReader();
+                const allEntries = [];
+                await new Promise((resolve) => {
+                    const readBatch = () => {
+                        reader.readEntries((batch) => {
+                            if (!batch.length) resolve();
+                            else { allEntries.push(...batch); readBatch(); }
+                        }, (err) => { console.warn('readEntries error:', err); resolve(); });
+                    };
+                    readBatch();
+                });
+                for (const e of allEntries) {
+                    await collectFilesFromEntry(e, basePath + entry.name + '/', files);
+                }
+            }
+        };
+
+        const processFilesForUpload = (files) => {
+            const compliant = [];
+            const nonCompliant = [];
+
+            for (const item of files) {
+                const isJar = item.file.name.toLowerCase().endsWith('.jar');
+                const isInsideFolder = item.relativePath.includes('/');
+                
+                if (isJar && !isInsideFolder) {
+                    compliant.push({ file: item.file, relativePath: item.relativePath, selected: true });
+                } else {
+                    nonCompliant.push({
+                        file: item.file,
+                        relativePath: item.relativePath,
+                        selected: false,
+                        isDir: isInsideFolder
+                    });
+                }
+            }
+
+            if (nonCompliant.length > 0) {
+                uploadConfirmModal.compliantFiles = compliant;
+                uploadConfirmModal.nonCompliantFiles = nonCompliant;
+                uploadConfirmModal.visible = true;
+            } else {
+                executeUpload(compliant);
+            }
+        };
+
         const uploadFiles = async (e) => {
             const files = e.target.files;
             if (!files.length) return;
-
-            const largeFiles = [];
-            const smallFiles = [];
+            const fileListArray = [];
             for (let i = 0; i < files.length; i++) {
-                if (isLargeFile(files[i])) largeFiles.push(files[i]);
-                else smallFiles.push(files[i]);
+                fileListArray.push({ file: files[i], relativePath: files[i].webkitRelativePath || files[i].name });
             }
+            processFilesForUpload(fileListArray);
+            e.target.value = '';
+        };
 
-            let totalSize = Array.from(files).reduce((s, f) => s + f.size, 0);
+        const confirmUploadFromModal = () => {
+            uploadConfirmModal.visible = false;
+            const selectedCompliant = uploadConfirmModal.compliantFiles.filter(f => f.selected);
+            const selectedNonCompliant = uploadConfirmModal.nonCompliantFiles.filter(f => f.selected);
+            const allToUpload = [...selectedCompliant, ...selectedNonCompliant];
+            executeUpload(allToUpload);
+        };
+
+        const executeUpload = async (filesToUpload) => {
+            if (!filesToUpload.length) return;
+            const totalSize = filesToUpload.reduce((s, f) => s + f.file.size, 0);
             let uploadedSize = 0;
 
+            const controller = new AbortController();
             store.task.visible = true;
-            store.task.title = $t('common.loading');
+            store.task.title = '上传模组';
             store.task.percent = 0;
-            store.task.message = `...`;
-            store.task.subMessage = `0 / ${formatSize(totalSize)}`;
+            store.task.processedSize = 0;
+            store.task.totalSize = totalSize;
+            store.task.fileName = '';
+            store.task.speed = 0;
+            store.task.canCancel = true;
+            store.task.onCancel = () => {
+                controller.abort();
+            };
+
+            let lastTime = Date.now();
+            let lastLoaded = 0;
+
+            const updateProgress = (loadedBytes, currentFileName) => {
+                const currentUploaded = uploadedSize + loadedBytes;
+                store.task.percent = Math.min(100, Math.round((currentUploaded * 100) / totalSize));
+                store.task.processedSize = currentUploaded;
+                store.task.fileName = currentFileName;
+
+                const now = Date.now();
+                const timeDiff = (now - lastTime) / 1000;
+                if (timeDiff >= 0.5) {
+                    const loadedDiff = currentUploaded - lastLoaded;
+                    store.task.speed = Math.round(loadedDiff / timeDiff);
+                    lastTime = now;
+                    lastLoaded = currentUploaded;
+                }
+            };
 
             try {
+                const largeFiles = filesToUpload.filter(f => isLargeFile(f.file));
+                const smallFiles = filesToUpload.filter(f => !isLargeFile(f.file));
+
                 if (smallFiles.length) {
-                    const fd = new FormData();
-                    for (const f of smallFiles) fd.append('files', f);
-                    fd.append('path', 'mods');
-                    const smallTotal = smallFiles.reduce((s, f) => s + f.size, 0);
-                    await api.post('/api/files/upload', fd, {
-                        onUploadProgress: (p) => {
-                            if (p.total) {
-                                const currentUploaded = uploadedSize + p.loaded;
-                                store.task.percent = Math.round((currentUploaded * 100) / totalSize);
-                                store.task.subMessage = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                    for (const item of smallFiles) {
+                        if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                        
+                        const fd = new FormData();
+                        fd.append('files', item.file, item.relativePath);
+                        fd.append('path', 'mods');
+                        fd.append('fileNames', JSON.stringify([item.relativePath]));
+
+                        await api.post('/api/files/upload', fd, {
+                            signal: controller.signal,
+                            onUploadProgress: (p) => {
+                                if (p.total) {
+                                    updateProgress(p.loaded, item.relativePath);
+                                }
                             }
-                        }
-                    });
-                    uploadedSize += smallTotal;
+                        });
+                        uploadedSize += item.file.size;
+                        lastTime = Date.now();
+                        lastLoaded = uploadedSize;
+                        store.task.processedSize = uploadedSize;
+                    }
                 }
 
-                for (const file of largeFiles) {
-                    await uploadFileWithChunk(file, {
+                for (const item of largeFiles) {
+                    if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                    await uploadFileWithChunk(item.file, {
                         initUrl: '/api/files/chunk/init',
                         completeUrl: '/api/files/chunk/complete',
+                        cancelUrl: '/api/files/chunk/cancel',
+                        fileName: item.relativePath,
                         extraInitData: { targetPath: 'mods' },
+                        signal: controller.signal,
                         onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
-                            const currentUploaded = uploadedSize + bytesDone;
-                            store.task.percent = Math.round((currentUploaded * 100) / totalSize);
-                            store.task.subMessage = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                            updateProgress(bytesDone, item.relativePath);
                         }
                     });
-                    uploadedSize += file.size;
+                    uploadedSize += item.file.size;
+                    lastTime = Date.now();
+                    lastLoaded = uploadedSize;
+                    store.task.processedSize = uploadedSize;
                 }
 
                 showToast($t('common.success'));
                 loadFiles();
-            } catch (e) {
-                showToast($t('common.error'), 'danger');
+            } catch (err) {
+                if (err.name === 'AbortError' || axios.isCancel(err) || err.message === 'canceled') {
+                    showToast('已取消上传', 'warning');
+                } else {
+                    showToast($t('common.error'), 'danger');
+                }
             } finally {
                 setTimeout(() => { store.task.visible = false; }, 500);
-                e.target.value = '';
             }
         };
 
@@ -436,13 +838,97 @@ export default {
             });
         };
 
-        onMounted(() => loadFiles());
+        const getModSlug = (filename) => {
+            let name = filename.replace(/\.jar(\.disabled)?$/i, '');
+            name = name.toLowerCase();
+            const match = name.match(/[-_](mc)?\d/);
+            if (match) {
+                return name.substring(0, match.index);
+            }
+            return name.replace(/[-_]?\d.*$/, '').trim();
+        };
+
+        const duplicateModGroups = computed(() => {
+            const groups = {};
+            for (const file of fileList.value) {
+                let key = '';
+                let displayName = '';
+                if (file.metadata && file.metadata.project_id) {
+                    key = `project:${file.metadata.project_id}`;
+                    displayName = file.metadata.title || file.name;
+                } else {
+                    const slug = getModSlug(file.name);
+                    key = `slug:${slug}`;
+                    displayName = slug;
+                }
+                
+                if (!groups[key]) {
+                    groups[key] = {
+                        name: displayName,
+                        files: []
+                    };
+                }
+                groups[key].files.push(file);
+            }
+            return Object.values(groups).filter(g => g.files.length > 1);
+        });
+
+        watch(duplicateModGroups, (newVal) => {
+            if (conflictModal.selectedGroupIdx >= newVal.length) {
+                conflictModal.selectedGroupIdx = Math.max(0, newVal.length - 1);
+            }
+        }, { deep: true });
+
+        const resolveConflictKeep = async (group, keepMod) => {
+            const toDelete = group.files.filter(f => f.name !== keepMod.name).map(f => f.name);
+            if (!toDelete.length) return;
+
+            const executeDelete = async () => {
+                await operateFiles('delete', toDelete);
+                if (duplicateModGroups.value.length === 0) {
+                    conflictModal.visible = false;
+                }
+            };
+
+            if (conflictModal.skipConfirm) {
+                await executeDelete();
+            } else {
+                openModal({
+                    title: $t('mods.confirm_keep_title'),
+                    message: $t('mods.confirm_keep_msg', { name: keepMod.name, count: toDelete.length }),
+                    callback: executeDelete
+                });
+            }
+        };
+
+        const uploadDropdownVisible = ref(false);
+        const toggleUploadDropdown = (event) => {
+            event.stopPropagation();
+            uploadDropdownVisible.value = !uploadDropdownVisible.value;
+        };
+        const closeUploadDropdown = () => {
+            uploadDropdownVisible.value = false;
+        };
+
+        onMounted(() => {
+            loadFiles();
+            document.addEventListener('click', closeUploadDropdown);
+        });
+
+        onUnmounted(() => {
+            document.removeEventListener('click', closeUploadDropdown);
+        });
 
         return {
-            fileList, filteredFiles, selectedFiles, selectAll, searchQuery, modInput,
+            fileList, filteredFiles, selectedFiles, selectAll, searchQuery, modInput, modFolderInput,
             uploadFiles, operateFiles, askDelete, notFound, loadingList, store,
             selectedMod, loadingDetails, translatingBody, bodyTranslations,
-            showModDetails, translateBody, renderMarkdown
+            showModDetails, translateBody, renderMarkdown,
+            isDragging, dragCounter, uploadConfirmModal, compliantCheckedCount,
+            nonCompliantCheckedCount, hasAnySelectedFiles, handleDrop, confirmUploadFromModal,
+            formatSize, duplicateModGroups, resolveConflictKeep,
+            uploadDropdownVisible, toggleUploadDropdown,
+            conflictModal, openConflictModal
         };
     }
 };

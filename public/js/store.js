@@ -31,7 +31,9 @@ export const store = reactive({
         message: '',
         subMessage: '',
         percent: 0,
-        speed: 0
+        speed: 0,
+        processedSize: 0,
+        totalSize: 0
     },
 
     // --- 插件系统 ---

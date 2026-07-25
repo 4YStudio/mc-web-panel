@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal, t, uploadFileWithChunk, isLargeFile } from '../utils.js';
@@ -239,6 +239,57 @@ export default {
                 </div>
             </div>
         </Transition>
+
+        <!-- Upload Confirmation Modal in FileManager -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="uploadConfirmModal.visible" class="modal-backdrop fade show" style="z-index: 2060; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);"></div>
+            </Transition>
+
+            <Transition name="scale">
+                <div v-if="uploadConfirmModal.visible" class="modal show d-block" @click.self="uploadConfirmModal.visible = false" style="z-index: 2070;">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border);">
+                            <div class="modal-header border-0 bg-primary text-white py-3 shadow-sm">
+                                <h5 class="modal-title fw-bold">
+                                    <i class="fa-solid fa-cloud-arrow-up me-2 text-warning"></i>{{ $t('files.upload_confirm_title') }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" @click="uploadConfirmModal.visible = false"></button>
+                            </div>
+                            
+                            <div class="modal-body p-4" style="background: var(--c-surface); color: var(--c-text-primary);">
+                                <p class="small mb-3" style="color: var(--c-text-secondary);">
+                                    {{ $t('files.upload_confirm_desc') }}
+                                </p>
+                                
+                                <div class="card border rounded-3 overflow-hidden" style="background: var(--c-surface-elevated, bg-body-tertiary); border-color: var(--c-border) !important;">
+                                    <div class="card-header bg-primary bg-opacity-10 fw-bold d-flex justify-content-between align-items-center py-2 px-3 border-0" style="color: var(--c-primary);">
+                                        <span><i class="fa-solid fa-list me-2"></i>{{ $t('files.upload_list_title') }}</span>
+                                        <span class="badge bg-primary bg-opacity-20 rounded-pill small" style="color: var(--c-primary);">{{ checkedCount }} / {{ uploadConfirmModal.files.length }}</span>
+                                    </div>
+                                    <div class="card-body p-2 overflow-auto custom-scrollbar" style="max-height: 350px;">
+                                        <div class="list-group list-group-flush">
+                                            <label v-for="(item, idx) in uploadConfirmModal.files" :key="idx" class="list-group-item bg-transparent border-0 d-flex align-items-start gap-2 py-1.5 px-2 cursor-pointer">
+                                                <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" v-model="item.selected">
+                                                <div class="min-width-0">
+                                                    <div class="text-truncate fw-semibold small" style="color: var(--c-text-primary);" :title="item.relativePath">{{ item.relativePath }}</div>
+                                                    <div class="font-monospace" style="font-size: 0.65rem; color: var(--c-text-secondary);">{{ formatSize(item.file.size) }}</div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-footer border-0 px-4 py-3 d-flex justify-content-end gap-2" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
+                                <button type="button" class="btn btn-secondary px-3 py-1.5 rounded-pill shadow-sm fw-bold small" @click="uploadConfirmModal.visible = false">{{ $t('common.cancel') }}</button>
+                                <button type="button" class="btn btn-primary px-3 py-1.5 rounded-pill shadow-sm fw-bold small" @click="confirmUploadFromModal" :disabled="!hasAnySelectedFiles">{{ $t('common.confirm') }}{{ $t('common.upload') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
     `,
     setup() {
@@ -263,8 +314,33 @@ export default {
         const previewingFile = ref(null);
         const previewType = ref('');
         const previewData = ref(null);
+        // Upload Confirmation Modal state
+        const uploadConfirmModal = reactive({
+            visible: false,
+            files: [],
+        });
 
-        // ... computed ...
+        const checkedCount = computed(() => {
+            return uploadConfirmModal.files.filter(f => f.selected).length;
+        });
+
+        const hasAnySelectedFiles = computed(() => {
+            return uploadConfirmModal.files.some(f => f.selected);
+        });
+
+        const processFilesForUpload = (files) => {
+            uploadConfirmModal.files = files.map(f => ({ file: f.file, relativePath: f.relativePath, selected: true }));
+            uploadConfirmModal.visible = true;
+        };
+
+        const confirmUploadFromModal = () => {
+            uploadConfirmModal.visible = false;
+            const selected = uploadConfirmModal.files.filter(f => f.selected).map(f => ({ file: f.file, relativePath: f.relativePath }));
+            if (selected.length) {
+                executeUpload(selected);
+            }
+        };
+
         const pathParts = computed(() => currentPath.value ? currentPath.value.split('/') : []);
         const joinPath = (base, name) => base ? `${base}/${name}` : name;
         const goUp = () => { if (!currentPath.value) return; const parts = currentPath.value.split('/'); parts.pop(); changeDir(parts.join('/')); };
@@ -379,57 +455,9 @@ export default {
             }
         };
 
-        const uploadDroppedFiles = async (fileEntries) => {
-            store.task.visible = true; store.task.title = $t('common.upload'); store.task.percent = 0;
-            const allFiles = fileEntries.map(e => e.file);
-            let totalSize = allFiles.reduce((s, f) => s + f.size, 0);
-            let uploadedSize = 0;
-
-            try {
-                const smallFiles = fileEntries.filter(e => !isLargeFile(e.file));
-                const largeFiles = fileEntries.filter(e => isLargeFile(e.file));
-
-                if (smallFiles.length) {
-                    const fd = new FormData();
-                    const fileNames = [];
-                    for (const e of smallFiles) {
-                        fd.append('files', e.file, e.relativePath);
-                        fileNames.push(e.relativePath);
-                    }
-                    fd.append('path', currentPath.value);
-                    fd.append('fileNames', JSON.stringify(fileNames));
-                    const smallTotal = smallFiles.reduce((s, e) => s + e.file.size, 0);
-                    await api.post('/api/files/upload', fd, {
-                        onUploadProgress: (p) => {
-                            if (p.total) {
-                                const currentUploaded = uploadedSize + p.loaded;
-                                store.task.percent = Math.round((currentUploaded * 100) / totalSize);
-                                store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
-                            }
-                        }
-                    });
-                    uploadedSize += smallTotal;
-                }
-
-                for (const entry of largeFiles) {
-                    await uploadFileWithChunk(entry.file, {
-                        initUrl: '/api/files/chunk/init',
-                        completeUrl: '/api/files/chunk/complete',
-                        fileName: entry.relativePath,
-                        extraInitData: { targetPath: currentPath.value },
-                        onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
-                            const currentUploaded = uploadedSize + bytesDone;
-                            store.task.percent = Math.round((currentUploaded * 100) / totalSize);
-                            store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
-                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
-                        }
-                    });
-                    uploadedSize += entry.file.size;
-                }
-
-                showToast($t('common.success')); loadFiles();
-            } catch (e) { showToast($t('common.error'), 'danger'); }
-            finally { setTimeout(() => store.task.visible = false, 500); }
+        const uploadDroppedFiles = (fileEntries) => {
+            const allFiles = fileEntries.map(e => ({ file: e.file, relativePath: e.relativePath }));
+            processFilesForUpload(allFiles);
         };
 
         // --- 文件编辑逻辑 (增强版) ---
@@ -458,9 +486,6 @@ export default {
             }
         };
 
-        // ... rest of the file ...
-
-
         const hasUnsavedChanges = computed(() => fileContent.value !== originalContent.value);
 
         const saveFile = async () => {
@@ -480,63 +505,113 @@ export default {
         };
 
         // --- 基础文件操作 ---
-        const uploadFiles = async (e) => {
+        const uploadFiles = (e) => {
             const files = e.target.files;
             if (!files.length) return;
-
-            const largeFiles = [];
-            const smallFiles = [];
+            const fileListArray = [];
             for (let i = 0; i < files.length; i++) {
-                if (isLargeFile(files[i])) largeFiles.push(files[i]);
-                else smallFiles.push(files[i]);
+                fileListArray.push({ file: files[i], relativePath: files[i].webkitRelativePath || files[i].name });
             }
+            processFilesForUpload(fileListArray);
+            e.target.value = '';
+        };
 
-            store.task.visible = true; store.task.title = $t('common.upload'); store.task.percent = 0;
-            let totalSize = Array.from(files).reduce((s, f) => s + f.size, 0);
+        const executeUpload = async (filesToUpload) => {
+            const totalSize = filesToUpload.reduce((s, f) => s + f.file.size, 0);
             let uploadedSize = 0;
 
+            const controller = new AbortController();
+            store.task.visible = true;
+            store.task.title = $t('common.upload');
+            store.task.percent = 0;
+            store.task.processedSize = 0;
+            store.task.totalSize = totalSize;
+            store.task.fileName = '';
+            store.task.speed = 0;
+            store.task.canCancel = true;
+            store.task.onCancel = () => {
+                controller.abort();
+            };
+
+            let lastTime = Date.now();
+            let lastLoaded = 0;
+
+            const updateProgress = (loadedBytes, currentFileName) => {
+                const currentUploaded = uploadedSize + loadedBytes;
+                store.task.percent = Math.min(100, Math.round((currentUploaded * 100) / totalSize));
+                store.task.processedSize = currentUploaded;
+                store.task.fileName = currentFileName;
+
+                const now = Date.now();
+                const timeDiff = (now - lastTime) / 1000;
+                if (timeDiff >= 0.5) {
+                    const loadedDiff = currentUploaded - lastLoaded;
+                    store.task.speed = Math.round(loadedDiff / timeDiff);
+                    lastTime = now;
+                    lastLoaded = currentUploaded;
+                }
+            };
+
             try {
+                const smallFiles = filesToUpload.filter(e => !isLargeFile(e.file));
+                const largeFiles = filesToUpload.filter(e => isLargeFile(e.file));
+
                 if (smallFiles.length) {
                     const fd = new FormData();
                     const fileNames = [];
-                    for (const f of smallFiles) {
-                        fd.append('files', f, f.webkitRelativePath || f.name);
-                        fileNames.push(f.webkitRelativePath || f.name);
+                    for (const e of smallFiles) {
+                        fd.append('files', e.file, e.relativePath);
+                        fileNames.push(e.relativePath);
                     }
                     fd.append('path', currentPath.value);
                     fd.append('fileNames', JSON.stringify(fileNames));
-                    const smallTotal = smallFiles.reduce((s, f) => s + f.size, 0);
+                    const smallTotal = smallFiles.reduce((s, e) => s + e.file.size, 0);
+                    
+                    const displayNames = fileNames.length === 1 ? fileNames[0] : `批量上传 ${fileNames.length} 个文件`;
+
                     await api.post('/api/files/upload', fd, {
+                        signal: controller.signal,
                         onUploadProgress: (p) => {
                             if (p.total) {
-                                const currentUploaded = uploadedSize + p.loaded;
-                                store.task.percent = Math.round((currentUploaded * 100) / totalSize);
-                                store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
+                                updateProgress(p.loaded, displayNames);
                             }
                         }
                     });
                     uploadedSize += smallTotal;
+                    lastTime = Date.now();
+                    lastLoaded = uploadedSize;
+                    store.task.processedSize = uploadedSize;
                 }
 
-                for (const file of largeFiles) {
-                    const chunkResult = await uploadFileWithChunk(file, {
+                for (const entry of largeFiles) {
+                    if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                    await uploadFileWithChunk(entry.file, {
                         initUrl: '/api/files/chunk/init',
                         completeUrl: '/api/files/chunk/complete',
-                        fileName: file.webkitRelativePath || file.name,
+                        cancelUrl: '/api/files/chunk/cancel',
+                        fileName: entry.relativePath,
                         extraInitData: { targetPath: currentPath.value },
+                        signal: controller.signal,
                         onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
-                            const currentUploaded = uploadedSize + bytesDone;
-                            store.task.percent = Math.round((currentUploaded * 100) / totalSize);
-                            store.task.message = `${formatSize(currentUploaded)} / ${formatSize(totalSize)}`;
-                            store.task.subMessage = `${chunkNum} / ${totalChunks}`;
+                            updateProgress(bytesDone, entry.relativePath);
                         }
                     });
-                    uploadedSize += file.size;
+                    uploadedSize += entry.file.size;
+                    lastTime = Date.now();
+                    lastLoaded = uploadedSize;
+                    store.task.processedSize = uploadedSize;
                 }
 
                 showToast($t('common.success')); loadFiles();
-            } catch (e) { showToast($t('common.error'), 'danger'); }
-            finally { setTimeout(() => store.task.visible = false, 500); e.target.value = ''; }
+            } catch (e) {
+                if (e.name === 'AbortError' || axios.isCancel(e) || e.message === 'canceled') {
+                    showToast('已取消上传', 'warning');
+                } else {
+                    showToast($t('common.error'), 'danger');
+                }
+            } finally {
+                setTimeout(() => store.task.visible = false, 500);
+            }
         };
 
         const operateFiles = async (action, files, dest = '', extra = {}) => {
@@ -550,18 +625,33 @@ export default {
         const operateFilesWithProgress = async (action, files, dest = '', extra = {}) => {
             const fullFiles = files.map(f => joinPath(currentPath.value, f));
             const isCompressOrExtract = action === 'compress' || action === 'extract';
+            const controller = new AbortController();
+            
             if (isCompressOrExtract) {
                 store.task.visible = true;
                 store.task.title = action === 'compress' ? $t('files.compressing') : $t('files.extracting');
                 store.task.percent = -1;
-                store.task.message = files.length === 1 ? files[0] : `${files.length} files`;
-                store.task.subMessage = '';
+                store.task.processedSize = 0;
+                store.task.totalSize = 0;
+                store.task.fileName = files.length === 1 ? files[0] : `${files.length} 个文件`;
+                store.task.speed = 0;
+                store.task.canCancel = true;
+                store.task.onCancel = () => {
+                    controller.abort();
+                };
             }
             try {
-                await api.post('/api/files/operate', { action, sources: fullFiles, destination: dest, ...extra });
+                await api.post('/api/files/operate', { action, sources: fullFiles, destination: dest, ...extra }, {
+                    signal: controller.signal
+                });
                 showToast($t('common.success')); loadFiles();
-            } catch (e) { showToast($t('common.error'), 'danger'); }
-            finally {
+            } catch (e) {
+                if (e.name === 'AbortError' || axios.isCancel(e) || e.message === 'canceled') {
+                    showToast('操作已取消', 'warning');
+                } else {
+                    showToast($t('common.error'), 'danger');
+                }
+            } finally {
                 if (isCompressOrExtract) {
                     store.task.percent = 100;
                     setTimeout(() => { store.task.visible = false; }, 500);
@@ -656,7 +746,8 @@ export default {
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
             editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder,
             previewImage, previewArchive, closePreview,
-            toggleActionMenu, activeActionMenu
+            toggleActionMenu, activeActionMenu,
+            uploadConfirmModal, checkedCount, hasAnySelectedFiles, confirmUploadFromModal
         };
     }
 };

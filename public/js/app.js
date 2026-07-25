@@ -287,6 +287,8 @@ const app = createApp({
                 store.task.percent = data.progress;
                 store.task.subMessage = data.progress + '%';
                 store.task.speed = data.speed || 0;
+                store.task.processedSize = data.processedSize || 0;
+                store.task.totalSize = data.totalSize || 0;
             });
 
             // Fallback: if socket disconnects during an update, start auto-refresh poll

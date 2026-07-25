@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.2.4';
+const APP_VERSION = '2.2.5';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -3765,15 +3765,39 @@ if (cluster.isPrimary) {
             activeDownloads.set('system_update', controller);
 
             const writer = fs.createWriteStream(newExePath);
-            const response = await axios({
-                url: downloadUrl,
-                method: 'GET',
-                responseType: 'stream',
-                signal: controller.signal
-            });
+
+            let currentUrl = downloadUrl;
+            let response = null;
+            let redirectsFollowed = 0;
+            const maxRedirects = 5;
+
+            while (redirectsFollowed < maxRedirects) {
+                console.log(`[Update] Requesting download chunk: ${currentUrl}`);
+                response = await axios({
+                    url: currentUrl,
+                    method: 'GET',
+                    responseType: 'stream',
+                    signal: controller.signal,
+                    maxRedirects: 0,
+                    validateStatus: (status) => (status >= 200 && status < 400)
+                });
+
+                if (response.status >= 300 && response.status < 400 && response.headers.location) {
+                    let nextUrl = new URL(response.headers.location, currentUrl).href;
+                    currentUrl = applyGithubProxy(nextUrl);
+                    redirectsFollowed++;
+                    console.log(`[Update] Redirecting to: ${currentUrl}`);
+                } else {
+                    break;
+                }
+            }
+
+            if (!response || response.status !== 200) {
+                throw new Error(`Failed to download update, server returned status: ${response ? response.status : 'unknown'}`);
+            }
 
             // 追踪进度
-            const totalLength = parseInt(response.headers['content-length'], 10);
+            const totalLength = parseInt(response.headers['content-length'], 10) || 0;
             let downloadedLength = 0;
             let lastUpdateTime = Date.now();
             let lastDownloadedLength = 0;
@@ -3786,8 +3810,13 @@ if (cluster.isPrimary) {
                     lastUpdateTime = now;
                     lastDownloadedLength = downloadedLength;
 
-                    const progress = Math.round((downloadedLength / totalLength) * 100);
-                    io.emit('update_progress', { progress, speed });
+                    const progress = totalLength > 0 ? Math.round((downloadedLength / totalLength) * 100) : 0;
+                    io.emit('update_progress', { 
+                        progress, 
+                        speed,
+                        processedSize: downloadedLength,
+                        totalSize: totalLength
+                    });
                 }
             });
 
