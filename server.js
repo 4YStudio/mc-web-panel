@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.2.5';
+const APP_VERSION = '2.2.6';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -290,6 +290,9 @@ const saveInstances = (data) => {
 
 // 默认配置
 const DEFAULT_CONFIG = {
+    username: '',
+    passwordHash: '',
+    passwordSalt: '',
     secret: '',
     isSetup: false,
     port: 3000,
@@ -306,6 +309,76 @@ const DEFAULT_CONFIG = {
     githubProxy: '',
     sessionSecret: ''
 };
+
+
+// 密码哈希辅助函数
+function hashPassword(password, salt) {
+    if (!salt) salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return { hash, salt };
+}
+
+// 登录防爆破与锁定逻辑
+const failedAttempts = new Map(); // ip -> { count, lockUntil }
+
+function checkBruteForce(ip) {
+    const record = failedAttempts.get(ip);
+    if (record && record.lockUntil && Date.now() < record.lockUntil) {
+        return {
+            locked: true,
+            remaining: Math.ceil((record.lockUntil - Date.now()) / 1000)
+        };
+    }
+    return { locked: false };
+}
+
+function recordFailedAttempt(ip) {
+    let record = failedAttempts.get(ip);
+    if (!record) {
+        record = { count: 0, lockUntil: 0 };
+    }
+    record.count++;
+    if (record.count >= 5) {
+        record.lockUntil = Date.now() + 10 * 60 * 1000; // 锁定10分钟
+    }
+    failedAttempts.set(ip, record);
+}
+
+function resetFailedAttempts(ip) {
+    failedAttempts.delete(ip);
+}
+
+// 图形验证码生成器 (SVG)
+function generateCaptcha() {
+    const chars = '23456789abcdefghkmnpqrstuvwxyzABCDEFGHKMNPQRSTUVWXYZ';
+    let text = '';
+    for (let i = 0; i < 4; i++) {
+        text += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const width = 120;
+    const height = 40;
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+    svg += `<rect width="100%" height="100%" fill="#f3f4f6"/>`;
+    for (let i = 0; i < 4; i++) {
+        const x1 = Math.random() * width;
+        const y1 = Math.random() * height;
+        const x2 = Math.random() * width;
+        const y2 = Math.random() * height;
+        const color = `rgba(${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},0.3)`;
+        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2"/>`;
+    }
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const fontSize = Math.floor(Math.random() * 8) + 22;
+        const angle = (Math.random() - 0.5) * 30;
+        const x = 15 + i * 25 + Math.random() * 5;
+        const y = 28 + (Math.random() - 0.5) * 6;
+        const color = `rgb(${Math.floor(Math.random()*150)},${Math.floor(Math.random()*100)},${Math.floor(Math.random()*200)})`;
+        svg += `<text x="${x}" y="${y}" font-size="${fontSize}" font-family="monospace" font-weight="bold" fill="${color}" transform="rotate(${angle} ${x} ${y})">${char}</text>`;
+    }
+    svg += `</svg>`;
+    return { text: text.toLowerCase(), svg };
+}
 
 let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : { ...DEFAULT_CONFIG };
 
@@ -2668,6 +2741,52 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    app.post('/api/panel/2fa/disable', requireAuth, async (req, res) => {
+        try {
+            appConfig.secret = '';
+            await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/panel/account/update', requireAuth, async (req, res) => {
+        const { username, currentPassword, newPassword } = req.body;
+        try {
+            if (!username) {
+                return res.status(400).json({ error: '用户名不能为空' });
+            }
+
+            // 1. 验证当前密码
+            if (!currentPassword) {
+                return res.status(400).json({ error: '必须输入当前密码进行安全校验' });
+            }
+            const { hash } = hashPassword(currentPassword, appConfig.passwordSalt);
+            if (hash !== appConfig.passwordHash) {
+                return res.status(400).json({ error: '当前密码验证错误' });
+            }
+
+            // 2. 更新用户名
+            appConfig.username = username;
+
+            // 3. 更新密码 (如果提供了新密码)
+            if (newPassword) {
+                if (newPassword.length < 6) {
+                    return res.status(400).json({ error: '新密码长度不能少于 6 位' });
+                }
+                const { hash: newHash, salt: newSalt } = hashPassword(newPassword);
+                appConfig.passwordHash = newHash;
+                appConfig.passwordSalt = newSalt;
+            }
+
+            await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // 4. 重启面板
     // 4. 重启面板
     app.post('/api/panel/restart', requireAuth, (req, res) => {
@@ -2678,7 +2797,6 @@ if (cluster.isPrimary) {
         }, 1000);
     });
 
-    // --- 原有 API (保持不变) ---
     app.get('/api/auth/check', (req, res) => {
         let isSetup = false;
         try {
@@ -2688,12 +2806,19 @@ if (cluster.isPrimary) {
         } catch (e) { }
         res.json({
             isSetup,
+            initialized: !!appConfig.username && !!appConfig.passwordHash,
             authenticated: !!req.session.authenticated,
             has2FA: !!appConfig.secret
         });
     });
+
+    app.get('/api/auth/captcha', (req, res) => {
+        const { text, svg } = generateCaptcha();
+        req.session.captcha = text;
+        res.json({ svg });
+    });
+
     app.get('/api/auth/qr', (req, res) => {
-        // If no secret is set, generate a temporary one for the session
         let secret = appConfig.secret;
         if (!secret) {
             if (!req.session.tempSecret) req.session.tempSecret = authenticator.generateSecret();
@@ -2704,32 +2829,127 @@ if (cluster.isPrimary) {
         });
     });
 
-    app.post('/api/auth/login', (req, res) => {
-        const { token } = req.body;
-        let secret = appConfig.secret;
-        let isFirstSetup = false;
+    app.post('/api/auth/setup', (req, res) => {
+        const { username, password, enable2FA, token, tempSecret } = req.body;
 
-        if (!secret && req.session.tempSecret) {
-            secret = req.session.tempSecret;
-            isFirstSetup = true;
+        if (appConfig.username && appConfig.passwordHash) {
+            return res.status(400).json({ error: '系统已经初始化过账户密码' });
         }
 
-        if (secret && authenticator.check(token, secret)) {
-            req.session.authenticated = true;
-            if (isFirstSetup) {
-                appConfig.secret = secret;
-                appConfig.isSetup = true;
-                fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
-                delete req.session.tempSecret;
-            } else if (!appConfig.isSetup) {
-                appConfig.isSetup = true;
-                fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+        if (!username || !password || password.length < 6) {
+            return res.status(400).json({ error: '用户名不能为空，密码长度必须大于等于 6 位' });
+        }
+
+        if (enable2FA) {
+            const secret = tempSecret || req.session.tempSecret;
+            if (!secret) {
+                return res.status(400).json({ error: '缺少 2FA 密钥，请重新扫描二维码' });
             }
+            if (!token || !authenticator.check(token, secret)) {
+                return res.status(400).json({ error: '2FA 验证码校验失败' });
+            }
+            appConfig.secret = secret;
+        } else {
+            appConfig.secret = '';
+        }
+
+        const { hash, salt } = hashPassword(password);
+        appConfig.username = username;
+        appConfig.passwordHash = hash;
+        appConfig.passwordSalt = salt;
+        appConfig.isSetup = true;
+
+        fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
+        delete req.session.tempSecret;
+
+        req.session.authenticated = true;
+        resetFailedAttempts(req.ip);
+        res.json({ success: true });
+    });
+
+    app.post('/api/auth/login', (req, res) => {
+        const { username, password, captcha, token } = req.body;
+
+        // 1. 防爆破检测
+        const lock = checkBruteForce(req.ip);
+        if (lock.locked) {
+            return res.status(429).json({ error: `防爆破拦截: 尝试次数过多，请等待 ${lock.remaining} 秒后再试` });
+        }
+
+        // 情况 A: 2FA 令牌直登 (Coexisting 2FA-only login)
+        if (token && !username) {
+            let secret = appConfig.secret;
+            if (!secret) {
+                return res.status(400).json({ error: '系统未启用 2FA 双重认证' });
+            }
+            if (authenticator.check(token, secret)) {
+                req.session.authenticated = true;
+                resetFailedAttempts(req.ip);
+                return res.json({ success: true });
+            } else {
+                recordFailedAttempt(req.ip);
+                return res.status(400).json({ error: '2FA 验证码错误' });
+            }
+        }
+
+        // 情况 B: 账号密码登录
+        // 2. 验证码校验
+        if (!req.session.captcha || !captcha || req.session.captcha !== captcha.toLowerCase()) {
+            recordFailedAttempt(req.ip);
+            delete req.session.captcha;
+            return res.status(400).json({ error: '验证码错误' });
+        }
+        delete req.session.captcha;
+
+        // 3. 账号密码校验
+        if (!appConfig.username || !appConfig.passwordHash) {
+            return res.status(400).json({ error: '系统尚未初始化' });
+        }
+
+        if (username !== appConfig.username) {
+            recordFailedAttempt(req.ip);
+            return res.status(400).json({ error: '用户名或密码错误' });
+        }
+
+        const { hash } = hashPassword(password, appConfig.passwordSalt);
+        if (hash !== appConfig.passwordHash) {
+            recordFailedAttempt(req.ip);
+            return res.status(400).json({ error: '用户名或密码错误' });
+        }
+
+        // 4. 账号密码登录成功
+        req.session.authenticated = true;
+        resetFailedAttempts(req.ip);
+        res.json({ success: true });
+    });
+
+    app.post('/api/auth/verify-2fa', (req, res) => {
+        const { token } = req.body;
+
+        const lock = checkBruteForce(req.ip);
+        if (lock.locked) {
+            return res.status(429).json({ error: `防爆破拦截: 尝试次数过多，请等待 ${lock.remaining} 秒后再试` });
+        }
+
+        if (!req.session.preAuth) {
+            return res.status(401).json({ error: '会话已过期，请重新登录密码' });
+        }
+
+        if (!appConfig.secret) {
+            return res.status(400).json({ error: '未启用 2FA' });
+        }
+
+        if (token && authenticator.check(token, appConfig.secret)) {
+            delete req.session.preAuth;
+            req.session.authenticated = true;
+            resetFailedAttempts(req.ip);
             res.json({ success: true });
         } else {
-            res.json({ success: false });
+            recordFailedAttempt(req.ip);
+            res.status(400).json({ error: '2FA 验证码错误' });
         }
     });
+
     app.post('/api/auth/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
     // 服务器控制

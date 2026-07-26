@@ -2784,3 +2784,10 @@ h3 { font-size: 1.25rem; }
         transform: none !important;
     }
 }
+
+/* Captcha Layout Alignment */
+.captcha-img-container svg {
+    height: 100% !important;
+    width: 100% !important;
+    display: block;
+}

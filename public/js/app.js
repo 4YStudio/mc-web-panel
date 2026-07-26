@@ -66,10 +66,11 @@ const app = createApp({
 
             try {
                 const { data } = await api.get('/api/auth/check');
-                store.auth.isSetup = data.has2FA;
-                store.isSetup = data.isSetup;
-                store.auth.loggedIn = data.authenticated;
-                if (!data.has2FA) {
+                store.auth.initialized = !!data.initialized;
+                store.auth.isSetup = !!data.has2FA;
+                store.isSetup = !!data.isSetup;
+                store.auth.loggedIn = !!data.authenticated;
+                if (!data.initialized) {
                     const qr = await api.get('/api/auth/qr');
                     store.auth.qrCode = qr.data.qr;
                     store.auth.secret = qr.data.secret;

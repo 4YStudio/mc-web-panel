@@ -62,7 +62,26 @@ export const messages = {
             placeholder_code: '请输入 2FA 验证码',
             btn_verify: '验证身份',
             toast_fail: '验证码错误',
-            toast_error: '请求失败'
+            toast_error: '请求失败',
+            placeholder_user: '请输入用户名',
+            placeholder_pass: '请输入密码',
+            placeholder_captcha: '验证码',
+            placeholder_confirm_pass: '请确认新密码',
+            btn_login: '登 录',
+            btn_next: '下一步',
+            btn_prev: '返回上一步',
+            enable_2fa: '开启 2FA 双重认证（推荐）',
+            init_title: '初始化管理员账号',
+            btn_init: '完成初始化',
+            toast_init_success: '账号初始化成功',
+            toast_init_fail: '初始化失败',
+            toast_login_fail: '用户名或密码错误',
+            toast_captcha_fail: '验证码错误',
+            locked_prefix: '登录失败次数过多，请等待 ',
+            locked_suffix: ' 秒后再试',
+            mismatch_pass: '两次输入的密码不一致',
+            switch_to_2fa: '使用 2FA 令牌直登',
+            switch_to_password: '使用账号密码登录'
         },
         sidebar: {
             title: 'MC 面板',
@@ -701,7 +720,17 @@ export const messages = {
             tab_other: '其他界面',
             other_interfaces_desc: 'Java管理界面、插件加载界面、FRP管理器等扩展界面将继承通用外观设置。如需单独调整，请在此处修改。',
             upload: '上传',
-            upload_success: '上传成功'
+            upload_success: '上传成功',
+            account_mgmt: '账号管理',
+            admin_user: '管理员用户名',
+            current_pass: '当前密码 (必填)',
+            new_pass: '新密码 (留空则不修改)',
+            confirm_new_pass: '确认新密码',
+            disable_2fa: '禁用 2FA 双重认证',
+            enable_2fa: '启用 2FA 双重认证',
+            disable_2fa_confirm: '确定要禁用 2FA 双重认证吗？这会降低账号的安全性。',
+            account_update_success: '管理员账号信息更新成功',
+            account_update_fail: '账号信息更新失败'
         },
 
         plugins: {
@@ -996,7 +1025,26 @@ export const messages = {
             placeholder_code: 'Enter 2FA Code',
             btn_verify: 'Verify Identity',
             toast_fail: 'Invalid Code',
-            toast_error: 'Request Failed'
+            toast_error: 'Request Failed',
+            placeholder_user: 'Enter Username',
+            placeholder_pass: 'Enter Password',
+            placeholder_captcha: 'Captcha',
+            placeholder_confirm_pass: 'Confirm New Password',
+            btn_login: 'Login',
+            btn_next: 'Next',
+            btn_prev: 'Back',
+            enable_2fa: 'Enable 2FA (Recommended)',
+            init_title: 'Initialize Admin Account',
+            btn_init: 'Initialize',
+            toast_init_success: 'Admin credentials initialized successfully',
+            toast_init_fail: 'Initialization failed',
+            toast_login_fail: 'Incorrect username or password',
+            toast_captcha_fail: 'Invalid captcha',
+            locked_prefix: 'Too many failed attempts. Please try again after ',
+            locked_suffix: ' seconds',
+            mismatch_pass: 'Passwords do not match',
+            switch_to_2fa: 'Login with 2FA Token',
+            switch_to_password: 'Login with Username/Password'
         },
         sidebar: {
             title: 'MC Panel',
@@ -1631,7 +1679,17 @@ export const messages = {
             tab_other: 'Other Pages',
             other_interfaces_desc: 'Java Manager, Plugin Loader, FRP Manager and other extension pages inherit general appearance settings. Adjust here if needed.',
             upload: 'Upload',
-            upload_success: 'Upload successful'
+            upload_success: 'Upload successful',
+            account_mgmt: 'Account Management',
+            admin_user: 'Admin Username',
+            current_pass: 'Current Password (Required)',
+            new_pass: 'New Password (leave blank to keep)',
+            confirm_new_pass: 'Confirm New Password',
+            disable_2fa: 'Disable 2FA',
+            enable_2fa: 'Enable 2FA',
+            disable_2fa_confirm: 'Are you sure you want to disable 2FA? This lowers account security.',
+            account_update_success: 'Admin account updated successfully',
+            account_update_fail: 'Failed to update account credentials'
         },
 
         plugins: {

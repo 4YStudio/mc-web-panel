@@ -95,11 +95,13 @@ export default {
                     <div class="card-body p-3 p-md-4">
                         <div class="mb-3 mb-md-4">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.secret') }}</label>
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control" :value="config.secret" readonly>
-                                <button class="btn btn-outline-danger" @click="reset2FA">
-                                    <i class="fa-solid fa-rotate d-md-none"></i>
-                                    <span class="d-none d-md-inline"><i class="fa-solid fa-rotate me-1"></i>{{ $t('panel_settings.reset_2fa') }}</span>
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="text" class="form-control" :value="config.secret || '未启用 / Disabled'" readonly>
+                                <button class="btn btn-outline-success" @click="reset2FA">
+                                    <i class="fa-solid fa-key me-1"></i>{{ config.secret ? $t('panel_settings.reset_2fa') : $t('panel_settings.enable_2fa') }}
+                                </button>
+                                <button v-if="config.secret" class="btn btn-outline-danger" @click="disable2FA">
+                                    <i class="fa-solid fa-trash me-1"></i>{{ $t('panel_settings.disable_2fa') }}
                                 </button>
                             </div>
                             <div class="form-text small" style="font-size: 0.7rem;">{{ $t('panel_settings.secret_masked') }}</div>
@@ -108,6 +110,39 @@ export default {
                         <div class="mb-0">
                             <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.session_timeout') }}</label>
                             <input type="number" class="form-control" v-model.number="config.sessionTimeout" min="1" max="365">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 账号管理卡片 -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header fw-bold py-2 py-md-3 px-3 px-md-4" style="color: var(--c-accent);">
+                        <i class="fa-solid fa-user-gear me-2"></i>{{ $t('panel_settings.account_mgmt') }}
+                    </div>
+                    <div class="card-body p-3 p-md-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.admin_user') }}</label>
+                            <input type="text" class="form-control" v-model="accountForm.username">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.current_pass') }}</label>
+                            <input type="password" class="form-control" v-model="accountForm.currentPassword" placeholder="******">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.new_pass') }}</label>
+                            <input type="password" class="form-control" v-model="accountForm.newPassword" placeholder="******">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.confirm_new_pass') }}</label>
+                            <input type="password" class="form-control" v-model="accountForm.confirmNewPassword" placeholder="******">
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button class="btn btn-outline-primary fw-bold" @click="updateAccount" :disabled="updatingAccount">
+                                <span v-if="updatingAccount" class="spinner-border spinner-border-sm me-2"></span>
+                                <i v-else class="fa-solid fa-user-pen me-2"></i>{{ $t('common.save') }}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -373,6 +408,13 @@ export default {
         const loading = ref(true);
         const saving = ref(false);
         const testingAI = ref(false);
+        const updatingAccount = ref(false);
+        const accountForm = reactive({
+            username: '',
+            currentPassword: '',
+            newPassword: '',
+            confirmNewPassword: ''
+        });
 
         const config = reactive({
             port: 3000,
@@ -517,6 +559,7 @@ export default {
                 loading.value = true;
                 const res = await api.get('/api/panel/config');
                 Object.assign(config, res.data);
+                accountForm.username = res.data.username || 'admin';
                 javaArgsText.value = (config.javaArgs || []).join('\n');
 
                 if (res.data.appearance) {
@@ -676,6 +719,62 @@ export default {
             });
         };
 
+        const updateAccount = async () => {
+            if (!accountForm.username) {
+                showToast($t('login.placeholder_user'), 'warning');
+                return;
+            }
+            if (!accountForm.currentPassword) {
+                showToast($t('panel_settings.current_pass'), 'warning');
+                return;
+            }
+            if (accountForm.newPassword && accountForm.newPassword.length < 6) {
+                showToast($t('login.placeholder_pass') + ' (>= 6 chars)', 'warning');
+                return;
+            }
+            if (accountForm.newPassword !== accountForm.confirmNewPassword) {
+                showToast($t('login.mismatch_pass'), 'warning');
+                return;
+            }
+
+            updatingAccount.value = true;
+            try {
+                const res = await api.post('/api/panel/account/update', {
+                    username: accountForm.username,
+                    currentPassword: accountForm.currentPassword,
+                    newPassword: accountForm.newPassword
+                });
+                if (res.data.success) {
+                    showToast($t('panel_settings.account_update_success'), 'success');
+                    accountForm.currentPassword = '';
+                    accountForm.newPassword = '';
+                    accountForm.confirmNewPassword = '';
+                }
+            } catch (err) {
+                showToast($t('panel_settings.account_update_fail') + ': ' + (err.response?.data?.error || err.message), 'danger');
+            } finally {
+                updatingAccount.value = false;
+            }
+        };
+
+        const disable2FA = () => {
+            openModal({
+                title: $t('panel_settings.disable_2fa'),
+                message: $t('panel_settings.disable_2fa_confirm'),
+                callback: async () => {
+                    try {
+                        const res = await api.post('/api/panel/2fa/disable');
+                        if (res.data.success) {
+                            showToast($t('common.success'), 'success');
+                            loadConfig();
+                        }
+                    } catch (e) {
+                        showToast($t('common.error') + ': ' + (e.response?.data?.error || e.message), 'danger');
+                    }
+                }
+            });
+        };
+
         onMounted(() => {
             loadConfigWithSave();
             loadJars();
@@ -735,7 +834,8 @@ export default {
 
         return {
             store, loading, saving, testingAI, config, javaArgsText, jars,
-            saveConfig, testAI, reset2FA,
+            saveConfig, testAI, reset2FA, disable2FA,
+            updatingAccount, accountForm, updateAccount,
             appearance, activeAppearanceTab, appearanceTabs,
             logoInput, bgInput, triggerLogoUpload, triggerBgUpload,
             handleLogoUpload, handleBgUpload, removeLogo, removeBackground
