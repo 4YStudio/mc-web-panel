@@ -5,78 +5,8 @@ import { showToast, waitForPanel, uploadFileWithChunk, isLargeFile } from '../ut
 
 export default {
     template: `
-    <div class="login-page d-flex align-items-center justify-content-center h-100 w-100">
-        <style>
-        /* 统一登录与初始化页面输入框样式 */
-        .login-page .form-control {
-            height: 50px !important;
-            font-size: 0.95rem !important;
-            font-family: inherit !important;
-            font-weight: 500 !important;
-            background: rgba(255, 255, 255, 0.04) !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
-            color: var(--c-text-primary) !important;
-            letter-spacing: normal !important;
-            text-align: left !important;
-            padding: 0.75rem 1.25rem !important;
-            border-radius: 8px !important;
-        }
-
-        .login-page .form-control:focus {
-            background: rgba(255, 255, 255, 0.08) !important;
-            border-color: var(--c-primary) !important;
-            box-shadow: 0 0 0 0.25rem rgba(var(--c-primary-rgb), 0.15) !important;
-        }
-
-        /* 专门为 2FA 验证码输入框定义的样式 (居中、等宽、大间距) */
-        .login-page .login-input-2fa {
-            text-align: center !important;
-            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace !important;
-            letter-spacing: 6px !important;
-            font-size: 1.25rem !important;
-            font-weight: 600 !important;
-            padding: 0.75rem 0.5rem !important;
-            height: 50px !important;
-        }
-
-        /* 验证码布局对齐 */
-        .login-page .captcha-input-field {
-            border-top-right-radius: 0px !important;
-            border-bottom-right-radius: 0px !important;
-        }
-
-        .login-page .captcha-img-container {
-            height: 50px !important;
-            background: #f8f9fa;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 120px !important;
-            border-top-left-radius: 0px !important;
-            border-bottom-left-radius: 0px !important;
-            border-top-right-radius: 8px !important;
-            border-bottom-right-radius: 8px !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
-            border-left: 0 !important;
-        }
-
-        [data-bs-theme="dark"] .login-page .captcha-img-container {
-            background: #ffffff !important;
-        }
-
-        /* Label 样式微调，使其更高端 */
-        .login-page .form-label {
-            font-size: 0.72rem !important;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--c-text-secondary) !important;
-            margin-bottom: 0.4rem !important;
-            font-weight: 700 !important;
-            opacity: 0.85;
-        }
-        </style>
-
-        <div class="glass-card login-card p-4 p-md-5 text-center animate-in" style="width: 100%; max-width: 420px;">
+    <div class="login-page d-flex justify-content-center w-100 h-100 overflow-y-auto py-4 py-md-5">
+        <div class="glass-card login-card p-4 p-md-5 text-center animate-in my-auto" style="width: 100%; max-width: 420px;">
             <div class="mb-4">
                  <img v-if="store.customLogoUrl" :src="store.customLogoUrl" alt="Logo" class="login-logo">
                  <img v-else-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="login-logo rounded-circle">

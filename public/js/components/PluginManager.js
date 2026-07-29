@@ -20,9 +20,6 @@ export default {
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="https://4ystudio.github.io/mc-web-panel/market.html" target="_blank" class="btn btn-outline-info rounded-pill px-3 px-md-4">
-                    <i class="fa-solid fa-store"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.market_button') }}</span>
-                </a>
                 <a href="https://4ystudio.github.io/mc-web-panel/dev-guide/" target="_blank" class="btn btn-outline-primary rounded-pill px-3 px-md-4">
                     <i class="fa-solid fa-book"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.guide_button') }}</span>
                 </a>
@@ -32,13 +29,13 @@ export default {
             </div>
         </div>
 
-        <div class="plugin-list-view">
+        <div class="plugin-list-view mt-3">
             <div v-if="loading" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status"></div>
                 <div class="text-muted mt-2 small">{{ $t('common.loading') }}</div>
             </div>
             <div v-else>
-                <div v-if="plugins.length > 0" class="row g-3">
+                    <div v-if="plugins.length > 0" class="row g-3">
                     <template v-for="(plugin, idx) in plugins" :key="plugin.id">
                         <div v-if="plugin" class="col-md-6 col-lg-4 stagger-item" :style="{'animation-delay': (idx * 0.05) + 's'}">
                             <div class="card h-100 plugin-card border-secondary shadow-sm" style="border-radius: 16px; transition: all 0.3s ease; background-color: var(--c-surface) !important;">
@@ -88,6 +85,9 @@ export default {
                                             </span>
                                         </div>
                                         <div class="d-flex gap-2 align-items-center">
+                                            <button v-if="plugin.updateUrl" class="btn btn-sm btn-outline-warning px-2 py-0" @click="checkPluginUpdate(plugin)" :disabled="checkingUpdate === plugin.id" style="font-size: 0.72rem; border-radius: 8px;" :title="'检查更新 (Check Updates)'">
+                                                <i class="fa-solid" :class="checkingUpdate === plugin.id ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'"></i>
+                                            </button>
                                             <button v-if="pluginSettingsMap[plugin.id]" class="btn btn-sm btn-outline-info px-2 py-0" @click="openSettingsModal(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('plugins.settings') || 'Settings'">
                                                 <i class="fa-solid fa-gear"></i>
                                             </button>
@@ -330,6 +330,56 @@ export default {
                                 <button v-if="settingsSchema && settingsSchema.fields" class="btn btn-primary rounded-pill px-4 fw-bold" @click="saveSettings" :disabled="savingSettings">
                                     <span v-if="savingSettings" class="spinner-border spinner-border-sm me-1"></span>
                                     <i v-else class="fa-solid fa-check me-1"></i>{{ $t('common.save') || '保存' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <Teleport to="body">
+            <Transition name="modal-fade">
+                <div class="modal fade show" v-if="showUpdateModal" style="display: block; z-index: 1050;">
+                    <div class="modal-backdrop fade show" @click="showUpdateModal = false" style="z-index: -1;"></div>
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; background-color: var(--c-surface); color: var(--c-text-primary);">
+                            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                                <h5 class="modal-title fw-bold">
+                                    <i class="fa-solid fa-arrows-rotate me-2 text-warning"></i>
+                                    更新插件 - {{ updateInfo?.name }}
+                                </h5>
+                                <button type="button" class="btn-close" @click="showUpdateModal = false"></button>
+                            </div>
+                            <div class="modal-body px-4 py-3">
+                                <div class="p-3 bg-light bg-opacity-50 rounded-3 border mb-3 text-dark">
+                                    <div class="row text-center">
+                                        <div class="col-5">
+                                            <div class="small text-muted">当前版本</div>
+                                            <div class="fw-bold text-danger">{{ updateInfo?.currentVersion }}</div>
+                                        </div>
+                                        <div class="col-2 d-flex align-items-center justify-content-center">
+                                            <i class="fa-solid fa-arrow-right text-muted"></i>
+                                        </div>
+                                        <div class="col-5">
+                                            <div class="small text-muted">最新版本</div>
+                                            <div class="fw-bold text-success">{{ updateInfo?.latestVersion }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-if="updateInfo?.changelog" class="mb-3">
+                                    <label class="form-label small fw-bold text-muted">更新日志</label>
+                                    <div class="p-3 rounded-3 small bg-light text-dark" style="max-height: 150px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5;">
+                                        {{ updateInfo?.changelog }}
+                                    </div>
+                                </div>
+                                <p class="text-muted small mb-0">更新将会自动下载并热替换插件文件，加载完成后将自动重新启用。</p>
+                            </div>
+                            <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                                <button class="btn rounded-pill px-4" @click="showUpdateModal = false" :disabled="updatingPluginRemote" :class="store.isDark ? 'btn-outline-light' : 'btn-light'">{{ $t('common.cancel') }}</button>
+                                <button class="btn btn-primary rounded-pill px-4 fw-bold" @click="triggerRemoteUpdate" :disabled="updatingPluginRemote">
+                                    <span v-if="updatingPluginRemote" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="fa-solid fa-check me-1"></i>立即更新
                                 </button>
                             </div>
                         </div>
@@ -603,6 +653,54 @@ export default {
             return 0;
         };
 
+        const checkingUpdate = ref(null);
+        const updateInfo = ref(null);
+        const showUpdateModal = ref(false);
+        const updatingPluginRemote = ref(false);
+
+        const checkPluginUpdate = async (plugin) => {
+            checkingUpdate.value = plugin.id;
+            try {
+                const res = await api.get('/api/plugins/check-update', { params: { pluginId: plugin.id } });
+                const data = res.data;
+                if (compareVersions(data.latestVersion, data.currentVersion) > 0) {
+                    updateInfo.value = {
+                        pluginId: plugin.id,
+                        name: plugin.name,
+                        currentVersion: data.currentVersion,
+                        latestVersion: data.latestVersion,
+                        downloadUrl: data.downloadUrl,
+                        changelog: data.changelog
+                    };
+                    showUpdateModal.value = true;
+                } else {
+                    showToast('已是最新版本！', 'success');
+                }
+            } catch (e) {
+                showToast('获取更新失败: ' + (e.response?.data?.error || e.message), 'danger');
+            } finally {
+                checkingUpdate.value = null;
+            }
+        };
+
+        const triggerRemoteUpdate = async () => {
+            if (!updateInfo.value) return;
+            updatingPluginRemote.value = true;
+            try {
+                await api.post('/api/plugins/update-remote', {
+                    pluginId: updateInfo.value.pluginId,
+                    downloadUrl: updateInfo.value.downloadUrl
+                });
+                showToast('插件更新成功！已自动加载新版本。', 'success');
+                showUpdateModal.value = false;
+                await refreshPlugins();
+            } catch (e) {
+                showToast('更新失败: ' + (e.response?.data?.error || e.message), 'danger');
+            } finally {
+                updatingPluginRemote.value = false;
+            }
+        };
+
         onMounted(() => {
             refreshPlugins();
         });
@@ -615,7 +713,8 @@ export default {
             showUninstallConfirm, pluginToUninstall, uninstallConfirmName,
             knownPermissions, getPermissionLabel, pluginStatusMap, getStatusColor,
             pluginSettingsMap, showSettingsModal, settingsPlugin, settingsSchema, settingsForm,
-            openSettingsModal, closeSettingsModal, saveSettings, resetSettings, savingSettings
+            openSettingsModal, closeSettingsModal, saveSettings, resetSettings, savingSettings,
+            checkingUpdate, updateInfo, showUpdateModal, updatingPluginRemote, checkPluginUpdate, triggerRemoteUpdate
         };
     }
 };

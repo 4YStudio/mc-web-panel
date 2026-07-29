@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.2.6';
+const APP_VERSION = '2.2.7';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -382,13 +382,16 @@ function generateCaptcha() {
 
 let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : { ...DEFAULT_CONFIG };
 
-// 如果没有 sessionSecret，生成并根据情况保存
+// 生成 sessionSecret 和 cliSecret
 if (!appConfig.sessionSecret) {
     appConfig.sessionSecret = authenticator.generateSecret() + '_' + Date.now();
 }
+if (!appConfig.cliSecret) {
+    appConfig.cliSecret = crypto.randomBytes(32).toString('hex');
+}
 
-// 立即保存配置文件 (如果不存在)
-if (!fs.existsSync(CONFIG_FILE)) {
+// 立即保存配置文件
+if (!fs.existsSync(CONFIG_FILE) || !appConfig.cliSecret) {
     fs.ensureDirSync(DATA_DIR);
     fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
 }
@@ -862,7 +865,8 @@ if (cluster.isPrimary) {
                 onlinePlayers: new Set(),
                 logHistory: [],
                 detectedVersion: { mc: 'Unknown', loader: 'Unknown' },
-                javaVersion: ''
+                javaVersion: '',
+                stopping: false
             };
             const instDir = getInstanceDir(instanceId);
             const logPath = instDir ? path.join(instDir, 'panel.log') : null;
@@ -899,6 +903,112 @@ if (cluster.isPrimary) {
 
     let MAX_LOG_HISTORY = appConfig.maxLogHistory || 1000;
     let globalJavaVersion = '';
+
+    // Helper: Check if Port is In Use
+    const isPortInUse = (port) => {
+        return new Promise((resolve) => {
+            const net = require('net');
+            const tester = net.createServer()
+                .once('error', (err) => {
+                    if (err.code === 'EADDRINUSE') resolve(true);
+                    else resolve(false);
+                })
+                .once('listening', () => {
+                    tester.once('close', () => resolve(false)).close();
+                })
+                .listen(port);
+        });
+    };
+
+    // Helper: Download File from URL
+    const downloadFile = async (url, dest, instanceId) => {
+        try {
+            appendLog(instanceId, `[系统] 开始下载预设服务端核心: ${url} ...\n`);
+            const writer = fs.createWriteStream(dest);
+            const response = await axios({
+                url,
+                method: 'GET',
+                responseType: 'stream',
+                headers: { 'User-Agent': MODRINTH_UA }
+            });
+            
+            let downloadedBytes = 0;
+            const totalBytes = parseInt(response.headers['content-length'], 10) || 0;
+            let lastReportedPercent = -10;
+            
+            response.data.on('data', (chunk) => {
+                downloadedBytes += chunk.length;
+                if (totalBytes > 0) {
+                    const percent = Math.floor((downloadedBytes / totalBytes) * 100);
+                    if (percent >= lastReportedPercent + 10) {
+                        appendLog(instanceId, `[系统] 下载进度: ${percent}%\n`);
+                        lastReportedPercent = percent - (percent % 10);
+                    }
+                }
+            });
+            
+            response.data.pipe(writer);
+            
+            return new Promise((resolve, reject) => {
+                writer.on('finish', () => {
+                    appendLog(instanceId, `[系统] 服务端核心下载成功: ${path.basename(dest)} (大小: ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB)\n`);
+                    resolve();
+                });
+                writer.on('error', (err) => {
+                    appendLog(instanceId, `[系统] 🔴 下载失败: ${err.message}\n`);
+                    reject(err);
+                });
+            });
+        } catch (e) {
+            appendLog(instanceId, `[系统] 🔴 连接下载源失败: ${e.message}\n`);
+            throw e;
+        }
+    };
+
+    // Helper: Select Best Installed Java Path matching version requirements
+    const selectBestJava = (requiredVer) => {
+        try {
+            const data = readJavaInstalled();
+            const installations = data.installations || [];
+            const match = installations.find(j => {
+                const verStr = (j.version || '').toLowerCase();
+                if (requiredVer === 17) {
+                    return verStr.includes('17.') || verStr.startsWith('17');
+                } else if (requiredVer === 8) {
+                    return verStr.includes('1.8.') || verStr.startsWith('8.') || verStr.startsWith('8');
+                } else if (requiredVer === 21) {
+                    return verStr.includes('21.') || verStr.startsWith('21');
+                }
+                return false;
+            });
+            return match ? match.path : '';
+        } catch (e) {
+            return '';
+        }
+    };
+
+    // Helper: Trigger registered Webhooks
+    const triggerWebhook = async (event, payload) => {
+        const urls = appConfig.webhooks || [];
+        if (!urls.length) return;
+        
+        const timestamp = new Date().toISOString();
+        const data = {
+            event,
+            timestamp,
+            payload
+        };
+        
+        for (const url of urls) {
+            try {
+                axios.post(url, data, { timeout: 5000 }).catch(err => {
+                    console.error(`[Webhook] Failed to send to ${url}:`, err.message);
+                });
+            } catch (e) {
+                console.error(`[Webhook] Error sending to ${url}:`, e.message);
+            }
+        }
+    };
 
     // Helper: Resolve Java Binary Path (appends bin/java if needed)
     const resolveJavaPath = (inputPath) => {
@@ -972,6 +1082,10 @@ if (cluster.isPrimary) {
 
     const requireAuth = (req, res, next) => {
         if (req.session.authenticated) return next();
+        const cliSecret = req.headers['x-cli-secret'];
+        if (cliSecret && cliSecret === appConfig.cliSecret) {
+            return next();
+        }
         res.status(401).json({ error: '未授权' });
     };
 
@@ -1149,22 +1263,65 @@ if (cluster.isPrimary) {
     });
 
     app.post('/api/instances/create', requireAuth, async (req, res) => {
-        const { name, jarName, javaArgs, javaPath, loaderType } = req.body;
+        const { name, jarName, javaArgs, javaPath, loaderType, preset } = req.body;
         if (!name) return res.status(400).json({ error: '实例名称不能为空' });
 
         const id = crypto.randomBytes(4).toString('hex');
         const dir = `instances/${id}`;
         const absDir = path.join(BASE_DIR, dir);
-        const lt = loaderType || appConfig.loaderType || 'fabric';
+
+        let finalJarName = jarName;
+        let finalLoaderType = loaderType || appConfig.loaderType || 'fabric';
+        let finalJavaPath = javaPath;
+
+        const PRESETS = {
+            'vanilla-1.20.4': {
+                url: 'https://api.papermc.io/v2/projects/paper/versions/1.20.4/builds/496/downloads/paper-1.20.4-496.jar',
+                jarName: 'paper-1.20.4-496.jar',
+                loaderType: 'fabric',
+                javaVer: 17
+            },
+            'fabric-1.20.1': {
+                url: 'https://meta.fabricmc.net/v2/versions/loader/1.20.1/0.15.11/1.0.1/server/jar',
+                jarName: 'fabric-server-mc.1.20.1-loader.0.15.11-launcher.1.0.1.jar',
+                loaderType: 'fabric',
+                javaVer: 17
+            },
+            'paper-1.12.2': {
+                url: 'https://api.papermc.io/v2/projects/paper/versions/1.12.2/builds/1618/downloads/paper-1.12.2-1618.jar',
+                jarName: 'paper-1.12.2-1618.jar',
+                loaderType: 'fabric',
+                javaVer: 8
+            }
+        };
+
+        if (preset && PRESETS[preset]) {
+            const p = PRESETS[preset];
+            finalJarName = p.jarName;
+            finalLoaderType = p.loaderType;
+            const bestJava = selectBestJava(p.javaVer);
+            if (bestJava) {
+                finalJavaPath = bestJava;
+            }
+        }
 
         try {
             fs.ensureDirSync(absDir);
+
+            // Automatically write eula.txt to accept EULA
+            await fs.writeFile(path.join(absDir, 'eula.txt'), 'eula=true');
+
+            // Pre-create server.properties if preset is used
+            if (preset) {
+                await fs.writeFile(path.join(absDir, 'server.properties'), `server-port=25565\nmotd=A Minecraft Server Created by Setup Wizard\n`);
+            }
+
             instanceConfig.instances.push({
                 id, name, dir,
-                loaderType: lt,
-                jarName: jarName || appConfig.jarName,
+                loaderType: finalLoaderType,
+                jarName: finalJarName || appConfig.jarName,
                 javaArgs: (javaArgs && javaArgs.length) ? javaArgs : appConfig.javaArgs,
-                javaPath: javaPath || appConfig.javaPath,
+                javaPath: finalJavaPath || appConfig.javaPath,
                 backupStrategy: 'panel',
                 autoBackupEnabled: false,
                 autoBackupInterval: 12,
@@ -1172,7 +1329,17 @@ if (cluster.isPrimary) {
                 createdAt: new Date().toISOString()
             });
             saveInstances(instanceConfig);
-            getOrCreateInstanceState(id); // 初始化状态
+            const instState = getOrCreateInstanceState(id); // Initialize state
+
+            // If preset, start download in background
+            if (preset && PRESETS[preset]) {
+                const p = PRESETS[preset];
+                const dest = path.join(absDir, p.jarName);
+                downloadFile(p.url, dest, id).catch(err => {
+                    console.error(`Failed to download preset jar for ${id}`, err);
+                });
+            }
+
             res.json({ success: true, instance: { id, name } });
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -1800,6 +1967,88 @@ if (cluster.isPrimary) {
         res.json(results);
     });
 
+
+    // 检查插件更新服务 (由插件开发者决定更新地址，非统一商店)
+    app.get('/api/plugins/check-update', requireAuth, async (req, res) => {
+        const { pluginId } = req.query;
+        if (!pluginId) {
+            return res.status(400).json({ error: '缺少插件 ID' });
+        }
+
+        const manifest = pluginLoader.getPluginManifest(pluginId);
+        if (!manifest) {
+            return res.status(404).json({ error: '未找到该插件' });
+        }
+
+        const updateUrl = manifest.updateUrl || manifest.updateCheckUrl;
+        if (!updateUrl) {
+            return res.status(400).json({ error: '该插件未配置更新查询地址 (updateUrl)' });
+        }
+
+        try {
+            const response = await axios.get(updateUrl, { timeout: 5000 });
+            const data = response.data;
+            if (!data || !data.version) {
+                return res.status(400).json({ error: '更新接口返回的格式不正确' });
+            }
+
+            res.json({
+                currentVersion: manifest.version,
+                latestVersion: data.version,
+                downloadUrl: data.downloadUrl || data.url,
+                changelog: data.changelog || data.description || ''
+            });
+        } catch (e) {
+            res.status(500).json({ error: '获取更新失败: ' + e.message });
+        }
+    });
+
+    // 远程执行插件更新/升级安装
+    app.post('/api/plugins/update-remote', requireAuth, async (req, res) => {
+        const { pluginId, downloadUrl } = req.body;
+        if (!pluginId || !downloadUrl) {
+            return res.status(400).json({ error: '缺少必要参数 (pluginId 或 downloadUrl)' });
+        }
+
+        const tempZipPath = path.join(PLUGINS_DIR, `_update_${pluginId}_${Date.now()}.zip`);
+        try {
+            // 下载 ZIP 文件到临时目录
+            const response = await axios({
+                method: 'get',
+                url: downloadUrl,
+                responseType: 'stream'
+            });
+
+            const writer = fs.createWriteStream(tempZipPath);
+            response.data.pipe(writer);
+
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            // 先卸载原先的插件以防文件冲突与旧实例占用
+            try {
+                await pluginLoader.uninstall(pluginId);
+            } catch (err) {
+                // 如果是新安装，卸载失败可以忽略
+            }
+
+            // 执行新版本热安装
+            const manifest = await pluginLoader.install(tempZipPath);
+
+            // 清理下载的 ZIP 压缩包
+            await fs.remove(tempZipPath);
+
+            res.json({ success: true, plugin: manifest });
+        } catch (e) {
+            if (fs.existsSync(tempZipPath)) {
+                try { await fs.remove(tempZipPath); } catch (err) {}
+            }
+            console.error('Failed to update plugin remotely:', e);
+            res.status(500).json({ error: '远程插件更新失败: ' + e.message });
+        }
+    });
 
     // --- Plugin System API ---
     app.get('/api/plugins/list', requireAuth, (req, res) => {
@@ -2653,7 +2902,7 @@ if (cluster.isPrimary) {
     // 2. 保存面板配置
     app.post('/api/panel/config', requireAuth, async (req, res) => {
         try {
-            const { port, defaultLang, theme, consoleInfoPosition, loaderType, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance } = req.body;
+            const { port, defaultLang, theme, consoleInfoPosition, loaderType, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance, webhooks } = req.body;
 
             // 验证配置
             if (port && (port < 1024 || port > 65535)) {
@@ -2690,6 +2939,7 @@ if (cluster.isPrimary) {
             if (loaderType !== undefined) appConfig.loaderType = loaderType;
             if (jarName !== undefined) appConfig.jarName = jarName;
             if (javaArgs !== undefined) appConfig.javaArgs = javaArgs;
+            if (webhooks !== undefined) appConfig.webhooks = webhooks;
             if (sessionTimeout !== undefined) appConfig.sessionTimeout = sessionTimeout;
             if (maxLogHistory !== undefined) appConfig.maxLogHistory = maxLogHistory;
             if (monitorInterval !== undefined) appConfig.monitorInterval = monitorInterval;
@@ -3176,6 +3426,20 @@ if (cluster.isPrimary) {
     app.post('/api/server/start', requireAuth, withInstance, async (req, res) => {
         const { instState, instDir, instanceId } = req;
         if (instState.process) return res.json({ message: '已运行' });
+        instState.stopping = false;
+
+        // Port conflict detection
+        const propsFile = path.join(instDir, 'server.properties');
+        let port = 25565;
+        if (fs.existsSync(propsFile)) {
+            try {
+                const props = PropertiesReader(propsFile);
+                port = parseInt(props.get('server-port')) || 25565;
+            } catch (e) {}
+        }
+        if (await isPortInUse(port)) {
+            return res.json({ success: false, errorType: 'port_in_use', port: port, message: `端口 ${port} 已被占用` });
+        }
 
         const instConf = instanceConfig.instances.find(i => i.id === instanceId);
         const rawJavaPath = instConf.javaPath || appConfig.javaPath;
@@ -3259,11 +3523,13 @@ if (cluster.isPrimary) {
                 if (join) {
                     instState.onlinePlayers.add(join[1]);
                     io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
+                    triggerWebhook('player_change', { instanceId, type: 'join', player: join[1], onlinePlayers: Array.from(instState.onlinePlayers) });
                 }
                 const leave = line.match(/:\s(\w+)\sleft the game/);
                 if (leave) {
                     instState.onlinePlayers.delete(leave[1]);
                     io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
+                    triggerWebhook('player_change', { instanceId, type: 'leave', player: leave[1], onlinePlayers: Array.from(instState.onlinePlayers) });
                 }
 
                 // Auto-detect Version
@@ -3304,23 +3570,150 @@ if (cluster.isPrimary) {
                 instState.process = null;
             });
 
-            instState.process.on('close', (code) => {
+            instState.process.on('close', async (code) => {
                 appendLog(instanceId, `[系统] --- 服务器已停止 (Code ${code}) ---\n`);
+                
+                // 异常关闭且非主动作业时执行崩溃原因诊断
+                if (code !== 0 && !instState.stopping) {
+                    const logsToAnalyze = instState.logHistory.slice(-50).join('\n');
+                    let diagnosed = false;
+
+                    // 1. OOM (Java Heap Space) 内存溢出
+                    if (/java\.lang\.OutOfMemoryError/i.test(logsToAnalyze) || 
+                        /Could not reserve enough space for object heap/i.test(logsToAnalyze) ||
+                        /Too small initial heap/i.test(logsToAnalyze) ||
+                        /JVM heap/i.test(logsToAnalyze)) {
+                        appendLog(instanceId, `[诊断] 🔴 服务器因内存溢出 (OOM) 崩溃！检测到 Java 堆内存耗尽，请前往“服务器设置”或实例配置适当调高最大分配内存 (如 -Xmx 参数)。\n`);
+                        diagnosed = true;
+                    }
+                    
+                    // 2. Linux 系统 OOM Killer 杀进程 (Exit Code 137 / SIGKILL)
+                    if (!diagnosed && code === 137) {
+                        appendLog(instanceId, `[诊断] 🔴 服务器进程被系统强制终止 (Code 137)！这通常是由于系统物理内存耗尽，触发了 Linux 系统的 OOM Killer。请检查物理主机可用内存，或适当调小本实例的最大内存限制 (-Xmx)。\n`);
+                        diagnosed = true;
+                    }
+
+                    // 3. Java 版本不匹配
+                    if (!diagnosed && (/UnsupportedClassVersionError/i.test(logsToAnalyze) || 
+                                       /has been compiled by a more recent version/i.test(logsToAnalyze) || 
+                                       /Java class version/i.test(logsToAnalyze) || 
+                                       /Unsupported Java/i.test(logsToAnalyze))) {
+                        appendLog(instanceId, `[诊断] 🔴 Java 版本不兼容！当前配置的 Java 路径版本不支持该版本的 Minecraft。请前往“Java 管理”安装或切换到更合适的 Java 版本 (例如：MC 1.20+ 建议使用 Java 17+)。\n`);
+                        diagnosed = true;
+                    }
+
+                    // 4. 端口已被占用
+                    if (!diagnosed && (/FAILED TO BIND TO PORT/i.test(logsToAnalyze) || 
+                                       /Address already in use/i.test(logsToAnalyze) || 
+                                       /port already in use/i.test(logsToAnalyze))) {
+                        appendLog(instanceId, `[诊断] 🔴 网络端口绑定失败！服务器设定的通讯端口已被系统中的其他程序占用。请前往实例启动设置或 server.properties 中修改端口，或者关闭其他冲突的实例/服务。\n`);
+                        diagnosed = true;
+                    }
+
+                    // 5. 未同意 EULA 协议
+                    if (!diagnosed && (/agree to the EULA/i.test(logsToAnalyze) || /Failed to load eula\.txt/i.test(logsToAnalyze))) {
+                        appendLog(instanceId, `[诊断] 🔴 服务器未同意 EULA 协议！请通过文件管理器编辑实例根目录下的 eula.txt 文件，将 eula=false 更改为 eula=true 以允许服务器正常启动。\n`);
+                        diagnosed = true;
+                    }
+
+                    // 6. Mod / 插件前置依赖缺失或冲突
+                    if (!diagnosed && (/DependencyResolutionException/i.test(logsToAnalyze) || 
+                                       /Missing or unsupported mandatory dependencies/i.test(logsToAnalyze) || 
+                                       /requires version/i.test(logsToAnalyze) || 
+                                       /depends on/i.test(logsToAnalyze))) {
+                        appendLog(instanceId, `[诊断] 🔴 检测到 Mod/插件依赖缺失或冲突！请仔细阅读上方的报错日志，确保下载了所有必需的前置 Mod，并删除版本冲突的插件。\n`);
+                        diagnosed = true;
+                    }
+
+                    // 7. 扫描最新崩溃日志文件 (crash-reports)
+                    if (!diagnosed) {
+                        try {
+                            const crashDir = path.join(instDir, 'crash-reports');
+                            if (fs.existsSync(crashDir)) {
+                                const files = await fs.readdir(crashDir);
+                                if (files.length > 0) {
+                                    const fileStats = await Promise.all(files.map(async f => {
+                                        const s = await fs.stat(path.join(crashDir, f));
+                                        return { name: f, mtime: s.mtimeMs };
+                                    }));
+                                    fileStats.sort((a, b) => b.mtime - a.mtime);
+                                    const newest = fileStats[0];
+                                    if (Date.now() - newest.mtime < 30000) {
+                                        appendLog(instanceId, `[诊断] 🔴 服务器发生异常崩溃！崩溃报告已生成：crash-reports/${newest.name}。您可以在文件管理器中查看该文件以获取详细异常堆栈。\n`);
+                                        diagnosed = true;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to scan crash-reports', e);
+                        }
+                    }
+
+                    if (!diagnosed) {
+                        appendLog(instanceId, `[诊断] ⚠️ 服务器异常退出 (Code ${code})，但未能匹配到特定崩溃特征。请仔细检查上方最新的报错日志信息进行排查。\n`);
+                    }
+                }
+
+                // Webhook event triggers on stop/crash
+                if (code !== 0 && !instState.stopping) {
+                    triggerWebhook('server_state_change', { instanceId, isRunning: false, state: 'crash', code });
+                } else {
+                    triggerWebhook('server_state_change', { instanceId, isRunning: false, state: 'stop', code });
+                }
+
                 io.emit(`status:${instanceId}`, { isRunning: false });
                 instState.onlinePlayers.clear();
                 io.emit(`players_update:${instanceId}`, []);
                 instState.process = null;
+                instState.stopping = false;
             });
 
             io.emit(`status:${instanceId}`, { isRunning: true });
+            triggerWebhook('server_state_change', { instanceId, isRunning: true, state: 'start' });
             res.json({ success: true });
         } catch (e) {
             appendLog(instanceId, `[错误] 启动异常: ${e.message}\n`);
             res.status(500).json({ error: e.message });
         }
     });
+
+    app.post('/api/server/reassign_port', requireAuth, withInstance, async (req, res) => {
+        const { instDir, instanceId } = req;
+        const propsFile = path.join(instDir, 'server.properties');
+        if (!fs.existsSync(propsFile)) {
+            return res.status(404).json({ error: 'server.properties 文件不存在' });
+        }
+        
+        try {
+            // Find a free port starting from 25565
+            let port = 25565;
+            while (await isPortInUse(port)) {
+                port++;
+            }
+            
+            // Read and update properties file
+            const content = await fs.readFile(propsFile, 'utf-8');
+            let result = content;
+            const regex = new RegExp(`^(server-port\\s*=\\s*)(.*)$`, 'm');
+            if (regex.test(result)) {
+                result = result.replace(regex, `$1${port}`);
+            } else {
+                result += `\nserver-port=${port}`;
+            }
+            await fs.writeFile(propsFile, result);
+            appendLog(instanceId, `[系统] 检测到端口冲突，已自动将端口重分配为: ${port}\n`);
+            
+            res.json({ success: true, port });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     app.post('/api/server/stop', requireAuth, withInstance, (req, res) => {
-        if (req.instState.process) req.instState.process.stdin.write('stop\n');
+        if (req.instState.process) {
+            req.instState.stopping = true;
+            req.instState.process.stdin.write('stop\n');
+        }
         res.json({ success: true });
     });
 
@@ -3328,9 +3721,11 @@ if (cluster.isPrimary) {
         const proc = req.instState.process;
         if (proc) {
             try {
+                req.instState.stopping = true;
                 proc.kill('SIGKILL');
                 appendLog(req.instanceId, '[系统] 服务器进程已被强制终止\n');
             } catch (e) {
+                req.instState.stopping = false;
                 return res.status(500).json({ error: '强制终止失败: ' + e.message });
             }
         }

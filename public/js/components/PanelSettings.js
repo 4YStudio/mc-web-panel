@@ -174,6 +174,23 @@ export default {
                             </button>
                         </div>
                     </div>
+            </div>
+
+            <!-- Webhook Settings Card -->
+            <div class="col-md-6">
+                <div class="card h-100 animate-in">
+                    <div class="card-header text-warning fw-bold py-2 py-md-3 px-3 px-md-4">
+                        <i class="fa-solid fa-link me-2"></i>{{ $t('panel_settings.webhook_settings') || '事件订阅 (Webhook)' }}
+                    </div>
+                    <div class="card-body p-3 p-md-4 d-flex flex-column">
+                        <div class="mb-3 flex-grow-1">
+                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.webhook_urls') || 'Webhook 接收端点 (每行一个)' }}</label>
+                            <textarea class="form-control font-monospace small" rows="5" v-model="webhookText" :placeholder="'http://example.com/webhook'"></textarea>
+                            <div class="form-text small opacity-75" style="font-size: 0.7rem;">
+                                {{ $t('panel_settings.webhook_desc') || '当服务器启动、停止、崩溃或有玩家进出游戏时，面板会向这些 URL 发送 POST 事件通知。' }}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -423,6 +440,7 @@ export default {
             consoleInfoPosition: 'top',
             jarName: '',
             javaArgs: [],
+            webhooks: [],
             secret: '',
             sessionTimeout: 7,
             maxLogHistory: 1000,
@@ -434,6 +452,7 @@ export default {
         });
 
         const javaArgsText = ref('');
+        const webhookText = ref('');
         const jars = ref([]);
         const instances = ref([]);
         const javaList = ref([]);
@@ -561,6 +580,7 @@ export default {
                 Object.assign(config, res.data);
                 accountForm.username = res.data.username || 'admin';
                 javaArgsText.value = (config.javaArgs || []).join('\n');
+                webhookText.value = (config.webhooks || []).join('\n');
 
                 if (res.data.appearance) {
                     appearance.sidebarOpacity = res.data.appearance.sidebarOpacity ?? 1;
@@ -590,6 +610,7 @@ export default {
             try {
                 saving.value = true;
                 config.javaArgs = javaArgsText.value.split('\n').map(s => s.trim()).filter(s => s);
+                config.webhooks = webhookText.value.split('\n').map(s => s.trim()).filter(s => s);
                 config.appearance = {
                     sidebarOpacity: appearance.sidebarOpacity,
                     contentOpacity: appearance.contentOpacity,
@@ -833,7 +854,7 @@ export default {
         });
 
         return {
-            store, loading, saving, testingAI, config, javaArgsText, jars,
+            store, loading, saving, testingAI, config, javaArgsText, webhookText, jars,
             saveConfig, testAI, reset2FA, disable2FA,
             updatingAccount, accountForm, updateAccount,
             appearance, activeAppearanceTab, appearanceTabs,

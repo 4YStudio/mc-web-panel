@@ -43,9 +43,9 @@ export const formatLog = (log) => {
         .replace(/(\/INFO\])/g, '/<span class="log-info">INFO</span>]')
         .replace(/(\/WARN\])/g, '/<span class="log-warn">WARN</span>]')
         .replace(/(\/ERROR\])/g, '/<span class="log-error">ERROR</span>]')
-        .replace(/(\[系统\])/g, `<span class="log-system">
-        [${t('dashboard.system')}]
-        </span>`);
+        .replace(/(\[系统\])/g, `<span class="log-system">[${t('dashboard.system')}]</span>`)
+        .replace(/(\[诊断\])/g, `<span class="log-diagnostic" style="color: #f43f5e; font-weight: bold; background: rgba(244, 63, 94, 0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(244, 63, 94, 0.25);">[诊断]</span>`)
+        .replace(/(\[Diagnostic\])/g, `<span class="log-diagnostic" style="color: #f43f5e; font-weight: bold; background: rgba(244, 63, 94, 0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(244, 63, 94, 0.25);">[Diagnostic]</span>`);
 };
 
 // Global Modal State
@@ -63,6 +63,10 @@ export const initModal = () => {
 };
 
 export const openModal = (opts) => {
+    if (opts.showAgainKey && localStorage.getItem(opts.showAgainKey) === 'true') {
+        if (opts.callback) opts.callback(opts.inputValue || '');
+        return;
+    }
     modalData.value = {
         title: opts.title || t('common.confirm'),
         message: opts.message || '',
@@ -71,7 +75,9 @@ export const openModal = (opts) => {
         suffix: opts.suffix || '',
         options: opts.options || [],
         placeholder: opts.placeholder || '',
-        callback: opts.callback
+        callback: opts.callback,
+        showAgainKey: opts.showAgainKey || '',
+        dontShowAgain: false
     };
     if (modalInstance) {
         const el = document.getElementById('confirmModal');
@@ -94,6 +100,9 @@ export const openModal = (opts) => {
 };
 
 export const confirmModalAction = () => {
+    if (modalData.value.showAgainKey && modalData.value.dontShowAgain) {
+        localStorage.setItem(modalData.value.showAgainKey, 'true');
+    }
     if (modalData.value.callback) modalData.value.callback(modalData.value.inputValue);
     if (modalInstance) modalInstance.hide();
 };

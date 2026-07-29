@@ -1347,6 +1347,7 @@ class PluginLoader {
                 permissions: m.permissions || [],
                 homepage: m.homepage || '',
                 license: m.license || '',
+                updateUrl: m.updateUrl || m.updateCheckUrl || '',
                 pluginDependencies: m.pluginDependencies || {}
             });
         }

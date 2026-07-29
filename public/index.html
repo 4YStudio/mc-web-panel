@@ -48,6 +48,12 @@
                         <select v-if="modalData.mode === 'select'" v-model="modalData.inputValue" class="form-select">
                             <option v-for="opt in modalData.options" :value="opt.value">{{ opt.label }}</option>
                         </select>
+                        <div v-if="modalData.showAgainKey" class="form-check mt-3 animate-in">
+                            <input class="form-check-input" type="checkbox" v-model="modalData.dontShowAgain" id="modalDontShowAgainCheck">
+                            <label class="form-check-input-label small text-muted ms-1 cursor-pointer" for="modalDontShowAgainCheck">
+                                {{ $t('common.dont_show_again') || '未来不再提示 / Don\'t show again' }}
+                            </label>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" data-bs-dismiss="modal">{{ $t('common.cancel') }}</button>

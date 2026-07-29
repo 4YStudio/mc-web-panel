@@ -1305,8 +1305,8 @@ export default {
             </div>
 
             <!-- System Stats Overview -->
-            <div v-if="store.consoleInfoPosition === 'top'" class="row g-3 mb-3 flex-shrink-0">
-                <div class="col-md-6 stagger-item">
+            <div v-if="store.consoleInfoPosition === 'top'" class="dashboard-grid mb-3 flex-shrink-0">
+                <div class="stagger-item">
                     <div class="stat-card h-100">
                         <div class="stat-card-header">
                             <div class="d-flex justify-content-between align-items-center">
@@ -1334,7 +1334,7 @@ export default {
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6 stagger-item" style="animation-delay: 0.1s;">
+                <div class="stagger-item" style="animation-delay: 0.1s;">
                      <div class="stat-card h-100">
                         <div class="stat-card-header">
                             <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
@@ -1443,6 +1443,10 @@ export default {
                                 <i class="fa-solid fa-circle-info me-1"></i>{{ $t('instance_manager.user_jvm_args_tip') }}
                             </div>
                             <textarea class="form-control font-monospace small" rows="5" v-model="form.javaArgs" :placeholder="$t('instance_manager.java_args_placeholder')"></textarea>
+                            <div v-if="store.stats && store.stats.mem && store.stats.mem.total > 0" class="form-text small mt-1 text-primary">
+                                <i class="fa-solid fa-lightbulb me-1"></i>
+                                {{ $t('instance_manager.java_args_recommend_tip', { total: store.stats.mem.total, recommend: Math.max(1, Math.floor(store.stats.mem.total * 0.75)) }) }}
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -1697,8 +1701,30 @@ export default {
 
         const serverAction = async (act) => {
             try {
-                await api.post(`/api/server/${act}`);
-                showToast('dashboard.toast_sent');
+                const res = await api.post(`/api/server/${act}`);
+                if (res.data && res.data.success === false) {
+                    if (res.data.errorType === 'port_in_use') {
+                        openModal({
+                            title: t('properties.port_conflict_title'),
+                            message: t('properties.port_conflict_msg', { port: res.data.port }),
+                            callback: async () => {
+                                try {
+                                    const reassignRes = await api.post('/api/server/reassign_port');
+                                    if (reassignRes.data.success) {
+                                        showToast(t('properties.port_reassign_success', { port: reassignRes.data.port }), 'success');
+                                        await api.post('/api/server/start');
+                                    }
+                                } catch (err) {
+                                    showToast(err.response?.data?.error || 'common.error', 'danger');
+                                }
+                            }
+                        });
+                    } else {
+                        showToast(res.data.message || 'common.error', 'danger');
+                    }
+                } else {
+                    showToast('dashboard.toast_sent');
+                }
             } catch (e) {
                 showToast('common.error', 'danger');
             }
@@ -1708,6 +1734,7 @@ export default {
             openModal({
                 title: t('dashboard.force_stop_confirm_title'),
                 message: t('dashboard.force_stop_confirm_msg'),
+                showAgainKey: 'skip_force_stop_confirm',
                 callback: async () => {
                     try {
                         await api.post('/api/server/force_stop');

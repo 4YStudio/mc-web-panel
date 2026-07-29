@@ -44,8 +44,15 @@ export default {
     setup(props) {
         const { player, size } = toRefs(props);
         const sourceType = ref(''); // '' | 'official' | 'littleskin'
+        const playerUuid = ref('');
         
-        const officialSrc = computed(() => `https://minotar.net/helm/${player.value}/${size.value}`);
+        const officialSrc = computed(() => {
+            if (playerUuid.value) {
+                return `https://crafatar.com/renders/head/${playerUuid.value}?size=${size.value}&overlay`;
+            }
+            return `https://minotar.net/cube/${player.value}/${size.value}`;
+        });
+        
         const littleSkinSrc = computed(() => `https://littleskin.cn/skin/${player.value}.png`);
 
         // --- CSS 裁剪核心算法 ---
@@ -73,7 +80,9 @@ export default {
         // --- 来源检测 ---
         const checkSource = async (name) => {
             if (skinSourceCache.has(name)) {
-                sourceType.value = skinSourceCache.get(name);
+                const cached = skinSourceCache.get(name);
+                sourceType.value = cached.type;
+                playerUuid.value = cached.uuid || '';
                 return;
             }
 
@@ -83,23 +92,25 @@ export default {
                 const data = await res.json();
 
                 if (data.success && data.code === 'player.found') {
-                    skinSourceCache.set(name, 'official');
+                    const uuid = data.data.player.raw_id || data.data.player.id;
+                    skinSourceCache.set(name, { type: 'official', uuid });
+                    playerUuid.value = uuid;
                     sourceType.value = 'official';
                 } else {
                     // 2. 不是正版 -> 判定为 LittleSkin
-                    // 即使 LittleSkin 也没有这个皮肤，显示的也是透明或错位图，比显示 loading 好
-                    skinSourceCache.set(name, 'littleskin');
+                    skinSourceCache.set(name, { type: 'littleskin', uuid: '' });
                     sourceType.value = 'littleskin';
                 }
             } catch (e) {
                 // 网络错误默认回退到 LittleSkin
-                skinSourceCache.set(name, 'littleskin');
+                skinSourceCache.set(name, { type: 'littleskin', uuid: '' });
                 sourceType.value = 'littleskin';
             }
         };
 
         watch(player, (val) => {
             sourceType.value = '';
+            playerUuid.value = '';
             if (val) checkSource(val);
         }, { immediate: true });
 

@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import { api } from '../api.js';
-import { showToast, t } from '../utils.js';
+import { showToast, t, openModal } from '../utils.js';
 import { socket } from '../socket.js';
 import { ref, reactive, computed, onMounted, onUnmounted } from '/js/vue.esm-browser.js';
 
@@ -126,7 +126,17 @@ export default {
 
         <div class="row g-3 g-md-4 transition-container">
             <div v-for="(inst, idx) in filteredInstances" :key="inst.id" class="col-md-6 col-lg-4 col-xl-3 animate-in" :style="{'animation-delay': (idx * 0.05) + 's'}">
-                <div class="card h-100 instance-card" :class="{'instance-card-active': store.currentInstanceId === inst.id}">
+                <div class="card h-100 instance-card position-relative" :class="{'instance-card-active': store.currentInstanceId === inst.id}">
+                    <!-- Mini Quick Control Overlay -->
+                    <div class="quick-control-overlay position-absolute" style="top: 16px; right: 16px; opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 10;">
+                        <button v-if="!inst.isRunning" @click.stop="quickAction(inst, 'start')" class="btn btn-sm btn-success rounded-circle shadow" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--c-surface);">
+                            <i class="fa-solid fa-play" style="font-size: 0.75rem;"></i>
+                        </button>
+                        <button v-else @click.stop="quickAction(inst, 'stop')" class="btn btn-sm btn-danger rounded-circle shadow" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--c-surface);">
+                            <i class="fa-solid fa-stop" style="font-size: 0.75rem;"></i>
+                        </button>
+                    </div>
+
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div class="d-flex align-items-center">
@@ -208,6 +218,19 @@ export default {
                             <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.name_label') }}</label>
                             <input type="text" class="form-control" v-model="form.name" :placeholder="$t('instance_manager.name_placeholder')">
                         </div>
+                        <div v-if="!isEditing" class="mb-3">
+                            <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.preset_label') || '一键傻瓜预设 / Quick Preset' }}</label>
+                            <select class="form-select" v-model="form.preset">
+                                <option value="">{{ $t('instance_manager.preset_none') || '自定义核心 (不使用预设) / Custom Core' }}</option>
+                                <option value="vanilla-1.20.4">Paper (1.20.4) 极简生存预设 (推荐 / Java 17)</option>
+                                <option value="fabric-1.20.1">Fabric (1.20.1) 模组生存预设 (Java 17)</option>
+                                <option value="paper-1.12.2">Paper (1.12.2) 经典旧版联机预设 (Java 8)</option>
+                            </select>
+                            <div class="form-text small text-primary mt-1" v-if="form.preset">
+                                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>
+                                {{ $t('instance_manager.preset_help') || '面板将在后台自动为您下载核心并同意 EULA 协议，创建后直接点【启动】即可。' }}
+                            </div>
+                        </div>
                         <div v-if="isEditing" class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('properties.loader_type') }}</label>
                             <div class="form-control-plaintext small fw-bold">
@@ -237,7 +260,7 @@ export default {
         // const { t } = VueI18n.useI18n(); // global mixin used in template, maybe not needed here if not used in script? 
         // usage in script: t is used in showToast. imported from utils.
         const form = ref({
-            id: '', name: '', jarName: '', javaArgs: '', javaPath: ''
+            id: '', name: '', jarName: '', javaArgs: '', javaPath: '', preset: ''
         });
         const isEditing = ref(false);
         const modal = ref(null);
@@ -274,7 +297,7 @@ export default {
         const showCreateModal = () => {
             isEditing.value = false;
             form.value = {
-                id: '', name: '', jarName: '', javaArgs: '', javaPath: ''
+                id: '', name: '', jarName: '', javaArgs: '', javaPath: '', preset: ''
             };
             modal.value.show();
         };
@@ -315,15 +338,22 @@ export default {
         };
 
         const deleteInstance = async (inst) => {
-            const msg = store.lang === 'zh' ? `确定要删除实例 "${inst.name}" 吗？此操作不可撤销。` : `Are you sure you want to delete "${inst.name}"? This cannot be undone.`;
-            if (!confirm(msg)) return;
-            try {
-                await api.post('/api/instances/delete', { id: inst.id });
-                showToast(t('instance_manager.delete_success'));
-                fetchInstances();
-            } catch (e) {
-                showToast(e.response?.data?.error || t('common.error'));
-            }
+            const title = t('instance_manager.delete_btn');
+            const message = store.lang === 'zh' ? `确定要删除实例 "${inst.name}" 吗？此操作不可撤销。` : `Are you sure you want to delete "${inst.name}"? This cannot be undone.`;
+            openModal({
+                title,
+                message,
+                showAgainKey: 'skip_delete_instance_confirm',
+                callback: async () => {
+                    try {
+                        await api.post('/api/instances/delete', { id: inst.id });
+                        showToast(t('instance_manager.delete_success'));
+                        fetchInstances();
+                    } catch (e) {
+                        showToast(e.response?.data?.error || t('common.error'));
+                    }
+                }
+            });
         };
 
         const enterInstance = async (inst) => {
@@ -405,9 +435,32 @@ export default {
         const quickAction = async (inst, act) => {
             try {
                 await api.post('/api/instances/select', { id: inst.id });
-                await api.post(`/api/server/${act}`);
-                showToast(t('instance_manager.action_sent', { name: inst.name, action: act }));
-                setTimeout(fetchInstances, 1000);
+                const res = await api.post(`/api/server/${act}`);
+                if (res.data && res.data.success === false) {
+                    if (res.data.errorType === 'port_in_use') {
+                        openModal({
+                            title: t('properties.port_conflict_title'),
+                            message: t('properties.port_conflict_msg', { port: res.data.port }),
+                            callback: async () => {
+                                try {
+                                    const reassignRes = await api.post('/api/server/reassign_port');
+                                    if (reassignRes.data.success) {
+                                        showToast(t('properties.port_reassign_success', { port: reassignRes.data.port }), 'success');
+                                        await api.post('/api/server/start');
+                                        setTimeout(fetchInstances, 1000);
+                                    }
+                                } catch (err) {
+                                    showToast(err.response?.data?.error || 'common.error', 'danger');
+                                }
+                            }
+                        });
+                    } else {
+                        showToast(res.data.message || 'common.error', 'danger');
+                    }
+                } else {
+                    showToast(t('instance_manager.action_sent', { name: inst.name, action: act }));
+                    setTimeout(fetchInstances, 1000);
+                }
             } catch (e) {
                 showToast(e.response?.data?.error || t('common.error'), 'danger');
             }

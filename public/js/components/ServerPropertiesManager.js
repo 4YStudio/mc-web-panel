@@ -3,6 +3,50 @@ import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal } from '../utils.js';
 
+const resizeImageTo64x64Png = (file) => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // Center crop logic
+            let srcX = 0;
+            let srcY = 0;
+            let srcWidth = img.width;
+            let srcHeight = img.height;
+            
+            if (img.width > img.height) {
+                srcWidth = img.height;
+                srcX = (img.width - img.height) / 2;
+            } else if (img.height > img.width) {
+                srcHeight = img.width;
+                srcY = (img.height - img.width) / 2;
+            }
+            
+            ctx.clearRect(0, 0, 64, 64);
+            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, 64, 64);
+            
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Canvas toBlob failed'));
+            }, 'image/png');
+        };
+        
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Failed to load image'));
+        };
+        
+        img.src = objectUrl;
+    });
+};
+
 export default {
     template: `
     <div>
@@ -56,10 +100,16 @@ export default {
             </div>
 
             <div v-if="editMode === 'gui'" class="pb-4">
-                <div class="mb-3">
-                    <div class="input-group input-group-sm">
+                <div class="mb-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div class="input-group input-group-sm flex-grow-1" style="min-width: 200px;">
                         <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
                         <input type="text" class="form-control border-start-0" :placeholder="$t('properties.filter')" v-model="filterText">
+                    </div>
+                    <div class="form-check form-switch m-0 flex-shrink-0 d-flex align-items-center gap-2">
+                        <input class="form-check-input" type="checkbox" id="advancedPropToggle" v-model="showAdvancedProperties" style="cursor: pointer;">
+                        <label class="form-check-label small fw-bold text-muted" for="advancedPropToggle" style="cursor: pointer; user-select: none;">
+                            {{ $t('properties.show_advanced') || '显示高级参数 (Show Advanced)' }}
+                        </label>
                     </div>
                 </div>
 
@@ -287,12 +337,24 @@ export default {
             return manualLabels[lang]?.[key] ?? key;
         };
 
+        const showAdvancedProperties = ref(false);
+        const BASIC_KEYS = new Set([
+            'server-port', 'difficulty', 'gamemode', 'motd', 'max-players',
+            'pvp', 'level-name', 'online-mode', 'white-list', 'view-distance',
+            'simulation-distance', 'hardcore', 'force-gamemode', 'allow-flight'
+        ]);
+
         const visibleGroups = computed(() => {
             const filter = filterText.value.toLowerCase().trim();
             const groups = [];
 
+            const isBasic = (key) => {
+                if (showAdvancedProperties.value) return true;
+                return BASIC_KEYS.has(key);
+            };
+
             for (const group of rawGroups.value) {
-                const items = rawProperties.value.filter(p => group.keys.includes(p.key));
+                const items = rawProperties.value.filter(p => group.keys.includes(p.key) && isBasic(p.key));
                 const filtered = filter
                     ? items.filter(p => p.key.toLowerCase().includes(filter) || String(p.value).toLowerCase().includes(filter))
                     : items;
@@ -301,7 +363,7 @@ export default {
                 }
             }
 
-            const ungrouped = rawProperties.value.filter(p => !p.grouped);
+            const ungrouped = rawProperties.value.filter(p => !p.grouped && isBasic(p.key));
             const filteredUngrouped = filter
                 ? ungrouped.filter(p => p.key.toLowerCase().includes(filter) || String(p.value).toLowerCase().includes(filter))
                 : ungrouped;
@@ -391,14 +453,19 @@ export default {
         const uploadIcon = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const fd = new FormData();
-            fd.append('icon', file);
             try {
+                const resizedBlob = await resizeImageTo64x64Png(file);
+                const fd = new FormData();
+                fd.append('icon', resizedBlob, 'server-icon.png');
+                
                 await api.post('/api/server/icon', fd);
-                showToast($t('common.success'));
+                showToast($t('properties.icon_auto_converted'), 'success');
                 store.serverIconVersion = Date.now();
                 e.target.value = '';
-            } catch (err) { showToast('common.error', 'danger'); }
+            } catch (err) {
+                console.error(err);
+                showToast('common.error', 'danger');
+            }
         };
 
         const deleteIcon = async () => {
@@ -532,7 +599,7 @@ export default {
             loadingMcVersions, loadingLoaderVersions, fabricChanging, fabricModalVisible,
             modalLoaderType, modalLoaderTypes, selectModalLoaderType,
             openFabricModal, closeFabricModal, fetchLoaderVersions, changeLoaderVersion, store,
-            filterText, visibleGroups, getLabel, saving
+            filterText, visibleGroups, getLabel, saving, showAdvancedProperties
         };
     }
 };
