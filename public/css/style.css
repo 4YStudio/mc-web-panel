@@ -5,38 +5,38 @@
 
     --bs-body-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-    --c-bg-base: #f4f9f4;
-    --c-bg-base-rgb: 244, 249, 244;
+    --c-bg-base: #f8fafc;
+    --c-bg-base-rgb: 248, 250, 252;
     --c-surface: #ffffff;
     --c-surface-rgb: 255, 255, 255;
     --c-surface-elevated: #ffffff;
-    --c-border: #d8ead8;
-    --c-border-subtle: #e6f2e6;
-    --c-text-primary: #1b2e1b;
-    --c-text-secondary: #5c7a5c;
-    --c-text-tertiary: #8faa8f;
+    --c-border: #e2e8f0;
+    --c-border-subtle: #f1f5f9;
+    --c-text-primary: #0f172a;
+    --c-text-secondary: #475569;
+    --c-text-tertiary: #94a3b8;
 
-    --c-primary: #4caf50;
-    --c-primary-light: #66bb6a;
-    --c-primary-dark: #388e3c;
-    --c-primary-hover: #43a047;
-    --c-primary-rgb: 76, 175, 80;
-    --c-primary-glow: rgba(76, 175, 80, 0.12);
-    --c-primary-subtle: rgba(76, 175, 80, 0.06);
+    --c-primary: #4d8ef7;
+    --c-primary-light: #6ba3f9;
+    --c-primary-dark: #3a6fd4;
+    --c-primary-hover: #3b82f6;
+    --c-primary-rgb: 77, 142, 247;
+    --c-primary-glow: rgba(77, 142, 247, 0.12);
+    --c-primary-subtle: rgba(77, 142, 247, 0.05);
 
-    --c-accent: #26a69a;
-    --c-accent-rgb: 38, 166, 154;
+    --c-accent: #38bdf8;
+    --c-accent-rgb: 56, 189, 248;
 
-    --glass-bg: rgba(255, 255, 255, 0.65);
-    --glass-border: rgba(255, 255, 255, 0.4);
-    --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.6);
+    --glass-shadow: 0 8px 32px rgba(31, 41, 55, 0.04);
 
-    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.02), 0 4px 16px rgba(76, 175, 80, 0.03);
-    --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(76, 175, 80, 0.06);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 16px rgba(77, 142, 247, 0.02);
+    --card-shadow-hover: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 16px -6px rgba(77, 142, 247, 0.04);
     --card-radius: 16px;
 
-    --sidebar-bg: rgba(255, 255, 255, 0.55);
-    --sidebar-border: rgba(76, 175, 80, 0.06);
+    --sidebar-bg: rgba(255, 255, 255, 0.6);
+    --sidebar-border: rgba(77, 142, 247, 0.04);
     --sidebar-width: 260px;
 
     --input-radius: 12px;
@@ -54,7 +54,7 @@
     --app-instance-opacity: 1;
     --app-bg-image: none;
 
-    --focus-ring: 0 0 0 3px rgba(var(--c-primary-rgb), 0.12);
+    --focus-ring: 0 0 0 3px rgba(var(--c-primary-rgb), 0.15);
 }
 
 [data-bs-theme="dark"] {
@@ -123,8 +123,8 @@ body {
 
 :root body {
     background:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(76, 175, 80, 0.06), transparent),
-        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(38, 166, 154, 0.04), transparent),
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(77, 142, 247, 0.06), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(56, 189, 248, 0.04), transparent),
         var(--c-bg-base);
 }
 
@@ -1355,11 +1355,13 @@ h3 { font-size: 1.25rem; }
     border-radius: var(--card-radius);
     box-shadow: var(--card-shadow);
     overflow: hidden;
-    transition: transform var(--transition-base), box-shadow var(--transition-base);
+    transition: transform var(--transition-elegant), box-shadow var(--transition-elegant), border-color var(--transition-elegant);
 }
 
 .stat-card:hover {
+    transform: translateY(-4px) scale(1.01);
     box-shadow: var(--card-shadow-hover);
+    border-color: rgba(var(--c-primary-rgb), 0.2);
 }
 
 .stat-card-header {
@@ -2575,16 +2577,24 @@ h3 { font-size: 1.25rem; }
 
 /* 侧边栏项悬停动画 */
 .sidebar-item {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border-left: 4px solid transparent;
+    padding-left: 1.25rem !important;
 }
 
 .sidebar-item:hover {
-    background: rgba(var(--c-primary-rgb), 0.08);
+    background: rgba(var(--c-primary-rgb), 0.06);
+    padding-left: 1.5rem !important;
 }
 
 .sidebar-item.active {
-    background: rgba(var(--c-primary-rgb), 0.1);
+    background: rgba(var(--c-primary-rgb), 0.08);
+    color: var(--c-primary) !important;
     font-weight: 600;
+    border-left-color: var(--c-primary);
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    padding-left: 1.25rem !important;
 }
 
 .sidebar-drag-item {
@@ -2872,10 +2882,52 @@ h3 { font-size: 1.25rem; }
     gap: 1rem;
 }
 
-/* Quick Control Hover Overlay */
-.instance-card:hover .quick-control-overlay {
-    opacity: 1 !important;
-    transform: scale(1.05);
+/* Card Hover Swap Animation */
+.card-hover-swap-container {
+    position: relative;
+    height: 38px;
+    overflow: hidden;
+}
+
+/* 避免滑动容器内的按钮因为 hover 浮起/阴影导致 overflow 裁剪显示不全 */
+.card-hover-swap-container .btn:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.card-info-view {
+    position: absolute;
+    width: 100%;
+    top: 0;
+    left: 0;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.card-action-view {
+    position: absolute;
+    width: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    pointer-events: none;
+}
+
+.instance-card:hover .card-info-view,
+.plugin-card:hover .card-info-view {
+    opacity: 0;
+    transform: translateY(-20px);
+    pointer-events: none;
+}
+
+.instance-card:hover .card-action-view,
+.plugin-card:hover .card-action-view {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 /* Breathing indicator effect */
@@ -2908,32 +2960,45 @@ h3 { font-size: 1.25rem; }
 }
 
 /* Card Floating Transitions */
-.card, .stat-card, .instance-card {
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.4s ease, border-color 0.4s ease !important;
+.card, .stat-card, .instance-card, .player-card {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s ease, border-color 0.4s ease !important;
 }
 
-.card:hover, .stat-card:hover, .instance-card:hover {
+.card:hover, .stat-card:hover, .instance-card:hover, .player-card:hover {
     transform: translateY(-4px) !important;
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(var(--c-primary-rgb), 0.04) !important;
+    border-color: rgba(var(--c-primary-rgb), 0.25) !important;
+}
+
+/* Player Card Specific Button Transitions */
+.player-card button {
+    opacity: 0.5;
+    transform: scale(0.9);
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.player-card:hover button {
+    opacity: 1;
+    transform: scale(1);
 }
 
 /* Button Hover Transitions */
 .btn {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 .btn:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(var(--c-primary-rgb), 0.15) !important;
+    transform: translateY(-1.5px) !important;
+    box-shadow: 0 4px 12px rgba(var(--c-primary-rgb), 0.16) !important;
 }
 .btn:active {
-    transform: translateY(1px) !important;
+    transform: translateY(0.5px) scale(0.98) !important;
 }
 
 /* Log Smooth Fade-In */
 .console-output div {
-    animation: logFadeIn 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    animation: logFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
 }
 
 @keyframes logFadeIn {
@@ -2941,4 +3006,34 @@ h3 { font-size: 1.25rem; }
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* 面板设置界面的左侧栏背景色与按钮交互优化 */
+.settings-sidebar {
+    background-color: var(--c-border-subtle) !important;
+    transition: background-color var(--transition-base);
+}
+
+[data-bs-theme="dark"] .settings-sidebar {
+    background-color: rgba(0, 0, 0, 0.16) !important;
+}
+
+.settings-tab-btn {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    color: var(--c-text-secondary) !important;
+    background: transparent !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.settings-tab-btn:hover {
+    color: var(--c-text-primary) !important;
+    background: rgba(var(--c-primary-rgb), 0.08) !important;
+}
+
+.settings-tab-btn.active {
+    color: #fff !important;
+    background-color: var(--c-primary) !important;
+    box-shadow: 0 4px 12px rgba(var(--c-primary-rgb), 0.2) !important;
 }

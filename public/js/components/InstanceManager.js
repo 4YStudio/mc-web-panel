@@ -127,17 +127,7 @@ export default {
         <div class="row g-3 g-md-4 transition-container">
             <div v-for="(inst, idx) in filteredInstances" :key="inst.id" class="col-md-6 col-lg-4 col-xl-3 animate-in" :style="{'animation-delay': (idx * 0.05) + 's'}">
                 <div class="card h-100 instance-card position-relative" :class="{'instance-card-active': store.currentInstanceId === inst.id}">
-                    <!-- Mini Quick Control Overlay -->
-                    <div class="quick-control-overlay position-absolute" style="top: 16px; right: 16px; opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 10;">
-                        <button v-if="!inst.isRunning" @click.stop="quickAction(inst, 'start')" class="btn btn-sm btn-success rounded-circle shadow" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--c-surface);">
-                            <i class="fa-solid fa-play" style="font-size: 0.75rem;"></i>
-                        </button>
-                        <button v-else @click.stop="quickAction(inst, 'stop')" class="btn btn-sm btn-danger rounded-circle shadow" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--c-surface);">
-                            <i class="fa-solid fa-stop" style="font-size: 0.75rem;"></i>
-                        </button>
-                    </div>
-
-                    <div class="card-body p-4">
+                    <div class="card-body p-4 d-flex flex-column h-100">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div class="d-flex align-items-center">
                                 <div class="me-3 position-relative" style="width: 44px; height: 44px;">
@@ -175,23 +165,46 @@ export default {
                             </div>
                         </div>
 
-                            <div class="btn-group w-100 mt-auto instance-card-btn-group">
-                                <button @click.stop="enterInstance(inst)" class="btn btn-primary px-3" :title="$t('instance_manager.select_btn')">
-                                    <i class="fa-solid fa-arrow-right"></i>
-                                </button>
-                                <button v-if="!inst.isRunning" @click.stop="quickAction(inst, 'start')" class="btn btn-success px-3" :title="$t('dashboard.start')">
-                                    <i class="fa-solid fa-play"></i>
-                                </button>
-                                <button v-else @click.stop="quickAction(inst, 'stop')" class="btn btn-danger px-3" :title="$t('dashboard.stop')">
-                                    <i class="fa-solid fa-stop"></i>
-                                </button>
-                                <button @click.stop="openSettings(inst)" class="btn btn-outline-secondary px-3" :title="$t('instance_manager.settings_btn')">
-                                    <i class="fa-solid fa-gear"></i>
-                                </button>
-                                <button @click.stop="deleteInstance(inst)" class="btn btn-outline-danger px-3" :title="$t('instance_manager.delete_btn')">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
+                        <!-- Hover Swap Container -->
+                        <div class="card-hover-swap-container mt-auto position-relative" style="height: 38px;">
+                            <!-- Info Panel (visible when NOT hovered) -->
+                            <div class="card-info-view w-100 h-100 d-flex align-items-center">
+                                <div class="d-flex flex-wrap gap-2">
+                                    <span class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">
+                                        <i class="fa-solid fa-cube text-primary me-1"></i>
+                                        {{ formatLoader(inst.loaderType) }}
+                                    </span>
+                                    <span class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">
+                                        <i class="fa-brands fa-java text-warning me-1"></i>
+                                        {{ getJavaLabel(inst.javaPath) }}
+                                    </span>
+                                    <span v-if="inst.port" class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">
+                                        <i class="fa-solid fa-network-wired text-info me-1"></i>
+                                        {{ inst.port }}
+                                    </span>
+                                </div>
                             </div>
+                            <!-- Buttons Panel (visible when hovered) -->
+                            <div class="card-action-view w-100 h-100">
+                                <div class="btn-group w-100 instance-card-btn-group">
+                                    <button @click.stop="enterInstance(inst)" class="btn btn-primary px-3" :title="$t('instance_manager.select_btn')">
+                                        <i class="fa-solid fa-arrow-right"></i>
+                                    </button>
+                                    <button v-if="!inst.isRunning" @click.stop="quickAction(inst, 'start')" class="btn btn-success px-3" :title="$t('dashboard.start')">
+                                        <i class="fa-solid fa-play"></i>
+                                    </button>
+                                    <button v-else @click.stop="quickAction(inst, 'stop')" class="btn btn-danger px-3" :title="$t('dashboard.stop')">
+                                        <i class="fa-solid fa-stop"></i>
+                                    </button>
+                                    <button @click.stop="openSettings(inst)" class="btn btn-outline-secondary px-3" :title="$t('instance_manager.settings_btn')">
+                                        <i class="fa-solid fa-gear"></i>
+                                    </button>
+                                    <button @click.stop="deleteInstance(inst)" class="btn btn-outline-danger px-3" :title="$t('instance_manager.delete_btn')">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -397,6 +410,27 @@ export default {
             location.reload();
         };
 
+        const formatLoader = (type) => {
+            if (!type) return 'Vanilla';
+            if (type === 'vanilla') return 'Vanilla';
+            if (type === 'fabric') return 'Fabric';
+            if (type === 'forge') return 'Forge';
+            if (type === 'neoforge') return 'NeoForge';
+            return type.charAt(0).toUpperCase() + type.slice(1);
+        };
+
+        const getJavaLabel = (javaPath) => {
+            if (!javaPath) return 'System Java';
+            const installations = store.javaInstallations || [];
+            const found = installations.find(j => j.path === javaPath);
+            if (found) return found.version;
+            const normalized = javaPath.toLowerCase();
+            if (normalized.includes('1.8') || normalized.includes('java-8') || normalized.includes('jre8') || normalized.includes('jdk8')) return 'Java 8';
+            if (normalized.includes('17') || normalized.includes('java-17') || normalized.includes('jdk-17')) return 'Java 17';
+            if (normalized.includes('21') || normalized.includes('java-21') || normalized.includes('jdk-21')) return 'Java 21';
+            return 'Java';
+        };
+
         const selectPlugin = (item) => {
             showPluginMenu.value = false;
             if (item.view) {
@@ -473,7 +507,7 @@ export default {
             filteredInstances, toggleTheme, toggleLang, logout,
             showMobileMenu, showPluginMenu, togglePluginMenu, pluginDropdown,
             pluginMenuRight, pluginMenuTop, selectPlugin,
-            serverIconUrl, onNavIconError
+            serverIconUrl, onNavIconError, getJavaLabel, formatLoader
         };
     }
 };

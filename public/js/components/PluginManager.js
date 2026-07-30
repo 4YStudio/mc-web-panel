@@ -39,7 +39,7 @@ export default {
                     <template v-for="(plugin, idx) in plugins" :key="plugin.id">
                         <div v-if="plugin" class="col-md-6 col-lg-4 stagger-item" :style="{'animation-delay': (idx * 0.05) + 's'}">
                             <div class="card h-100 plugin-card border-secondary shadow-sm" style="border-radius: 16px; transition: all 0.3s ease; background-color: var(--c-surface) !important;">
-                                <div class="card-body p-3 p-md-4">
+                                <div class="card-body p-3 p-md-4 d-flex flex-column h-100">
                                     <div class="d-flex align-items-start justify-content-between mb-3">
                                         <div class="d-flex align-items-center gap-3">
                                             <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -77,30 +77,40 @@ export default {
                                         </div>
                                     </div>
 
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="status-indicator" :class="plugin.error ? 'bg-danger' : (plugin.enabled && plugin.loaded ? 'bg-success' : 'bg-secondary')" style="width: 6px; height: 6px;"></span>
-                                            <span class="small" :class="plugin.error ? 'text-danger' : (plugin.enabled && plugin.loaded ? 'text-success' : 'text-muted')">
-                                                {{ plugin.error ? $t('plugins.error') : (plugin.enabled && plugin.loaded ? $t('plugins.running') : $t('plugins.stopped')) }}
-                                            </span>
-                                        </div>
-                                        <div class="d-flex gap-2 align-items-center">
-                                            <button v-if="plugin.updateUrl" class="btn btn-sm btn-outline-warning px-2 py-0" @click="checkPluginUpdate(plugin)" :disabled="checkingUpdate === plugin.id" style="font-size: 0.72rem; border-radius: 8px;" :title="'检查更新 (Check Updates)'">
-                                                <i class="fa-solid" :class="checkingUpdate === plugin.id ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'"></i>
-                                            </button>
-                                            <button v-if="pluginSettingsMap[plugin.id]" class="btn btn-sm btn-outline-info px-2 py-0" @click="openSettingsModal(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('plugins.settings') || 'Settings'">
-                                                <i class="fa-solid fa-gear"></i>
-                                            </button>
-                                            <div class="form-check form-switch m-0 me-1">
-                                                <input class="form-check-input" type="checkbox" :checked="plugin.enabled"
-                                                    @change="togglePlugin(plugin)" :disabled="toggling === plugin.id">
+                                    <!-- Hover Swap Container -->
+                                    <div class="card-hover-swap-container position-relative mt-auto pt-2" style="height: 38px;">
+                                        <!-- Info Panel (visible when NOT hovered) -->
+                                        <div class="card-info-view w-100 h-100 d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="status-indicator" :class="plugin.error ? 'bg-danger' : (plugin.enabled && plugin.loaded ? 'bg-success' : 'bg-secondary')" style="width: 6px; height: 6px;"></span>
+                                                <span class="small" :class="plugin.error ? 'text-danger' : (plugin.enabled && plugin.loaded ? 'text-success' : 'text-muted')">
+                                                    {{ plugin.error ? $t('plugins.error') : (plugin.enabled && plugin.loaded ? $t('plugins.running') : $t('plugins.stopped')) }}
+                                                </span>
                                             </div>
-                                            <button class="btn btn-sm btn-outline-secondary px-2 py-0" @click="exportPlugin(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.export')">
-                                                <i class="fa-solid fa-download"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger px-2 py-0" @click="askUninstall(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.delete')">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
+                                            <div class="small text-muted font-monospace" style="font-size: 0.65rem;">
+                                                {{ plugin.homepage ? '已关联主页 / Web' : '本地插件 / Local' }}
+                                            </div>
+                                        </div>
+                                        <!-- Buttons Panel (visible when hovered) -->
+                                        <div class="card-action-view w-100 h-100 d-flex align-items-center justify-content-end">
+                                            <div class="d-flex gap-2 align-items-center">
+                                                <button v-if="plugin.updateUrl" class="btn btn-sm btn-outline-warning px-2 py-0" @click="checkPluginUpdate(plugin)" :disabled="checkingUpdate === plugin.id" style="font-size: 0.72rem; border-radius: 8px;" :title="'检查更新 (Check Updates)'">
+                                                    <i class="fa-solid" :class="checkingUpdate === plugin.id ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'"></i>
+                                                </button>
+                                                <button v-if="pluginSettingsMap[plugin.id]" class="btn btn-sm btn-outline-info px-2 py-0" @click="openSettingsModal(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('plugins.settings') || 'Settings'">
+                                                    <i class="fa-solid fa-gear"></i>
+                                                </button>
+                                                <div class="form-check form-switch m-0 me-1">
+                                                    <input class="form-check-input" type="checkbox" :checked="plugin.enabled"
+                                                        @change="togglePlugin(plugin)" :disabled="toggling === plugin.id">
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-secondary px-2 py-0" @click="exportPlugin(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.export')">
+                                                    <i class="fa-solid fa-download"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger px-2 py-0" @click="askUninstall(plugin)" style="font-size: 0.72rem; border-radius: 8px;" :title="$t('common.delete')">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
