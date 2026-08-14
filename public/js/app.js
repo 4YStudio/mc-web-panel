@@ -70,6 +70,9 @@ const app = createApp({
                 store.auth.isSetup = !!data.has2FA;
                 store.isSetup = !!data.isSetup;
                 store.auth.loggedIn = !!data.authenticated;
+                store.auth.username = data.username || '';
+                store.auth.isSubAccount = !!data.isSubAccount;
+                store.auth.permissions = data.permissions || [];
                 if (!data.initialized) {
                     const qr = await api.get('/api/auth/qr');
                     store.auth.qrCode = qr.data.qr;
@@ -356,6 +359,28 @@ const app = createApp({
         watch(() => store.view, (newView, oldView) => {
             if (newView !== oldView && oldView) {
                 store.prevView = oldView;
+            }
+
+            if (store.auth.loggedIn && store.auth.isSubAccount) {
+                const VIEW_PERMISSIONS = {
+                    'properties': 'instance.properties',
+                    'mods': 'instance.mods',
+                    'files': 'instance.files',
+                    'players': 'instance.players',
+                    'panel-settings': 'panel.settings'
+                };
+                let requiredPerm = VIEW_PERMISSIONS[newView];
+
+                const isPlugin = store.pluginSidebarItems.find(item => item.view === newView);
+                if (isPlugin) {
+                    if (isPlugin.id.includes('backup')) requiredPerm = 'instance.backups';
+                    else if (isPlugin.id.includes('modrinth')) requiredPerm = 'instance.mods';
+                    else requiredPerm = 'panel.plugins';
+                }
+
+                if (requiredPerm && !(store.auth.permissions || []).includes(requiredPerm)) {
+                    store.view = 'dashboard';
+                }
             }
         });
 

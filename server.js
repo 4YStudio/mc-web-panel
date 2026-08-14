@@ -268,8 +268,20 @@ const INSTANCES_DIR = path.join(BASE_DIR, 'instances');
 const GLOBAL_BACKUP_DIR = path.join(BASE_DIR, 'backups', 'global');
 const INSTANCES_FILE = path.join(DATA_DIR, 'instances.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const PLUGINS_DIR = path.join(BASE_DIR, 'plugins');
+
+const loadUsers = () => {
+    try {
+        if (fs.existsSync(USERS_FILE)) return fs.readJsonSync(USERS_FILE);
+    } catch (e) { }
+    return [];
+};
+
+const saveUsers = (users) => {
+    fs.writeJsonSync(USERS_FILE, users, { spaces: 2 });
+};
 
 // --- 多实例迁移与初始化 ---
 fs.ensureDirSync(DATA_DIR);
@@ -1089,6 +1101,22 @@ if (cluster.isPrimary) {
         res.status(401).json({ error: '未授权' });
     };
 
+    const requirePermission = (permission) => {
+        return (req, res, next) => {
+            if (!req.session.authenticated) {
+                return res.status(401).json({ error: '未授权' });
+            }
+            if (!req.session.isSubAccount) {
+                return next();
+            }
+            const permissions = req.session.permissions || [];
+            if (permissions.includes(permission)) {
+                return next();
+            }
+            res.status(403).json({ error: '权限不足，无法进行此操作' });
+        };
+    };
+
     // --- Plugin System ---
     const pluginLoader = new PluginLoader(app, io, {
         instancesDir: INSTANCES_DIR,
@@ -1104,7 +1132,33 @@ if (cluster.isPrimary) {
         saveInstances
     });
 
-    pluginLoader.requireAuth = requireAuth;
+    const getPluginPermission = (pluginId) => {
+        if (pluginId.includes('backup')) {
+            return 'instance.backups';
+        }
+        if (pluginId.includes('modrinth')) {
+            return 'instance.mods';
+        }
+        return 'panel.plugins';
+    };
+
+    const pluginAuthMiddleware = (req, res, next) => {
+        const pluginId = req.params.pluginId;
+        const permission = getPluginPermission(pluginId);
+        if (!req.session.authenticated) {
+            return res.status(401).json({ error: '未授权' });
+        }
+        if (!req.session.isSubAccount) {
+            return next();
+        }
+        const permissions = req.session.permissions || [];
+        if (permissions.includes(permission)) {
+            return next();
+        }
+        res.status(403).json({ error: '权限不足，无法进行此操作' });
+    };
+
+    pluginLoader.requireAuth = pluginAuthMiddleware;
     pluginLoader.registerMiddleware();
 
     // Initial discovery and load
@@ -1969,7 +2023,7 @@ if (cluster.isPrimary) {
 
 
     // 检查插件更新服务 (由插件开发者决定更新地址，非统一商店)
-    app.get('/api/plugins/check-update', requireAuth, async (req, res) => {
+    app.get('/api/plugins/check-update', requirePermission('panel.plugins'), async (req, res) => {
         const { pluginId } = req.query;
         if (!pluginId) {
             return res.status(400).json({ error: '缺少插件 ID' });
@@ -2004,7 +2058,7 @@ if (cluster.isPrimary) {
     });
 
     // 远程执行插件更新/升级安装
-    app.post('/api/plugins/update-remote', requireAuth, async (req, res) => {
+    app.post('/api/plugins/update-remote', requirePermission('panel.plugins'), async (req, res) => {
         const { pluginId, downloadUrl } = req.body;
         if (!pluginId || !downloadUrl) {
             return res.status(400).json({ error: '缺少必要参数 (pluginId 或 downloadUrl)' });
@@ -2051,7 +2105,7 @@ if (cluster.isPrimary) {
     });
 
     // --- Plugin System API ---
-    app.get('/api/plugins/list', requireAuth, (req, res) => {
+    app.get('/api/plugins/list', requirePermission('panel.plugins'), (req, res) => {
         const lang = req.query.lang || 'zh';
         const list = pluginLoader.getPluginList().map(p => ({
             ...p,
@@ -2061,7 +2115,7 @@ if (cluster.isPrimary) {
         res.json(list);
     });
 
-    app.post('/api/plugins/enable', requireAuth, async (req, res) => {
+    app.post('/api/plugins/enable', requirePermission('panel.plugins'), async (req, res) => {
         try {
             const { pluginId } = req.body;
             if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
@@ -2072,7 +2126,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/plugins/disable', requireAuth, async (req, res) => {
+    app.post('/api/plugins/disable', requirePermission('panel.plugins'), async (req, res) => {
         try {
             const { pluginId } = req.body;
             if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
@@ -2084,7 +2138,7 @@ if (cluster.isPrimary) {
     });
 
     const pluginUpload = multer({ dest: path.join(DATA_DIR, 'tmp_uploads') });
-    app.post('/api/plugins/upload', requireAuth, pluginUpload.single('plugin'), async (req, res) => {
+    app.post('/api/plugins/upload', requirePermission('panel.plugins'), pluginUpload.single('plugin'), async (req, res) => {
         try {
             if (!req.file) return res.status(400).json({ error: '未收到文件' });
             const analysis = await pluginLoader.analyzePlugin(req.file.path);
@@ -2108,7 +2162,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/plugins/install-confirm', requireAuth, async (req, res) => {
+    app.post('/api/plugins/install-confirm', requirePermission('panel.plugins'), async (req, res) => {
         try {
             const { tempDir, finalDir } = req.body;
             if (!tempDir || !finalDir) return res.status(400).json({ error: '缺少安装信息' });
@@ -2135,7 +2189,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/plugins/uninstall', requireAuth, async (req, res) => {
+    app.post('/api/plugins/uninstall', requirePermission('panel.plugins'), async (req, res) => {
         try {
             const { pluginId } = req.body;
             if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
@@ -2146,7 +2200,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.get('/api/plugins/export/:pluginId', requireAuth, async (req, res) => {
+    app.get('/api/plugins/export/:pluginId', requirePermission('panel.plugins'), async (req, res) => {
         const { pluginId } = req.params;
         const pluginPath = path.join(PLUGINS_DIR, pluginId);
         if (!fs.existsSync(pluginPath)) {
@@ -2210,12 +2264,12 @@ if (cluster.isPrimary) {
         res.json(pluginLoader.getPluginStatus(pluginId));
     });
 
-    app.get('/api/plugins/settings', requireAuth, (req, res) => {
+    app.get('/api/plugins/settings', requirePermission('panel.plugins'), (req, res) => {
         const pluginId = req.query.pluginId;
         res.json(pluginLoader.getPluginSettings(pluginId));
     });
 
-    app.post('/api/plugins/settings', requireAuth, (req, res) => {
+    app.post('/api/plugins/settings', requirePermission('panel.plugins'), (req, res) => {
         try {
             const { pluginId, values } = req.body;
             if (!pluginId) return res.status(400).json({ error: '缺少插件 ID' });
@@ -2656,7 +2710,7 @@ if (cluster.isPrimary) {
     });
 
     // Modrinth API / AI Translate
-    app.get('/api/mods/modrinth/search', requireAuth, async (req, res) => {
+    app.get('/api/mods/modrinth/search', requirePermission('instance.mods'), async (req, res) => {
         const { q, facets, offset, limit, index } = req.query;
         console.log(`[Modrinth Search] q=${q}, facets=${facets}, index=${index}`);
         try {
@@ -2674,7 +2728,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.get('/api/mods/modrinth/versions', requireAuth, async (req, res) => {
+    app.get('/api/mods/modrinth/versions', requirePermission('instance.mods'), async (req, res) => {
         try {
             const response = await axios.get('https://api.modrinth.com/v2/tag/game_version', {
                 headers: { 'User-Agent': MODRINTH_UA }
@@ -2685,7 +2739,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.get('/api/mods/modrinth/project/:id', requireAuth, async (req, res) => {
+    app.get('/api/mods/modrinth/project/:id', requirePermission('instance.mods'), async (req, res) => {
         try {
             const [project, versions] = await Promise.all([
                 axios.get(`https://api.modrinth.com/v2/project/${req.params.id}`, { headers: { 'User-Agent': MODRINTH_UA } }),
@@ -2697,7 +2751,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/mods/modrinth/download', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/mods/modrinth/download', requirePermission('instance.mods'), withInstance, async (req, res) => {
         const { instDir, instanceId } = req;
         const { url, filename } = req.body;
         if (!url || !filename) return res.status(400).json({ error: 'URL and filename required' });
@@ -2804,7 +2858,7 @@ if (cluster.isPrimary) {
         });
     };
 
-    app.get('/api/mods/local/list', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/mods/local/list', requirePermission('instance.mods'), withInstance, async (req, res) => {
         const modsDir = path.join(req.instDir, 'mods');
         try {
             if (!fs.existsSync(modsDir)) {
@@ -2842,7 +2896,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.get('/api/mods/local/metadata', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/mods/local/metadata', requirePermission('instance.mods'), withInstance, async (req, res) => {
         const { file } = req.query;
         if (!file) return res.status(400).json({ error: 'File name required' });
 
@@ -2970,7 +3024,7 @@ if (cluster.isPrimary) {
     });
 
     // 3. 重置 2FA
-    app.get('/api/panel/2fa/generate', requireAuth, async (req, res) => {
+    app.get('/api/panel/2fa/generate', requirePermission('panel.settings'), async (req, res) => {
         try {
             const secret = authenticator.generateSecret();
             const otpauth = authenticator.keyuri('Admin', 'MC-Panel', secret);
@@ -2981,7 +3035,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.post('/api/panel/2fa/verify', requireAuth, async (req, res) => {
+    app.post('/api/panel/2fa/verify', requirePermission('panel.settings'), async (req, res) => {
         const { secret, token } = req.body;
         try {
             if (!authenticator.check(token, secret)) return res.status(400).json({ error: 'Invalid Code' });
@@ -2991,7 +3045,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.post('/api/panel/2fa/disable', requireAuth, async (req, res) => {
+    app.post('/api/panel/2fa/disable', requirePermission('panel.settings'), async (req, res) => {
         try {
             appConfig.secret = '';
             await fs.writeJson(CONFIG_FILE, appConfig, { spaces: 2 });
@@ -3001,7 +3055,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/panel/account/update', requireAuth, async (req, res) => {
+    app.post('/api/panel/account/update', requirePermission('panel.settings'), async (req, res) => {
         const { username, currentPassword, newPassword } = req.body;
         try {
             if (!username) {
@@ -3039,7 +3093,7 @@ if (cluster.isPrimary) {
 
     // 4. 重启面板
     // 4. 重启面板
-    app.post('/api/panel/restart', requireAuth, (req, res) => {
+    app.post('/api/panel/restart', requirePermission('panel.settings'), (req, res) => {
         res.json({ success: true, message: '面板正在重启...' });
         setTimeout(() => {
             // Exit with 100 to signal master to restart this worker
@@ -3058,7 +3112,10 @@ if (cluster.isPrimary) {
             isSetup,
             initialized: !!appConfig.username && !!appConfig.passwordHash,
             authenticated: !!req.session.authenticated,
-            has2FA: !!appConfig.secret
+            has2FA: !!appConfig.secret,
+            username: req.session.authenticated ? (req.session.username || '') : '',
+            isSubAccount: req.session.authenticated ? (!!req.session.isSubAccount) : false,
+            permissions: req.session.authenticated ? (req.session.permissions || []) : []
         });
     });
 
@@ -3126,7 +3183,7 @@ if (cluster.isPrimary) {
             return res.status(429).json({ error: `防爆破拦截: 尝试次数过多，请等待 ${lock.remaining} 秒后再试` });
         }
 
-        // 情况 A: 2FA 令牌直登 (Coexisting 2FA-only login)
+        // 情况 A: 2FA 令牌直登 (仅限主管理员，因为无用户名)
         if (token && !username) {
             let secret = appConfig.secret;
             if (!secret) {
@@ -3134,6 +3191,9 @@ if (cluster.isPrimary) {
             }
             if (authenticator.check(token, secret)) {
                 req.session.authenticated = true;
+                req.session.username = appConfig.username;
+                req.session.isSubAccount = false;
+                req.session.permissions = [];
                 resetFailedAttempts(req.ip);
                 return res.json({ success: true });
             } else {
@@ -3156,19 +3216,47 @@ if (cluster.isPrimary) {
             return res.status(400).json({ error: '系统尚未初始化' });
         }
 
-        if (username !== appConfig.username) {
+        let isMatched = false;
+        let matchedUser = null;
+
+        if (username === appConfig.username) {
+            const { hash } = hashPassword(password, appConfig.passwordSalt);
+            if (hash === appConfig.passwordHash) {
+                isMatched = true;
+            }
+        } else {
+            const users = loadUsers();
+            const user = users.find(u => u.username === username);
+            if (user) {
+                const { hash } = hashPassword(password, user.passwordSalt);
+                if (hash === user.passwordHash) {
+                    isMatched = true;
+                    matchedUser = user;
+                }
+            }
+        }
+
+        if (!isMatched) {
             recordFailedAttempt(req.ip);
             return res.status(400).json({ error: '用户名或密码错误' });
         }
 
-        const { hash } = hashPassword(password, appConfig.passwordSalt);
-        if (hash !== appConfig.passwordHash) {
-            recordFailedAttempt(req.ip);
-            return res.status(400).json({ error: '用户名或密码错误' });
+        // 4. 检查是否开启 2FA
+        const userSecret = matchedUser ? matchedUser.secret : appConfig.secret;
+        if (userSecret) {
+            req.session.preAuth = {
+                username,
+                isSubAccount: !!matchedUser,
+                permissions: matchedUser ? matchedUser.permissions : []
+            };
+            return res.json({ require2FA: true });
         }
 
-        // 4. 账号密码登录成功
+        // 5. 登录成功
         req.session.authenticated = true;
+        req.session.username = username;
+        req.session.isSubAccount = !!matchedUser;
+        req.session.permissions = matchedUser ? matchedUser.permissions : [];
         resetFailedAttempts(req.ip);
         res.json({ success: true });
     });
@@ -3182,16 +3270,29 @@ if (cluster.isPrimary) {
         }
 
         if (!req.session.preAuth) {
-            return res.status(401).json({ error: '会话已过期，请重新登录密码' });
+            return res.status(401).json({ error: '会话已过期，请重新登录' });
         }
 
-        if (!appConfig.secret) {
+        const { username, isSubAccount, permissions } = req.session.preAuth;
+        let secret = '';
+        if (isSubAccount) {
+            const users = loadUsers();
+            const user = users.find(u => u.username === username);
+            secret = user ? user.secret : '';
+        } else {
+            secret = appConfig.secret;
+        }
+
+        if (!secret) {
             return res.status(400).json({ error: '未启用 2FA' });
         }
 
-        if (token && authenticator.check(token, appConfig.secret)) {
-            delete req.session.preAuth;
+        if (token && authenticator.check(token, secret)) {
             req.session.authenticated = true;
+            req.session.username = username;
+            req.session.isSubAccount = isSubAccount;
+            req.session.permissions = permissions;
+            delete req.session.preAuth;
             resetFailedAttempts(req.ip);
             res.json({ success: true });
         } else {
@@ -3200,13 +3301,121 @@ if (cluster.isPrimary) {
         }
     });
 
+    const requireAdmin = (req, res, next) => {
+        if (req.session.authenticated && !req.session.isSubAccount) {
+            return next();
+        }
+        res.status(403).json({ error: '仅限主管理员访问' });
+    };
+
+    // 子账号管理 API (仅限主管理员)
+    app.get('/api/users', requireAdmin, (req, res) => {
+        const users = loadUsers();
+        const safeUsers = users.map(u => ({
+            username: u.username,
+            permissions: u.permissions || [],
+            has2FA: !!u.secret
+        }));
+        res.json({ users: safeUsers });
+    });
+
+    app.get('/api/users/qr', requireAdmin, (req, res) => {
+        const { username, tempSecret } = req.query;
+        const secret = tempSecret || authenticator.generateSecret();
+        QRCode.toDataURL(authenticator.keyuri(username || 'SubAccount', 'MC-Panel', secret), (err, url) => {
+            res.json({ qr: url, secret });
+        });
+    });
+
+    app.post('/api/users', requireAdmin, (req, res) => {
+        const { username, password, permissions, enable2FA, tempSecret } = req.body;
+
+        if (!username || username.trim().length < 2) {
+            return res.status(400).json({ error: '用户名长度不能少于 2 位' });
+        }
+        if (!password || password.length < 6) {
+            return res.status(400).json({ error: '密码长度不能少于 6 位' });
+        }
+        if (username === appConfig.username) {
+            return res.status(400).json({ error: '用户名与主管理员冲突' });
+        }
+
+        const users = loadUsers();
+        if (users.some(u => u.username === username)) {
+            return res.status(400).json({ error: '该用户名已存在' });
+        }
+
+        const { hash, salt } = hashPassword(password);
+        const newUser = {
+            username,
+            passwordHash: hash,
+            passwordSalt: salt,
+            permissions: permissions || [],
+            secret: enable2FA ? (tempSecret || '') : ''
+        };
+
+        users.push(newUser);
+        saveUsers(users);
+        res.json({ success: true });
+    });
+
+    app.put('/api/users/:username', requireAdmin, (req, res) => {
+        const targetUsername = req.params.username;
+        const { password, permissions, enable2FA, tempSecret } = req.body;
+
+        const users = loadUsers();
+        const userIdx = users.findIndex(u => u.username === targetUsername);
+        if (userIdx === -1) {
+            return res.status(404).json({ error: '未找到该子账号' });
+        }
+
+        const user = users[userIdx];
+
+        if (password && password.length >= 6) {
+            const { hash, salt } = hashPassword(password);
+            user.passwordHash = hash;
+            user.passwordSalt = salt;
+        }
+
+        if (permissions !== undefined) {
+            user.permissions = permissions;
+        }
+
+        if (enable2FA !== undefined) {
+            if (enable2FA) {
+                if (tempSecret) {
+                    user.secret = tempSecret;
+                } else if (!user.secret) {
+                    return res.status(400).json({ error: '启用 2FA 必须提供验证密钥' });
+                }
+            } else {
+                user.secret = '';
+            }
+        }
+
+        users[userIdx] = user;
+        saveUsers(users);
+        res.json({ success: true });
+    });
+
+    app.delete('/api/users/:username', requireAdmin, (req, res) => {
+        const targetUsername = req.params.username;
+        const users = loadUsers();
+        const filtered = users.filter(u => u.username !== targetUsername);
+        if (users.length === filtered.length) {
+            return res.status(404).json({ error: '未找到该子账号' });
+        }
+        saveUsers(filtered);
+        res.json({ success: true });
+    });
+
     app.post('/api/auth/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
     // 服务器控制
     app.get('/api/server/status', requireAuth, withInstance, (req, res) => res.json({ running: !!req.instState.process, onlinePlayers: Array.from(req.instState.onlinePlayers) }));
 
     // Player Inventory API
-    app.get('/api/server/player-inventory/:name', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/server/player-inventory/:name', requirePermission('instance.players'), withInstance, async (req, res) => {
         try {
             const playerName = req.params.name;
             const instDir = req.instDir;
@@ -3361,14 +3570,14 @@ if (cluster.isPrimary) {
         if (fs.existsSync(iconPath)) res.sendFile(iconPath);
         else res.status(404).send('No icon');
     });
-    app.post('/api/server/icon', requireAuth, withInstance, upload.single('icon'), async (req, res) => {
+    app.post('/api/server/icon', requirePermission('instance.properties'), withInstance, upload.single('icon'), async (req, res) => {
         try {
             if (!req.file) return res.status(400).json({ error: 'No file' });
             await fs.move(req.file.path, path.join(req.instDir, 'server-icon.png'), { overwrite: true });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
-    app.delete('/api/server/icon', requireAuth, withInstance, async (req, res) => {
+    app.delete('/api/server/icon', requirePermission('instance.properties'), withInstance, async (req, res) => {
         try {
             await fs.remove(path.join(req.instDir, 'server-icon.png'));
             res.json({ success: true });
@@ -3423,7 +3632,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(404).json({ error: 'Not found' }); }
     });
 
-    app.post('/api/server/start', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/server/start', requirePermission('instance.control'), withInstance, async (req, res) => {
         const { instState, instDir, instanceId } = req;
         if (instState.process) return res.json({ message: '已运行' });
         instState.stopping = false;
@@ -3709,7 +3918,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/server/stop', requireAuth, withInstance, (req, res) => {
+    app.post('/api/server/stop', requirePermission('instance.control'), withInstance, (req, res) => {
         if (req.instState.process) {
             req.instState.stopping = true;
             req.instState.process.stdin.write('stop\n');
@@ -3717,7 +3926,7 @@ if (cluster.isPrimary) {
         res.json({ success: true });
     });
 
-    app.post('/api/server/force_stop', requireAuth, withInstance, (req, res) => {
+    app.post('/api/server/force_stop', requirePermission('instance.control'), withInstance, (req, res) => {
         const proc = req.instState.process;
         if (proc) {
             try {
@@ -3731,7 +3940,7 @@ if (cluster.isPrimary) {
         }
         res.json({ success: true });
     });
-    app.post('/api/server/command', requireAuth, withInstance, (req, res) => {
+    app.post('/api/server/command', requirePermission('instance.control'), withInstance, (req, res) => {
         if (req.instState.process) {
             req.instState.process.stdin.write(req.body.command + '\n');
             appendLog(req.instanceId, `> ${req.body.command}\n`);
@@ -3740,7 +3949,7 @@ if (cluster.isPrimary) {
     });
 
     // 文件管理
-    app.get('/api/files/list', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/files/list', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const targetPath = path.join(instDir, req.query.path || '');
         if (!targetPath.startsWith(instDir)) return res.status(403).send('Denied');
@@ -3778,7 +3987,7 @@ if (cluster.isPrimary) {
         }
     };
 
-    app.post('/api/files/upload', requireAuth, withInstance, upload.array('files'), async (req, res) => {
+    app.post('/api/files/upload', requirePermission('instance.files'), withInstance, upload.array('files'), async (req, res) => {
         const { instDir } = req;
         const targetDir = req.body.path ? path.join(instDir, req.body.path) : instDir;
         if (!targetDir.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
@@ -3801,7 +4010,7 @@ if (cluster.isPrimary) {
     const CHUNK_TEMP_DIR = path.join(DATA_DIR, 'chunk_uploads');
     fs.ensureDirSync(CHUNK_TEMP_DIR);
 
-    app.post('/api/files/chunk/init', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/chunk/init', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const { fileName, fileSize, totalChunks, targetPath } = req.body;
         const destDir = targetPath ? path.join(instDir, targetPath) : instDir;
@@ -3820,7 +4029,7 @@ if (cluster.isPrimary) {
         res.json({ uploadId });
     });
 
-    app.post('/api/files/chunk/upload', requireAuth, withInstance, upload.single('chunk'), async (req, res) => {
+    app.post('/api/files/chunk/upload', requirePermission('instance.files'), withInstance, upload.single('chunk'), async (req, res) => {
         const { uploadId, chunkIndex } = req.body;
         if (!uploadId || chunkIndex === undefined) return res.status(400).json({ error: 'Missing params' });
 
@@ -3835,7 +4044,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.post('/api/files/chunk/complete', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/chunk/complete', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { uploadId } = req.body;
         if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
 
@@ -3875,7 +4084,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/files/chunk/cancel', requireAuth, async (req, res) => {
+    app.post('/api/files/chunk/cancel', requirePermission('instance.files'), async (req, res) => {
         const { uploadId } = req.body;
         if (!uploadId) return res.status(400).json({ error: 'Missing uploadId' });
         try {
@@ -3899,7 +4108,7 @@ if (cluster.isPrimary) {
         } catch (e) { }
     }, 1800000);
 
-    app.post('/api/files/operate', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/operate', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const { action, sources, destination, compressName } = req.body;
         const destPath = destination ? path.join(instDir, destination) : instDir;
@@ -4002,7 +4211,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.post('/api/files/rename', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/rename', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const { oldPath, newPath } = req.body;
         const op = path.join(instDir, oldPath);
@@ -4015,7 +4224,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.post('/api/files/mkdir', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/mkdir', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const targetPath = path.join(instDir, req.body.path);
         if (!targetPath.startsWith(instDir)) return res.status(403).json({ error: 'Denied' });
@@ -4023,7 +4232,7 @@ if (cluster.isPrimary) {
         catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.post('/api/files/create', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/create', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const targetPath = path.join(instDir, req.body.path);
         if (!targetPath.startsWith(instDir)) return res.status(403).json({ error: 'Denied' });
@@ -4035,13 +4244,13 @@ if (cluster.isPrimary) {
         catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.get('/api/files/download', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/files/download', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const filePath = path.join(instDir, req.query.path);
         if (!filePath.startsWith(instDir)) return res.status(403).send('Denied');
         if (fs.existsSync(filePath)) res.download(filePath); else res.status(404).send('Not Found');
     });
-    app.get('/api/files/content', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/files/content', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.query.path);
@@ -4051,7 +4260,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).send('Err'); }
     });
 
-    app.get('/api/files/archive-list', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/files/archive-list', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.query.path);
@@ -4084,7 +4293,7 @@ if (cluster.isPrimary) {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.get('/api/files/preview-image', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/files/preview-image', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.query.path);
@@ -4102,7 +4311,7 @@ if (cluster.isPrimary) {
             fs.createReadStream(filepath).pipe(res);
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
-    app.post('/api/files/save', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/files/save', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.body.filepath);
@@ -4201,7 +4410,7 @@ if (cluster.isPrimary) {
         { titleKey: 'properties.groups.other', keys: ['accepts-transfers', 'enable-code-of-conduct', 'bug-report-link', 'text-filtering-config', 'text-filtering-version', 'region-file-compression', 'enable-command-block'] }
     ];
 
-    app.get('/api/server/properties', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/server/properties', requirePermission('instance.properties'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const propsFile = path.join(instDir, 'server.properties');
@@ -4237,7 +4446,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/server/properties', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/server/properties', requirePermission('instance.properties'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const propsFile = path.join(instDir, 'server.properties');
@@ -4261,11 +4470,11 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.get('/api/lists/:type', requireAuth, withInstance, async (req, res) => {
+    app.get('/api/lists/:type', requirePermission('instance.players'), withInstance, async (req, res) => {
         const { instDir } = req;
         try { res.json(await fs.readJson(path.join(instDir, `${req.params.type}.json`))); } catch (e) { res.json([]); }
     });
-    app.post('/api/lists/:type', requireAuth, withInstance, async (req, res) => {
+    app.post('/api/lists/:type', requirePermission('instance.players'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const f = path.join(instDir, `${req.params.type}.json`);

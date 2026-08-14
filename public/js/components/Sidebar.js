@@ -7,9 +7,21 @@ const BUILTIN_ITEMS = [
     { id: 'properties', view: 'properties', icon: 'fa-sliders', labelKey: 'sidebar.settings' },
     { id: 'mods', view: 'mods', icon: 'fa-microchip', labelKey: 'sidebar.mods' },
     { id: 'files', view: 'files', icon: 'fa-folder-open', labelKey: 'sidebar.files' },
-
     { id: 'players', view: 'players', icon: 'fa-users', labelKey: 'sidebar.players' }
 ];
+
+const ITEM_PERMISSIONS = {
+    'properties': 'instance.properties',
+    'mods': 'instance.mods',
+    'files': 'instance.files',
+    'players': 'instance.players'
+};
+
+const getPluginPermission = (id) => {
+    if (id.includes('backup')) return 'instance.backups';
+    if (id.includes('modrinth')) return 'instance.mods';
+    return 'panel.plugins';
+};
 
 const loadSidebarConfig = (instanceId) => {
     try {
@@ -38,7 +50,18 @@ export const getFirstVisibleView = (instanceId) => {
     } else {
         ordered = [...allItems];
     }
-    const visible = ordered.filter(i => !(config.hiddenItems || []).includes(i.id));
+
+    const hasItemPermissionLocal = (item) => {
+        if (!store.auth.isSubAccount) return true;
+        const builtinPerm = ITEM_PERMISSIONS[item.id];
+        if (builtinPerm) {
+            return (store.auth.permissions || []).includes(builtinPerm);
+        }
+        const requiredPerm = getPluginPermission(item.id);
+        return (store.auth.permissions || []).includes(requiredPerm);
+    };
+
+    const visible = ordered.filter(i => !(config.hiddenItems || []).includes(i.id) && hasItemPermissionLocal(i));
     return visible.length > 0 ? visible[0].view : 'dashboard';
 };
 
@@ -175,6 +198,16 @@ export default {
             return store.instanceList.find(i => i.id === store.currentInstanceId);
         });
 
+        const hasItemPermission = (item) => {
+            if (!store.auth.isSubAccount) return true;
+            const builtinPerm = ITEM_PERMISSIONS[item.id];
+            if (builtinPerm) {
+                return (store.auth.permissions || []).includes(builtinPerm);
+            }
+            const requiredPerm = getPluginPermission(item.id);
+            return (store.auth.permissions || []).includes(requiredPerm);
+        };
+
         const allItems = computed(() => {
             const pluginItems = store.pluginSidebarItems
                 .filter(i => i.location === 'instance' || i.location === 'both')
@@ -201,13 +234,12 @@ export default {
             }
             return ordered.filter(i => {
                 if ((configState.hiddenItems || []).includes(i.id)) return false;
-
-                return true;
+                return hasItemPermission(i);
             });
         });
 
         const openCustomize = () => {
-            const items = allItems.value;
+            const items = allItems.value.filter(hasItemPermission);
             let ordered;
             if (configState.order && configState.order.length > 0) {
                 const itemMap = {};

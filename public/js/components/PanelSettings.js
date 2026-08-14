@@ -417,6 +417,132 @@ export default {
                     </div>
                 </div>
 
+                <!-- Sub-accounts Management Panel -->
+                <div v-show="activeSettingsTab === 'subaccounts'" class="animate-in">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold m-0 d-flex align-items-center">
+                            <i class="fa-solid fa-users-gear text-primary me-2"></i>
+                            子账号管理
+                        </h5>
+                        <button class="btn btn-primary btn-sm fw-bold px-3 py-1.5" @click="openCreateUserModal">
+                            <i class="fa-solid fa-user-plus me-1.5"></i>新建子账号
+                        </button>
+                    </div>
+
+                    <!-- Sub-accounts List -->
+                    <div v-if="users.length === 0" class="text-center py-5 border rounded-4 mb-4" style="background-color: var(--c-surface); border-color: var(--c-border) !important;">
+                        <i class="fa-solid fa-users text-muted mb-3" style="font-size: 2.5rem; opacity: 0.4;"></i>
+                        <p class="text-muted fw-medium mb-0">暂无子账号，点击上方按钮创建一个吧</p>
+                    </div>
+                    <div v-else class="row g-3 mb-4">
+                        <div v-for="user in users" :key="user.username" class="col-md-6">
+                            <div class="card instance-card h-100 p-4 border rounded-4 bg-surface flex-column" style="border-radius: 16px;">
+                                <div class="d-flex align-items-center gap-3 mb-4">
+                                    <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                        <i class="fa-solid fa-user" style="font-size: 1.25rem;"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="fw-bold mb-1 text-truncate" style="font-size: 0.9375rem;">{{ user.username }}</h5>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 fw-medium px-2 py-0.5" style="font-size: 0.75rem;">子账号</span>
+                                            <span v-if="user.has2FA" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10 fw-medium px-2 py-0.5 d-flex align-items-center gap-1" style="font-size: 0.75rem;">
+                                                <i class="fa-solid fa-shield-checkmark" style="font-size: 0.65rem;"></i>2FA 已绑定
+                                            </span>
+                                            <span v-else class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-10 fw-medium px-2 py-0.5" style="font-size: 0.75rem;">2FA 未启用</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="small mb-4 text-muted flex-grow-1">
+                                    <div class="fw-bold text-uppercase letter-spacing-1 mb-1" style="font-size: 0.625rem;">拥有权限</div>
+                                    <div class="text-truncate">
+                                        {{ user.permissions.length === 0 ? '无任何权限' : user.permissions.map(p => translatePermission(p)).join(', ') }}
+                                    </div>
+                                </div>
+
+                                <!-- Hover Swap Container -->
+                                <div class="card-hover-swap-container mt-auto position-relative" style="height: 38px;">
+                                    <!-- Info View -->
+                                    <div class="card-info-view w-100 h-100 d-flex align-items-center">
+                                        <span class="small text-muted"><i class="fa-solid fa-ellipsis me-1.5"></i>悬停以显示操作</span>
+                                    </div>
+                                    <!-- Action View -->
+                                    <div class="card-action-view w-100 h-100">
+                                        <div class="btn-group w-100 instance-card-btn-group">
+                                            <button class="btn btn-outline-primary btn-sm fw-bold px-3 py-2" @click="openEditUserModal(user)">
+                                                <i class="fa-solid fa-pen-to-square me-1.5"></i>编辑
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm fw-bold px-3 py-2" @click="deleteUser(user.username)">
+                                                <i class="fa-solid fa-trash-can me-1.5"></i>删除
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-account Create/Edit Modal -->
+                    <Teleport to="body">
+                        <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
+                                <div class="modal-content border-0 rounded-4 shadow-lg overflow-hidden" style="background-color: var(--c-surface);">
+                                    <div class="modal-header border-0 p-4 pb-3" style="background-color: rgba(var(--c-surface-rgb), 0.3); border-bottom: 1px solid var(--c-border) !important;">
+                                        <h5 class="modal-title fw-bold">{{ isEditingUser ? '编辑子账号' : '新建子账号' }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body p-4 pt-3">
+                                        <form @submit.prevent="saveUser">
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-bold text-muted">用户名</label>
+                                                <input type="text" class="form-control" v-model="userForm.username" :disabled="isEditingUser" required placeholder="请输入用户名">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-bold text-muted">密码 {{ isEditingUser ? '(留空表示不修改)' : '' }}</label>
+                                                <input type="password" class="form-control" v-model="userForm.password" :required="!isEditingUser" placeholder="请输入密码">
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-bold text-muted d-block">权限配置</label>
+                                                <div class="row g-2 border rounded-3 p-3" style="background-color: rgba(var(--c-surface-rgb), 0.5); border-color: var(--c-border) !important;">
+                                                    <div v-for="(label, value) in permissionOptions" :key="value" class="col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" :id="'perm_' + value" :value="value" v-model="userForm.permissions">
+                                                            <label class="form-check-label small fw-medium" :for="'perm_' + value">{{ label }}</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="form-check form-switch mb-3">
+                                                    <input class="form-check-input" type="checkbox" role="switch" id="enable2FASwitch" v-model="userForm.enable2FA" @change="handle2FAToggle">
+                                                    <label class="form-check-label small fw-bold text-muted" for="enable2FASwitch">开启 2FA 双重认证</label>
+                                                </div>
+                                                
+                                                <!-- 2FA QR Code Binding -->
+                                                <div v-if="userForm.enable2FA && userForm.tempQR" class="p-3 border rounded-3 text-center animate-in" style="background-color: rgba(var(--c-surface-rgb), 0.5); border-color: var(--c-border) !important;">
+                                                    <p class="small text-muted mb-2">使用 Google Authenticator 等应用扫描二维码绑定 2FA：</p>
+                                                    <img :src="userForm.tempQR" class="img-fluid border rounded-3 bg-white p-2 mb-2" style="width: 150px; height: 150px;">
+                                                    <div class="small fw-semibold text-secondary select-all">密钥: {{ userForm.tempSecret }}</div>
+                                                </div>
+                                            </div>
+
+                                            <div class="d-flex gap-2 justify-content-end mt-4">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm px-4 py-2 fw-bold" data-bs-dismiss="modal">取消</button>
+                                                <button type="submit" class="btn btn-primary btn-sm px-4 py-2 fw-bold" :disabled="savingUser">
+                                                    <span v-if="savingUser" class="spinner-border spinner-border-sm me-1"></span>保存
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Teleport>
+
+                </div>
+
             </div>
         </div>
     </div>
@@ -481,14 +607,19 @@ export default {
             { id: 'other', icon: 'fa-puzzle-piece', labelKey: 'panel_settings.tab_other' }
         ];
 
-        const activeSettingsTab = ref('basic');
-        const settingsTabs = computed(() => [
-            { id: 'basic', label: $t('panel_settings.basic') || '基本设置', icon: 'fa-sliders' },
-            { id: 'security', label: $t('panel_settings.security') || '安全与认证', icon: 'fa-shield-halved' },
-            { id: 'account', label: $t('panel_settings.account_mgmt') || '账户管理', icon: 'fa-user-gear' },
-            { id: 'integrations', label: '集成与回调 (Integrations)', icon: 'fa-link' },
-            { id: 'appearance', label: $t('panel_settings.appearance') || '个性化外观', icon: 'fa-palette' }
-        ]);
+        const settingsTabs = computed(() => {
+            const tabs = [
+                { id: 'basic', label: $t('panel_settings.basic') || '基本设置', icon: 'fa-sliders' },
+                { id: 'security', label: $t('panel_settings.security') || '安全与认证', icon: 'fa-shield-halved' },
+                { id: 'account', label: $t('panel_settings.account_mgmt') || '账户管理', icon: 'fa-user-gear' },
+                { id: 'integrations', label: '集成与回调 (Integrations)', icon: 'fa-link' },
+                { id: 'appearance', label: $t('panel_settings.appearance') || '个性化外观', icon: 'fa-palette' }
+            ];
+            if (!store.auth.isSubAccount) {
+                tabs.push({ id: 'subaccounts', label: '子账号管理', icon: 'fa-users-gear' });
+            }
+            return tabs;
+        });
 
         const triggerLogoUpload = () => logoInput.value.click();
         const triggerBgUpload = () => bgInput.value.click();
@@ -808,6 +939,162 @@ export default {
             });
         };
 
+        const activeSettingsTab = ref('basic');
+        const users = ref([]);
+        const isEditingUser = ref(false);
+        const savingUser = ref(false);
+        const userForm = reactive({
+            username: '',
+            password: '',
+            permissions: [],
+            enable2FA: false,
+            tempSecret: '',
+            tempQR: ''
+        });
+
+        const permissionOptions = {
+            'instance.control': '实例控制 (启动/停止/执行命令)',
+            'instance.properties': '修改配置 (server.properties/图标)',
+            'instance.files': '文件管理 (读写/上传/下载文件)',
+            'instance.mods': 'Mod/插件安装 (搜索/下载/启用/禁用)',
+            'instance.players': '玩家管理 (白名单/Ban/查看背包)',
+            'instance.backups': '备份管理 (创建/回档/删除备份)',
+            'panel.settings': '面板设置 (修改系统设置/主管理员信息)',
+            'panel.plugins': '插件系统 (管理面板功能扩展插件)'
+        };
+
+        const translatePermission = (perm) => {
+            return permissionOptions[perm] ? permissionOptions[perm].split(' ')[0] : perm;
+        };
+
+        const loadUsers = async () => {
+            if (store.auth.isSubAccount) return;
+            try {
+                const res = await api.get('/api/users');
+                users.value = res.data.users || [];
+            } catch (err) {
+                console.error('Failed to load sub-accounts:', err);
+            }
+        };
+
+        const handle2FAToggle = async () => {
+            if (userForm.enable2FA && !userForm.tempSecret) {
+                try {
+                    const res = await api.get('/api/users/qr', {
+                        params: { username: userForm.username || 'SubAccount' }
+                    });
+                    userForm.tempSecret = res.data.secret;
+                    userForm.tempQR = res.data.qr;
+                } catch (err) {
+                    showToast('生成 2FA 二维码失败', 'danger');
+                    userForm.enable2FA = false;
+                }
+            }
+        };
+
+        const openCreateUserModal = async () => {
+            isEditingUser.value = false;
+            userForm.username = '';
+            userForm.password = '';
+            userForm.permissions = [];
+            userForm.enable2FA = false;
+            userForm.tempSecret = '';
+            userForm.tempQR = '';
+            
+            const modalEl = document.getElementById('userModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        };
+
+        const openEditUserModal = async (user) => {
+            isEditingUser.value = true;
+            userForm.username = user.username;
+            userForm.password = '';
+            userForm.permissions = [...user.permissions];
+            userForm.enable2FA = user.has2FA;
+            userForm.tempSecret = '';
+            userForm.tempQR = '';
+
+            const modalEl = document.getElementById('userModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        };
+
+        const saveUser = async () => {
+            const username = userForm.username ? userForm.username.trim() : '';
+            const password = userForm.password ? userForm.password : '';
+
+            if (!username) {
+                showToast('用户名不能为空', 'danger');
+                return;
+            }
+            if (username.length < 2) {
+                showToast('用户名长度不能少于 2 位', 'danger');
+                return;
+            }
+            if (!isEditingUser.value) {
+                if (!password) {
+                    showToast('密码不能为空', 'danger');
+                    return;
+                }
+                if (password.length < 6) {
+                    showToast('密码长度不能少于 6 位', 'danger');
+                    return;
+                }
+            } else {
+                if (password && password.length < 6) {
+                    showToast('密码长度不能少于 6 位', 'danger');
+                    return;
+                }
+            }
+
+            savingUser.value = true;
+            try {
+                const payload = {
+                    username: username,
+                    password: password || undefined,
+                    permissions: userForm.permissions,
+                    enable2FA: userForm.enable2FA,
+                    tempSecret: userForm.tempSecret || undefined
+                };
+
+                if (isEditingUser.value) {
+                    await api.put(`/api/users/${username}`, payload);
+                    showToast('修改子账号成功', 'success');
+                } else {
+                    await api.post('/api/users', payload);
+                    showToast('创建子账号成功', 'success');
+                }
+
+                const modalEl = document.getElementById('userModal');
+                if (modalEl) {
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modal.hide();
+                }
+
+                await loadUsers();
+            } catch (err) {
+                showToast(err.response?.data?.error || err.message || '保存失败', 'danger');
+            } finally {
+                savingUser.value = false;
+            }
+        };
+
+        const deleteUser = async (username) => {
+            if (!confirm(`确定删除子账号 "${username}" 吗？`)) return;
+            try {
+                await api.delete(`/api/users/${username}`);
+                showToast('删除子账号成功', 'success');
+                await loadUsers();
+            } catch (err) {
+                showToast(err.response?.data?.error || err.message || '删除失败', 'danger');
+            }
+        };
+
         onMounted(() => {
             loadConfigWithSave();
             loadJars();
@@ -815,6 +1102,7 @@ export default {
             loadInstances();
             loadJavaList();
             loadAppearance();
+            loadUsers();
         });
 
         const savedAppearance = reactive({
@@ -872,7 +1160,9 @@ export default {
             appearance, activeAppearanceTab, appearanceTabs,
             logoInput, bgInput, triggerLogoUpload, triggerBgUpload,
             handleLogoUpload, handleBgUpload, removeLogo, removeBackground,
-            activeSettingsTab, settingsTabs
+            activeSettingsTab, settingsTabs,
+            users, isEditingUser, savingUser, userForm, permissionOptions, translatePermission,
+            handle2FAToggle, openCreateUserModal, openEditUserModal, saveUser, deleteUser
         };
     }
 };
