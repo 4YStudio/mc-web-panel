@@ -7,14 +7,16 @@ const BUILTIN_ITEMS = [
     { id: 'properties', view: 'properties', icon: 'fa-sliders', labelKey: 'sidebar.settings' },
     { id: 'mods', view: 'mods', icon: 'fa-microchip', labelKey: 'sidebar.mods' },
     { id: 'files', view: 'files', icon: 'fa-folder-open', labelKey: 'sidebar.files' },
-    { id: 'players', view: 'players', icon: 'fa-users', labelKey: 'sidebar.players' }
+    { id: 'players', view: 'players', icon: 'fa-users', labelKey: 'sidebar.players' },
+    { id: 'scrolls', view: 'scrolls', icon: 'fa-scroll', labelKey: 'sidebar.scrolls' }
 ];
 
 const ITEM_PERMISSIONS = {
     'properties': 'instance.properties',
     'mods': 'instance.mods',
     'files': 'instance.files',
-    'players': 'instance.players'
+    'players': 'instance.players',
+    'scrolls': 'instance.properties'
 };
 
 const getPluginPermission = (id) => {

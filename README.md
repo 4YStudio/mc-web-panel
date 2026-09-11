@@ -21,7 +21,7 @@
 
 ### ✨ 项目简介
 
-MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecraft 服务器管理面板。它提供了美观的 Web 界面，让您轻松管理 Fabric 服务器、玩家、文件等。
+MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecraft 服务器管理面板。它提供了美观的 Web 界面，让您轻松管理各类 Minecraft 服务器（Vanilla、Fabric、Forge、NeoForge 等）、玩家、文件与自动化脚本。
 
 无论是个人服务器还是小型社区，MC Web Panel 都能为您提供专业的管理体验！
 
@@ -35,12 +35,14 @@ MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecr
 
 | 特性 | 描述 |
 |-----|-----|
+| 📜 **卷轴系统 (自动化脚本)** | 全核心通用、零侵入免崩服的控制台事件驱动自动化脚本系统（进服迎宾、扫地姬、防沉迷等） |
 | 📊 **实时监控** | 实时查看服务器状态、CPU/内存使用率和控制台输出 |
 | 📁 **文件管理** | 支持在线上传、下载、编辑和解压文件 |
 | 🔧 **侧边栏自定义** | 拖拽排序和显示/隐藏侧边栏项目 |
 | 🎮 **Modrinth 浏览器** | 集成 Modrinth 搜索，一键安装模组 |
 | 🌐 **内网穿透** | 内置 FRP 管理，轻松实现公网访问 |
-| 👥 **玩家管理** | 管理白名单、OP、黑名单，以及踢出/封禁/传送在线玩家 |
+| 👥 **玩家与子账号管理** | 管理白名单、OP、封禁，支持多级子账号精细化权限分配与独立 2FA |
+| 👤 **智能头像系统** | 2D 纯正面头像，多源智能容灾降级与 100% 本地矢量像素兜底，彻底解决头像加载失效 |
 | 🎨 **外观自定义** | 个性化主题设置，支持自定义背景图、模糊度及透明度 |
 | 📱 **响应式设计** | 针对移动端和桌面端深度优化的 UI/UX 体验 |
 | 💾 **备份管理** | 强大的备份还原系统（支持快照和增量备份） |
@@ -55,6 +57,15 @@ MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecr
 3. **功能全面** - 涵盖服务器管理的方方面面
 4. **持续更新** - 活跃的开发社区，功能不断迭代
 5. **开源免费** - 完全开源，自由使用和修改
+
+### 📜 卷轴系统 (Scroll Automation)
+
+面板独创的 **「卷轴 (Scroll)」** 自动化脚本系统，无需在服务端安装任何 Mod 或插件，纯净服、模组服、插件服全版本通用：
+
+- **🌟 新手迎宾大标题 (`welcome-scroll`)**：玩家进服屏幕中央展示金色大标题与全服彩色欢迎公告（支持面板可视化自定义文案与颜色）
+- **🧹 智能扫地姬 (`auto-cleaner`)**：周期性自动清理地面掉落物，清理前 60s/10s 倒计时广播预警，避免误删贵重物品
+- **🛡 健康防沉迷守护 (`health-guardian`)**：统计玩家在线时长，通过 ActionBar 柔性提醒休息防沉迷
+- **🛠 卷轴工坊 & 在线开发指南**：内置可视化配置表单、在线代码编辑器、标准事件模板与详尽中文开发手册
 
 ### 📦 支持的模组与插件
 
@@ -139,7 +150,7 @@ npm run build
 
 ### ✨ Introduction
 
-MC Web Panel is a lightweight, modern, and high-performance Minecraft server management panel built with **Node.js** and **Vue 3**. It provides a beautiful web interface to manage your Fabric server, players, files, and more.
+MC Web Panel is a lightweight, modern, and high-performance Minecraft server management panel built with **Node.js** and **Vue 3**. It provides a beautiful web interface to manage your Minecraft servers (Vanilla, Fabric, Forge, NeoForge, etc.), players, files, and automation scripts.
 
 Whether it's a personal server or a small community, MC Web Panel can provide you with a professional management experience!
 
@@ -153,12 +164,14 @@ Whether it's a personal server or a small community, MC Web Panel can provide yo
 
 | Feature | Description |
 |---------|-------------|
+| 📜 **Scroll System (Automation)** | Zero-intrusion, crash-proof console event-driven automation system for all server cores (Welcome titles, item cleaner, anti-fatigue alerts, etc.) |
 | 📊 **Dashboard** | Real-time server status, CPU/RAM usage, and console output |
 | 📁 **File Manager** | Web-based file management with upload, download, edit, and unzip capabilities |
 | 🔧 **Customizable Sidebar** | Drag-and-drop to reorder sidebar items and toggle visibility |
 | 🎮 **Modrinth Browser** | Search and download mods directly from Modrinth with one-click installation |
 | 🌐 **Intranet Penetration** | Built-in FRP management for easy public access |
-| 👥 **Player Manager** | Manage whitelist, OPs, bans, and kick/ban/teleport online players |
+| 👥 **Players & Sub-Accounts** | Manage whitelist, OPs, bans, plus granular sub-account permissions and independent 2FA |
+| 👤 **Smart Avatar System** | High-performance 2D player avatars with multi-source auto-fallback and 100% local vector rendering |
 | 🎨 **Appearance Customization** | Personalized themes with custom background images, blur, and transparency settings |
 | 📱 **Responsive Design** | Optimized UI/UX for both desktop and mobile devices |
 | 💾 **Backup Management** | Powerful backup and restore system (supports snapshots and incremental backups) |
@@ -173,6 +186,15 @@ Whether it's a personal server or a small community, MC Web Panel can provide yo
 3. **Comprehensive Features** - Covers all aspects of server management
 4. **Continuous Updates** - Active development community, features constantly iterating
 5. **Open Source & Free** - Completely open source, free to use and modify
+
+### 📜 Scroll Automation System
+
+The exclusive **Scroll (卷轴)** automation script system requires no mods or server plugins, fully compatible across Vanilla, Fabric, Forge, NeoForge, Paper, and Bedrock:
+
+- **🌟 Welcome Title (`welcome-scroll`)**: Displays customizable golden titles and server-wide announcements upon player join
+- **🧹 Auto Cleaner (`auto-cleaner`)**: Periodically cleans dropped ground items with 60s & 10s countdown broadcast warnings
+- **🛡 Health Guardian (`health-guardian`)**: Tracks player playtime and sends friendly anti-fatigue alerts via ActionBar
+- **🛠 Workshop & Dev Guide**: Built-in visual schema config, online script editor, event templates, and comprehensive documentation
 
 ### 📦 Supported Mods & Plugins
 

@@ -33,7 +33,7 @@ async function prepareBuildDir() {
     console.log('Copying project files...');
     const manifest = {
         files: ['server.js', 'plugin-loader.js', 'package.json', 'server-icon.png'],
-        dirs: ['public']
+        dirs: ['public', 'plugins']
     };
     manifest.files.forEach(f => { 
         if (fs.existsSync(f)) {

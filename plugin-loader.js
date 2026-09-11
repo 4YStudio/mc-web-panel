@@ -20,6 +20,8 @@ const KNOWN_PERMISSIONS = {
     'task': { label: { zh: '后台任务', en: 'Background Tasks' }, description: { zh: '注册常驻或定时任务', en: 'Register persistent or scheduled tasks' } },
     'events': { label: { zh: '插件间通信', en: 'Inter-plugin Communication' }, description: { zh: '监听或发送插件间事件', en: 'Listen or emit inter-plugin events' } },
     'status': { label: { zh: '状态上报', en: 'Status Reporting' }, description: { zh: '上报插件运行状态', en: 'Report plugin runtime status' } },
+    'command': { label: { zh: '控制台指令', en: 'Server Command' }, description: { zh: '执行 Minecraft 控制台指令与监听日志', en: 'Execute Minecraft server commands and listen to logs' } },
+    'services': { label: { zh: '跨插件服务', en: 'Cross-plugin Services' }, description: { zh: '注册或调用跨插件共享能力', en: 'Register or consume inter-plugin shared services' } },
 };
 
 const getDisplayName = (name) => {
@@ -31,14 +33,34 @@ const getDisplayName = (name) => {
 
 class PluginLoader {
     constructor(app, io, options = {}) {
+        if (app && !app.use && !io && typeof app === 'object') {
+            options = app;
+            io = options.io || null;
+            app = options.app || null;
+        }
         this.app = app;
         this.io = io;
-        this.options = options;
-        this.pluginsDir = options.pluginsDir || DEFAULT_PLUGINS_DIR;
-        this._requireAuth = options.requireAuth || null;
+        this.options = options || {};
+
+        // Provide safe defaults for context properties expected by plugins
+        this.options.DATA_DIR = this.options.DATA_DIR || this.options.dataDir || (this.options.baseDir ? path.join(this.options.baseDir, 'data') : path.join(__dirname, 'data'));
+        this.options.BASE_DIR = this.options.BASE_DIR || this.options.baseDir || __dirname;
+        this.options.INSTANCES_DIR = this.options.INSTANCES_DIR || this.options.instancesDir || (this.options.baseDir ? path.join(this.options.baseDir, 'instances') : path.join(__dirname, 'instances'));
+        this.options.GLOBAL_BACKUP_DIR = this.options.GLOBAL_BACKUP_DIR || this.options.globalBackupDir || path.join(this.options.DATA_DIR, 'backups');
+        this.options.instancesState = this.options.instancesState || new Map();
+        this.options.instanceConfig = this.options.instanceConfig || { instances: this.options.instances || [] };
+        if (this.options.instanceConfig && (!this.options.instanceConfig.instances || this.options.instanceConfig.instances.length === 0) && this.options.instances) {
+            this.options.instanceConfig.instances = this.options.instances;
+        }
+        this.options.saveInstances = this.options.saveInstances || (() => {});
+        this.options.appendLog = this.options.appendLog || (() => {});
+        this.options.getConfig = this.options.getConfig || (() => ({}));
+
+        this.pluginsDir = path.resolve(this.options.pluginsDir || DEFAULT_PLUGINS_DIR);
+        this._requireAuth = this.options.requireAuth || null;
         this.plugins = new Map();
         this.pluginState = {};
-        this._stateFile = options.stateFile || path.join(__dirname, 'data', 'plugin-state.json');
+        this._stateFile = this.options.stateFile || path.join(__dirname, 'data', 'plugin-state.json');
         this._loadState();
 
         this._sidebarItems = [];
@@ -56,8 +78,100 @@ class PluginLoader {
         this._pluginStorage = new Map();
         this._pluginRequireCache = new Map();
 
-        setTimeout(() => this.cleanTempFiles(), 1000);
-        setInterval(() => this.cleanTempFiles(), 3600000);
+        // New architectural foundations
+        this._services = new Map(); // serviceName -> { pluginId, impl }
+        this._pluginServices = new Map(); // pluginId -> Set<serviceName>
+        this._lifecycleHandlers = new Map(); // eventName -> Array<{ pluginId, handler }>
+        this._taskCircuitBreakers = new Map(); // key -> { failures: number[], broken: boolean }
+        this._pluginErrorHistory = new Map(); // pluginId -> Array<{ timestamp, path, message, stack }>
+
+        const t1 = setTimeout(() => this.cleanTempFiles(), 1000);
+        if (t1 && t1.unref) t1.unref();
+        const t2 = setInterval(() => this.cleanTempFiles(), 3600000);
+        if (t2 && t2.unref) t2.unref();
+    }
+
+    _recordPluginError(pluginId, requestPath, err) {
+        if (!this._pluginErrorHistory.has(pluginId)) {
+            this._pluginErrorHistory.set(pluginId, []);
+        }
+        const history = this._pluginErrorHistory.get(pluginId);
+        history.unshift({
+            timestamp: new Date().toISOString(),
+            path: requestPath || '/',
+            message: err ? (err.message || String(err)) : 'Unknown error',
+            stack: err ? (err.stack || '') : ''
+        });
+        if (history.length > 20) history.pop();
+        console.error(`[PluginLoader] Error isolated for plugin "${pluginId}" at "${requestPath}":`, err?.message || err);
+    }
+
+    getPluginErrors(pluginId) {
+        return this._pluginErrorHistory.get(pluginId) || [];
+    }
+
+    _recordCircuitFailure(circuitKey, threshold = 5, windowMs = 60000) {
+        const now = Date.now();
+        let record = this._taskCircuitBreakers.get(circuitKey);
+        if (!record) {
+            record = { failures: [], broken: false };
+            this._taskCircuitBreakers.set(circuitKey, record);
+        }
+        record.failures.push(now);
+        record.failures = record.failures.filter(t => now - t <= windowMs);
+        if (record.failures.length >= threshold) {
+            record.broken = true;
+            return true;
+        }
+        return false;
+    }
+
+    _resetCircuit(circuitKey) {
+        this._taskCircuitBreakers.delete(circuitKey);
+    }
+
+    _isCircuitBroken(circuitKey) {
+        const record = this._taskCircuitBreakers.get(circuitKey);
+        return !!record?.broken;
+    }
+
+    emitLifecycleEvent(event, payload = {}) {
+        const handlers = this._lifecycleHandlers.get(event);
+        if (!handlers || handlers.length === 0) return;
+        for (const { pluginId, handler } of handlers) {
+            try {
+                const res = handler(payload);
+                if (res && typeof res.catch === 'function') {
+                    res.catch(err => {
+                        this._recordPluginError(pluginId, `lifecycle:${event}`, err);
+                    });
+                }
+            } catch (err) {
+                this._recordPluginError(pluginId, `lifecycle:${event}`, err);
+            }
+        }
+    }
+
+    registerService(pluginId, name, impl) {
+        if (!name || typeof name !== 'string') throw new Error('Service name must be a non-empty string');
+        if (!impl) throw new Error('Service implementation must be provided');
+        if (this._services.has(name)) {
+            const current = this._services.get(name);
+            console.warn(`[PluginLoader] Service "${name}" is being replaced by plugin "${pluginId}" (previously registered by "${current.pluginId}")`);
+        }
+        this._services.set(name, { pluginId, impl });
+        if (!this._pluginServices.has(pluginId)) {
+            this._pluginServices.set(pluginId, new Set());
+        }
+        this._pluginServices.get(pluginId).add(name);
+    }
+
+    getService(name) {
+        return this._services.get(name)?.impl || null;
+    }
+
+    hasService(name) {
+        return this._services.has(name);
     }
 
     registerMiddleware() {
@@ -67,20 +181,23 @@ class PluginLoader {
             if (!routers) return next();
 
             let matchedPrefix = null;
-            let matchedRouter = null;
+            let matchedEntry = null;
 
-            for (const [prefix, router] of routers) {
+            for (const [prefix, entry] of routers) {
                 const isRoot = prefix === '/';
                 const matchPrefix = isRoot ? '/' : (prefix.endsWith('/') ? prefix : prefix + '/');
                 if (req.path === prefix || req.path.startsWith(matchPrefix)) {
                     if (!matchedPrefix || prefix.length > matchedPrefix.length) {
                         matchedPrefix = prefix;
-                        matchedRouter = router;
+                        matchedEntry = entry;
                     }
                 }
             }
 
-            if (matchedRouter) {
+            if (matchedEntry) {
+                const router = typeof matchedEntry === 'function' ? matchedEntry : (matchedEntry.router || matchedEntry);
+                const routeOpts = (typeof matchedEntry === 'object' && matchedEntry.options) ? matchedEntry.options : {};
+
                 const originalUrl = req.url;
                 const originalBaseUrl = req.baseUrl;
                 let subPath = req.url.substring(matchedPrefix.length);
@@ -88,13 +205,53 @@ class PluginLoader {
                 req.url = subPath;
                 req.baseUrl = req.baseUrl + matchedPrefix;
 
-                return this.requireAuth(req, res, () => {
-                    matchedRouter(req, res, (err) => {
+                const executeRoute = () => {
+                    // RBAC check if route specified options
+                    if (req.session && req.session.isSubAccount) {
+                        if (routeOpts.requireAdmin) {
+                            req.url = originalUrl;
+                            req.baseUrl = originalBaseUrl;
+                            return res.status(403).json({ success: false, error: '仅限管理员访问' });
+                        }
+                        if (routeOpts.permission) {
+                            const perms = req.session.permissions || [];
+                            if (!perms.includes(routeOpts.permission)) {
+                                req.url = originalUrl;
+                                req.baseUrl = originalBaseUrl;
+                                return res.status(403).json({ success: false, error: '无权限访问该接口' });
+                            }
+                        }
+                    }
+
+                    try {
+                        router(req, res, (err) => {
+                            req.url = originalUrl;
+                            req.baseUrl = originalBaseUrl;
+                            if (err) {
+                                this._recordPluginError(pluginId, req.originalUrl, err);
+                                if (!res.headersSent) {
+                                    return res.status(500).json({
+                                        success: false,
+                                        error: `[插件 ${pluginId} 错误] ${err.message || '内部处理异常'}`
+                                    });
+                                }
+                            }
+                            next(err);
+                        });
+                    } catch (syncErr) {
                         req.url = originalUrl;
                         req.baseUrl = originalBaseUrl;
-                        next(err);
-                    });
-                });
+                        this._recordPluginError(pluginId, req.originalUrl, syncErr);
+                        if (!res.headersSent) {
+                            return res.status(500).json({
+                                success: false,
+                                error: `[插件 ${pluginId} 异常] ${syncErr.message || '内部同步异常'}`
+                            });
+                        }
+                    }
+                };
+
+                return this.requireAuth(req, res, executeRoute);
             }
             next();
         });
@@ -105,20 +262,21 @@ class PluginLoader {
             if (!routers) return next();
 
             let matchedPrefix = null;
-            let matchedRouter = null;
+            let matchedEntry = null;
 
-            for (const [prefix, router] of routers) {
+            for (const [prefix, entry] of routers) {
                 const isRoot = prefix === '/';
                 const matchPrefix = isRoot ? '/' : (prefix.endsWith('/') ? prefix : prefix + '/');
                 if (req.path === prefix || req.path.startsWith(matchPrefix)) {
                     if (!matchedPrefix || prefix.length > matchedPrefix.length) {
                         matchedPrefix = prefix;
-                        matchedRouter = router;
+                        matchedEntry = entry;
                     }
                 }
             }
 
-            if (matchedRouter) {
+            if (matchedEntry) {
+                const router = typeof matchedEntry === 'function' ? matchedEntry : (matchedEntry.router || matchedEntry);
                 const originalUrl = req.url;
                 const originalBaseUrl = req.baseUrl;
                 let subPath = req.url.substring(matchedPrefix.length);
@@ -126,11 +284,32 @@ class PluginLoader {
                 req.url = subPath;
                 req.baseUrl = req.baseUrl + matchedPrefix;
 
-                return matchedRouter(req, res, (err) => {
+                try {
+                    return router(req, res, (err) => {
+                        req.url = originalUrl;
+                        req.baseUrl = originalBaseUrl;
+                        if (err) {
+                            this._recordPluginError(pluginId, req.originalUrl, err);
+                            if (!res.headersSent) {
+                                return res.status(500).json({
+                                    success: false,
+                                    error: `[插件 ${pluginId} 公开路由错误] ${err.message || '内部处理异常'}`
+                                });
+                            }
+                        }
+                        next(err);
+                    });
+                } catch (syncErr) {
                     req.url = originalUrl;
                     req.baseUrl = originalBaseUrl;
-                    next(err);
-                });
+                    this._recordPluginError(pluginId, req.originalUrl, syncErr);
+                    if (!res.headersSent) {
+                        return res.status(500).json({
+                            success: false,
+                            error: `[插件 ${pluginId} 公开路由异常] ${syncErr.message || '内部同步异常'}`
+                        });
+                    }
+                }
             }
             next();
         });
@@ -202,17 +381,17 @@ class PluginLoader {
         }
     }
 
-    _checkPermission(pluginId, permission) {
+    _checkPermission(pluginId, permission, manifest = null) {
         const plugin = this.plugins.get(pluginId);
-        if (!plugin) return false;
-        const permissions = plugin.manifest.permissions || [];
+        const permissions = (plugin && plugin.manifest && plugin.manifest.permissions) || (manifest && manifest.permissions) || [];
         if (permissions.includes('*')) return true;
+        if (permissions.includes('file_system') && (permission.startsWith('fs.') || permission === 'fs')) return true;
         const basePermission = permission.split('.')[0];
         return permissions.includes(permission) || permissions.includes(basePermission);
     }
 
-    _requirePermission(pluginId, permission) {
-        if (!this._checkPermission(pluginId, permission)) {
+    _requirePermission(pluginId, permission, manifest = null) {
+        if (!this._checkPermission(pluginId, permission, manifest)) {
             throw new Error(`Plugin "${pluginId}" requires permission "${permission}" but it was not declared in manifest.permissions`);
         }
     }
@@ -233,10 +412,11 @@ class PluginLoader {
         }
     }
 
-    _loadPluginStorage(pluginId) {
+    _loadPluginStorage(pluginId, manifest = null) {
         const plugin = this.plugins.get(pluginId);
-        if (!plugin) return {};
-        const storageFile = path.join(plugin.manifest._dir, 'data', 'storage.json');
+        const dir = (plugin && plugin.manifest && plugin.manifest._dir) || (manifest && manifest._dir);
+        if (!dir) return {};
+        const storageFile = path.join(dir, 'data', 'storage.json');
         try {
             if (fs.existsSync(storageFile)) {
                 return fs.readJsonSync(storageFile);
@@ -247,15 +427,19 @@ class PluginLoader {
         return {};
     }
 
-    _savePluginStorage(pluginId, data) {
+    _savePluginStorage(pluginId, data, manifest = null) {
         const plugin = this.plugins.get(pluginId);
-        if (!plugin) return;
-        const dataDir = path.join(plugin.manifest._dir, 'data');
+        const dir = (plugin && plugin.manifest && plugin.manifest._dir) || (manifest && manifest._dir);
+        if (!dir) return;
+        const dataDir = path.join(dir, 'data');
         const storageFile = path.join(dataDir, 'storage.json');
+        const tmpFile = path.join(dataDir, `.storage.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
         try {
             fs.ensureDirSync(dataDir);
-            fs.writeJsonSync(storageFile, data, { spaces: 2 });
+            fs.writeJsonSync(tmpFile, data, { spaces: 2 });
+            fs.renameSync(tmpFile, storageFile);
         } catch (e) {
+            try { if (fs.existsSync(tmpFile)) fs.removeSync(tmpFile); } catch (_) {}
             console.error(`[PluginLoader] Failed to save storage for ${pluginId}:`, e.message);
         }
     }
@@ -279,12 +463,53 @@ class PluginLoader {
         if (!plugin) return;
         const dataDir = path.join(plugin.manifest._dir, 'data');
         const settingsFile = path.join(dataDir, 'settings.json');
+        const tmpFile = path.join(dataDir, `.settings.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
         try {
             fs.ensureDirSync(dataDir);
-            fs.writeJsonSync(settingsFile, values, { spaces: 2 });
+            fs.writeJsonSync(tmpFile, values, { spaces: 2 });
+            fs.renameSync(tmpFile, settingsFile);
         } catch (e) {
+            try { if (fs.existsSync(tmpFile)) fs.removeSync(tmpFile); } catch (_) {}
             console.error(`[PluginLoader] Failed to save settings for ${pluginId}:`, e.message);
         }
+    }
+
+    getActiveInstanceId() {
+        if (typeof this.options.getActiveInstanceId === 'function') {
+            return this.options.getActiveInstanceId();
+        }
+        if (this.options.activeInstanceId) {
+            return this.options.activeInstanceId;
+        }
+        const instancesFile = path.join(this.options.baseDir || __dirname, 'data', 'instances.json');
+        try {
+            if (fs.existsSync(instancesFile)) {
+                const config = fs.readJsonSync(instancesFile);
+                return config.activeInstanceId || 'default';
+            }
+        } catch (e) { }
+        return 'default';
+    }
+
+    getInstanceDir(instanceId) {
+        if (typeof this.options.getInstanceDir === 'function') {
+            return this.options.getInstanceDir(instanceId);
+        }
+        const targetId = instanceId || this.getActiveInstanceId();
+        const instances = this.options.instanceConfig?.instances || this.options.instances;
+        if (instances) {
+            const inst = instances.find(i => i.id === targetId);
+            if (inst && inst.dir) return path.isAbsolute(inst.dir) ? inst.dir : path.join(this.options.baseDir || __dirname, inst.dir);
+        }
+        const instancesFile = path.join(this.options.baseDir || __dirname, 'data', 'instances.json');
+        try {
+            if (fs.existsSync(instancesFile)) {
+                const config = fs.readJsonSync(instancesFile);
+                const inst = config.instances?.find(i => i.id === targetId);
+                if (inst && inst.dir) return path.isAbsolute(inst.dir) ? inst.dir : path.join(this.options.baseDir || __dirname, inst.dir);
+            }
+        } catch (e) { }
+        return path.join(this.options.instancesDir || (this.options.baseDir ? path.join(this.options.baseDir, 'instances') : path.join(__dirname, 'instances')), targetId || 'default');
     }
 
     async discover() {
@@ -336,6 +561,9 @@ class PluginLoader {
     }
 
     async loadAll() {
+        if (this.plugins.size === 0) {
+            await this.discover();
+        }
         const sortedIds = this._resolveLoadOrder();
         const results = [];
         for (const id of sortedIds) {
@@ -359,6 +587,10 @@ class PluginLoader {
             }
         }
         return results;
+    }
+
+    async loadPlugins() {
+        return await this.loadAll();
     }
 
     _resolveLoadOrder() {
@@ -487,6 +719,48 @@ class PluginLoader {
         }
     }
 
+    cleanupPlugin(pluginId) {
+        // Clean up lifecycle handlers
+        for (const [event, handlers] of this._lifecycleHandlers) {
+            this._lifecycleHandlers.set(event, handlers.filter(h => h.pluginId !== pluginId));
+        }
+
+        // Clean up services registered by this plugin
+        const svcs = this._pluginServices.get(pluginId);
+        if (svcs) {
+            for (const name of svcs) {
+                const cur = this._services.get(name);
+                if (cur && cur.pluginId === pluginId) {
+                    this._services.delete(name);
+                }
+            }
+            this._pluginServices.delete(pluginId);
+        }
+
+        // Clean up circuit breakers for this plugin
+        for (const key of Array.from(this._taskCircuitBreakers.keys())) {
+            if (key.startsWith(`${pluginId}:`)) {
+                this._taskCircuitBreakers.delete(key);
+            }
+        }
+
+        // Clean up event bus handlers
+        const eventHandlers = this._pluginEventHandlers.get(pluginId);
+        if (eventHandlers) {
+            for (const { event, handler } of eventHandlers) {
+                this._eventBus.removeListener(event, handler);
+            }
+            this._pluginEventHandlers.delete(pluginId);
+        }
+
+        if (this._logHandlers && this._logHandlers.length) {
+            this._logHandlers = this._logHandlers.filter(h => h.pluginId !== pluginId);
+        }
+
+        this._pluginSettings.delete(pluginId);
+        this._pluginStatus.delete(pluginId);
+    }
+
     async unload(pluginId) {
         const plugin = this.plugins.get(pluginId);
         if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
@@ -546,8 +820,40 @@ class PluginLoader {
             this._pluginEventHandlers.delete(pluginId);
         }
 
+        if (this._logHandlers && this._logHandlers.length) {
+            this._logHandlers = this._logHandlers.filter(h => h.pluginId !== pluginId);
+        }
+
+        // Clean up lifecycle handlers
+        for (const [event, handlers] of this._lifecycleHandlers) {
+            this._lifecycleHandlers.set(event, handlers.filter(h => h.pluginId !== pluginId));
+        }
+
+        // Clean up services registered by this plugin
+        const svcs = this._pluginServices.get(pluginId);
+        if (svcs) {
+            for (const name of svcs) {
+                const cur = this._services.get(name);
+                if (cur && cur.pluginId === pluginId) {
+                    this._services.delete(name);
+                }
+            }
+            this._pluginServices.delete(pluginId);
+        }
+
+        // Clean up circuit breakers for this plugin
+        for (const key of Array.from(this._taskCircuitBreakers.keys())) {
+            if (key.startsWith(`${pluginId}:`)) {
+                this._taskCircuitBreakers.delete(key);
+            }
+        }
+
         this._pluginSettings.delete(pluginId);
         this._pluginStatus.delete(pluginId);
+        const storageObj = this._pluginStorage.get(pluginId);
+        if (storageObj && typeof storageObj.save === 'function') {
+            try { storageObj.save(); } catch (e) { }
+        }
         this._pluginStorage.delete(pluginId);
 
         plugin.instance = null;
@@ -639,9 +945,9 @@ class PluginLoader {
             }
 
             const manifest = fs.readJsonSync(manifestPath);
-            if (!manifest.id) {
+            if (!manifest.id || !/^[a-zA-Z0-9_-]+$/.test(manifest.id)) {
                 if (isTemp) fs.removeSync(sourceDir);
-                throw new Error('Plugin manifest missing "id" field');
+                throw new Error('Plugin manifest missing valid "id" field (only letters, numbers, _, - allowed)');
             }
 
             const existing = this.plugins.get(manifest.id);
@@ -694,12 +1000,17 @@ class PluginLoader {
         }
 
         const manifest = fs.readJsonSync(manifestPath);
-        if (!manifest.id) {
+        if (!manifest.id || !/^[a-zA-Z0-9_-]+$/.test(manifest.id)) {
             if (tmpToCleanup) fs.removeSync(tmpToCleanup);
-            throw new Error('Plugin manifest missing "id" field');
+            throw new Error('Plugin manifest missing valid "id" field (only letters, numbers, _, - allowed)');
         }
 
-        const targetDir = path.join(this.pluginsDir, manifest.id);
+        const normPluginsDir = path.resolve(this.pluginsDir);
+        const targetDir = path.resolve(this.pluginsDir, manifest.id);
+        if (!targetDir.startsWith(normPluginsDir + path.sep)) {
+            if (tmpToCleanup) fs.removeSync(tmpToCleanup);
+            throw new Error('Invalid plugin target directory');
+        }
         if (fs.existsSync(targetDir)) {
             if (this.plugins.has(manifest.id)) {
                 try {
@@ -810,6 +1121,174 @@ class PluginLoader {
     _createPluginAPI(manifest) {
         const self = this;
         const pluginId = manifest.id;
+        const checkPerm = (permission) => self._checkPermission(pluginId, permission, manifest);
+        const requirePerm = (permission) => self._requirePermission(pluginId, permission, manifest);
+
+        const resolveScopeDir = (baseScope = 'plugin', instanceId = null) => {
+            let dir;
+            if (baseScope === 'plugin') {
+                dir = manifest._dir;
+            } else if (baseScope === 'data') {
+                dir = path.join(manifest._dir, 'data');
+                fs.ensureDirSync(dir);
+            } else if (baseScope === 'instance') {
+                const instDir = self.getInstanceDir(instanceId);
+                if (!instDir) throw new Error(`MC instance not found: ${instanceId || 'active'}`);
+                dir = instDir;
+            } else if (baseScope === 'globalData') {
+                if (!self.options.baseDir) throw new Error('Global data directory not configured');
+                dir = path.join(self.options.baseDir, 'data');
+            } else {
+                throw new Error(`Unsupported baseScope: "${baseScope}". Valid options: "plugin" | "data" | "instance" | "globalData"`);
+            }
+            return path.resolve(dir);
+        };
+
+        const resolveSafe = (relPath, baseScope = 'plugin', instanceId = null) => {
+            if (typeof relPath !== 'string' || !relPath.trim()) {
+                throw new Error('Path must be a non-empty string');
+            }
+            const baseDir = resolveScopeDir(baseScope, instanceId);
+            const targetPath = path.resolve(baseDir, relPath);
+            const relative = path.relative(baseDir, targetPath);
+            if (relative.startsWith('..') || path.isAbsolute(relative)) {
+                throw new Error(`Security Exception: Path traversal forbidden! "${relPath}" resolves outside of scope "${baseScope}"`);
+            }
+            return targetPath;
+        };
+
+        const checkReadPerm = () => {
+            const hasPerm = checkPerm('fs.read') || checkPerm('file_system') || checkPerm('fs');
+            if (!hasPerm) {
+                throw new Error(`Plugin "${pluginId}" requires "fs.read" permission`);
+            }
+        };
+
+        const checkWritePerm = () => {
+            const hasPerm = checkPerm('fs.write') || checkPerm('file_system') || checkPerm('fs');
+            if (!hasPerm) {
+                throw new Error(`Plugin "${pluginId}" requires "fs.write" permission`);
+            }
+        };
+
+        const pluginFs = {
+            resolveSafe(relPath, baseScope = 'data', instanceId = null) {
+                return resolveSafe(relPath, baseScope, instanceId);
+            },
+            async readText(relPath, baseScope = 'data', instanceId = null, encoding = 'utf8') {
+                checkReadPerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                return await fs.readFile(target, encoding);
+            },
+            readTextSync(relPath, baseScope = 'data', instanceId = null, encoding = 'utf8') {
+                checkReadPerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                return fs.readFileSync(target, encoding);
+            },
+            async writeText(relPath, content, baseScope = 'data', instanceId = null) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                await fs.ensureDir(path.dirname(target));
+                const tmp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+                await fs.writeFile(tmp, content);
+                await fs.rename(tmp, target);
+                return true;
+            },
+            writeTextSync(relPath, content, baseScope = 'data', instanceId = null) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                fs.ensureDirSync(path.dirname(target));
+                const tmp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+                fs.writeFileSync(tmp, content);
+                fs.renameSync(tmp, target);
+                return true;
+            },
+            async readJson(relPath, baseScope = 'data', instanceId = null) {
+                checkReadPerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                return await fs.readJson(target);
+            },
+            readJsonSync(relPath, baseScope = 'data', instanceId = null) {
+                checkReadPerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                return fs.readJsonSync(target);
+            },
+            async writeJson(relPath, data, baseScope = 'data', instanceId = null, options = { spaces: 2 }) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                await fs.ensureDir(path.dirname(target));
+                const tmp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+                await fs.writeJson(tmp, data, options);
+                await fs.rename(tmp, target);
+                return true;
+            },
+            writeJsonSync(relPath, data, baseScope = 'data', instanceId = null, options = { spaces: 2 }) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                fs.ensureDirSync(path.dirname(target));
+                const tmp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+                fs.writeJsonSync(tmp, data, options);
+                fs.renameSync(tmp, target);
+                return true;
+            },
+            async exists(relPath, baseScope = 'data', instanceId = null) {
+                try {
+                    const target = resolveSafe(relPath, baseScope, instanceId);
+                    return await fs.pathExists(target);
+                } catch (_) {
+                    return false;
+                }
+            },
+            existsSync(relPath, baseScope = 'data', instanceId = null) {
+                try {
+                    const target = resolveSafe(relPath, baseScope, instanceId);
+                    return fs.existsSync(target);
+                } catch (_) {
+                    return false;
+                }
+            },
+            async ensureDir(relPath, baseScope = 'data', instanceId = null) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                await fs.ensureDir(target);
+                return target;
+            },
+            ensureDirSync(relPath, baseScope = 'data', instanceId = null) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                fs.ensureDirSync(target);
+                return target;
+            },
+            async listDir(relPath = '', baseScope = 'data', instanceId = null) {
+                checkReadPerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                return await fs.readdir(target);
+            },
+            async remove(relPath, baseScope = 'data', instanceId = null) {
+                checkWritePerm();
+                const target = resolveSafe(relPath, baseScope, instanceId);
+                await fs.remove(target);
+                return true;
+            }
+        };
+
+        const registerLifecycle = (event, handler) => {
+            if (typeof handler !== 'function') throw new Error('Lifecycle handler must be a function');
+            if (!self._lifecycleHandlers.has(event)) {
+                self._lifecycleHandlers.set(event, []);
+            }
+            const list = self._lifecycleHandlers.get(event);
+            const entry = { pluginId, handler };
+            list.push(entry);
+
+            return () => {
+                const curr = self._lifecycleHandlers.get(event);
+                if (curr) {
+                    const idx = curr.indexOf(entry);
+                    if (idx !== -1) curr.splice(idx, 1);
+                }
+            };
+        };
 
         return {
             id: pluginId,
@@ -819,40 +1298,40 @@ class PluginLoader {
             version: API_VERSION,
 
             checkPermission(permission) {
-                return self._checkPermission(pluginId, permission);
+                return checkPerm(permission);
             },
 
-            registerRoutes(prefix, setupFn) {
-                self._requirePermission(pluginId, 'http');
+            registerRoutes(prefix, setupFn, options = {}) {
+                requirePerm('http');
                 const router = (typeof setupFn === 'function' && setupFn.length === 0) ? setupFn() : setupFn;
                 const normalizedPrefix = prefix.startsWith('/') ? prefix : '/' + prefix;
 
                 if (!self.pluginRouters.has(pluginId)) {
                     self.pluginRouters.set(pluginId, new Map());
                 }
-                self.pluginRouters.get(pluginId).set(normalizedPrefix, router);
+                self.pluginRouters.get(pluginId).set(normalizedPrefix, { router, options });
             },
 
-            registerPublicRoutes(prefix, setupFn) {
-                self._requirePermission(pluginId, 'http.public');
+            registerPublicRoutes(prefix, setupFn, options = {}) {
+                requirePerm('http.public');
                 const router = (typeof setupFn === 'function' && setupFn.length === 0) ? setupFn() : setupFn;
                 const normalizedPrefix = prefix.startsWith('/') ? prefix : '/' + prefix;
 
                 if (!self.publicPluginRouters.has(pluginId)) {
                     self.publicPluginRouters.set(pluginId, new Map());
                 }
-                self.publicPluginRouters.get(pluginId).set(normalizedPrefix, router);
+                self.publicPluginRouters.get(pluginId).set(normalizedPrefix, { router, options });
             },
 
             registerSocket(namespace, handlers) {
-                self._requirePermission(pluginId, 'socket');
+                requirePerm('socket');
                 const ns = self.io.of(`/plugin/${pluginId}${namespace}`);
                 ns.removeAllListeners('connection');
-                for (const [event, handler] of Object.entries(handlers)) {
-                    ns.on('connection', (socket) => {
+                ns.on('connection', (socket) => {
+                    for (const [event, handler] of Object.entries(handlers)) {
                         socket.on(event, (...args) => handler(socket, ...args));
-                    });
-                }
+                    }
+                });
                 return ns;
             },
 
@@ -877,7 +1356,7 @@ class PluginLoader {
             },
 
             registerSettings(schema) {
-                self._requirePermission(pluginId, 'settings');
+                requirePerm('settings');
                 if (!schema || typeof schema !== 'object') {
                     throw new Error('Settings schema must be an object');
                 }
@@ -940,38 +1419,162 @@ class PluginLoader {
             },
 
             getActiveInstanceId() {
-                const instancesFile = path.join(self.options.baseDir, 'data', 'instances.json');
-                try {
-                    if (fs.existsSync(instancesFile)) {
-                        const config = fs.readJsonSync(instancesFile);
-                        return config.activeInstanceId || 'default';
-                    }
-                } catch (e) { }
-                return 'default';
+                return self.getActiveInstanceId();
             },
 
             getInstanceDir(instanceId) {
-                const instancesFile = path.join(self.options.baseDir, 'data', 'instances.json');
-                try {
-                    if (fs.existsSync(instancesFile)) {
-                        const config = fs.readJsonSync(instancesFile);
-                        const inst = config.instances.find(i => i.id === (instanceId || this.getActiveInstanceId()));
-                        if (inst) return path.join(self.options.baseDir, inst.dir);
-                    }
-                } catch (e) { }
-                return path.join(self.options.instancesDir, instanceId || 'default');
+                return self.getInstanceDir(instanceId);
             },
 
             getConfig() {
                 return self.options.getConfig ? self.options.getConfig() : {};
             },
 
+            // Safe Filesystem Sandbox
+            fs: pluginFs,
+
+            // Unified Instance Context
+            instances: {
+                list() {
+                    const instances = self.options.instanceConfig?.instances || self.options.instances || [];
+                    return instances.map(inst => {
+                        const state = self.options.instancesState ? (self.options.instancesState.get ? self.options.instancesState.get(inst.id) : self.options.instancesState[inst.id]) : null;
+                        const running = !!(state?.running || state?.process);
+                        return {
+                            ...inst,
+                            running,
+                            isRunning: running,
+                            onlinePlayers: state?.onlinePlayers ? Array.from(state.onlinePlayers) : [],
+                            detectedVersion: state?.detectedVersion || null
+                        };
+                    });
+                },
+                get(instanceId) {
+                    const id = instanceId || self.getActiveInstanceId();
+                    const instances = self.options.instanceConfig?.instances || self.options.instances || [];
+                    const inst = instances.find(i => i.id === id);
+                    if (!inst) return null;
+                    const state = self.options.instancesState ? (self.options.instancesState.get ? self.options.instancesState.get(id) : self.options.instancesState[id]) : null;
+                    const running = !!(state?.running || state?.process);
+                    return {
+                        ...inst,
+                        dir: self.getInstanceDir(id),
+                        running,
+                        isRunning: running,
+                        onlinePlayers: state?.onlinePlayers ? Array.from(state.onlinePlayers) : [],
+                        detectedVersion: state?.detectedVersion || null
+                    };
+                },
+                getActiveId() {
+                    return self.getActiveInstanceId();
+                },
+                getDir(instanceId) {
+                    return self.getInstanceDir(instanceId);
+                },
+                withInstance(req, res, next) {
+                    const id = (req.query && req.query.instanceId) || (req.body && req.body.instanceId) || (req.headers && req.headers['x-instance-id']) || self.getActiveInstanceId() || 'default';
+                    const instDir = self.getInstanceDir(id);
+                    const instances = self.options.instanceConfig?.instances || self.options.instances || [];
+                    const instConfig = instances.find(i => i.id === id);
+                    if (instDir && !fs.existsSync(instDir)) {
+                        try { fs.ensureDirSync(instDir); } catch (_) {}
+                    }
+                    const state = self.options.instancesState ? (self.options.instancesState.get ? self.options.instancesState.get(id) : self.options.instancesState[id]) : null;
+                    req.instanceId = id;
+                    req.instDir = instDir;
+                    req.instance = instConfig || { id, dir: instDir };
+                    req.instState = state || { process: null, onlinePlayers: new Set(), logHistory: [] };
+                    next();
+                }
+            },
+
+            // Cross-plugin Shared Services
+            services: {
+                register(name, impl) {
+                    self.registerService(pluginId, name, impl);
+                },
+                get(name) {
+                    return self.getService(name);
+                },
+                has(name) {
+                    return self.hasService(name);
+                }
+            },
+
+            // Smart HTTP Client
+            http: {
+                resolveGitHubUrl(url) {
+                    const config = self.options.getConfig ? self.options.getConfig() : {};
+                    if (config.githubProxy && typeof url === 'string' && url.startsWith('https://github.com/')) {
+                        const proxy = config.githubProxy.endsWith('/') ? config.githubProxy : config.githubProxy + '/';
+                        return proxy + url;
+                    }
+                    return url;
+                },
+                async get(url, options = {}) {
+                    requirePerm('network');
+                    const finalUrl = options.proxyGitHub !== false ? this.resolveGitHubUrl(url) : url;
+                    const axios = require('axios');
+                    const timeout = options.timeout || 10000;
+                    const resp = await axios.get(finalUrl, {
+                        timeout,
+                        headers: options.headers || {},
+                        params: options.params || {},
+                        responseType: options.responseType || 'json'
+                    });
+                    return resp.data;
+                },
+                async post(url, data = {}, options = {}) {
+                    requirePerm('network');
+                    const finalUrl = options.proxyGitHub !== false ? this.resolveGitHubUrl(url) : url;
+                    const axios = require('axios');
+                    const timeout = options.timeout || 10000;
+                    const resp = await axios.post(finalUrl, data, {
+                        timeout,
+                        headers: options.headers || {},
+                        params: options.params || {}
+                    });
+                    return resp.data;
+                }
+            },
+
+            // Global System Notifications & Broadcasts
+            notify(type, message, instanceId = null) {
+                const payload = {
+                    type: ['success', 'info', 'warning', 'error'].includes(type) ? type : 'info',
+                    message: String(message),
+                    pluginId,
+                    pluginName: getDisplayName(manifest.name),
+                    instanceId: instanceId || null,
+                    timestamp: new Date().toISOString()
+                };
+                if (instanceId) {
+                    self.io.emit(`instance_notify:${instanceId}`, payload);
+                }
+                self.io.emit('panel_notify', payload);
+            },
+
+            broadcast(event, data) {
+                self.io.emit(`plugin:${pluginId}:${event}`, data);
+                self.io.emit(`plugin_broadcast`, { pluginId, event, data, timestamp: new Date().toISOString() });
+            },
+
+            // Native Lifecycle Event Subscriptions
+            onServerStart: (handler) => registerLifecycle('serverStart', handler),
+            onServerStop: (handler) => registerLifecycle('serverStop', handler),
+            onServerCrash: (handler) => registerLifecycle('serverCrash', handler),
+            onPlayerJoin: (handler) => registerLifecycle('playerJoin', handler),
+            onPlayerQuit: (handler) => registerLifecycle('playerQuit', handler),
+            onInstanceCreated: (handler) => registerLifecycle('instanceCreated', handler),
+            onInstanceDeleted: (handler) => registerLifecycle('instanceDeleted', handler),
+
+            // Persistent Key-Value Storage
             storage: (() => {
                 let _cache = null;
                 let _saveTimer = null;
                 const getCache = () => {
                     if (_cache === null) {
-                        _cache = self._loadPluginStorage(pluginId);
+                        _cache = self._loadPluginStorage(pluginId, manifest);
                     }
                     return _cache;
                 };
@@ -979,61 +1582,73 @@ class PluginLoader {
                     if (_saveTimer) clearTimeout(_saveTimer);
                     _saveTimer = setTimeout(() => {
                         if (_cache !== null) {
-                            self._savePluginStorage(pluginId, _cache);
+                            self._savePluginStorage(pluginId, _cache, manifest);
                         }
                     }, 500);
                     if (_saveTimer.unref) _saveTimer.unref();
                 };
-                return {
+                const flushNow = () => {
+                    if (_saveTimer) {
+                        clearTimeout(_saveTimer);
+                        _saveTimer = null;
+                    }
+                    if (_cache !== null) {
+                        self._savePluginStorage(pluginId, _cache, manifest);
+                    }
+                };
+                const apiObj = {
                     get(key, defaultValue) {
-                        self._requirePermission(pluginId, 'storage');
+                        requirePerm('storage');
                         const data = getCache();
                         if (key === undefined) return { ...data };
                         return data.hasOwnProperty(key) ? data[key] : defaultValue;
                     },
                     set(key, value) {
-                        self._requirePermission(pluginId, 'storage');
+                        requirePerm('storage');
                         const data = getCache();
                         data[key] = value;
                         scheduleSave();
                     },
                     delete(key) {
-                        self._requirePermission(pluginId, 'storage');
+                        requirePerm('storage');
                         const data = getCache();
                         delete data[key];
                         scheduleSave();
                     },
                     has(key) {
-                        self._requirePermission(pluginId, 'storage');
+                        requirePerm('storage');
                         const data = getCache();
                         return data.hasOwnProperty(key);
                     },
                     keys() {
-                        self._requirePermission(pluginId, 'storage');
+                        requirePerm('storage');
                         const data = getCache();
                         return Object.keys(data);
                     },
                     clear() {
-                        self._requirePermission(pluginId, 'storage');
+                        requirePerm('storage');
                         _cache = {};
                         scheduleSave();
                     },
                     save() {
-                        if (_cache !== null) {
-                            self._savePluginStorage(pluginId, _cache);
-                        }
+                        flushNow();
+                    },
+                    flush() {
+                        flushNow();
                     }
                 };
+                self._pluginStorage.set(pluginId, apiObj);
+                return apiObj;
             })(),
 
             emit(event, data) {
-                self._requirePermission(pluginId, 'events');
+                requirePerm('events');
                 self._eventBus.emit(`plugin:${pluginId}:${event}`, { data, sourcePluginId: pluginId });
                 self._eventBus.emit(`plugin:*:${event}`, { data, sourcePluginId: pluginId });
             },
 
             on(event, handler) {
-                self._requirePermission(pluginId, 'events');
+                requirePerm('events');
                 const wrappedHandler = (payload) => {
                     if (payload.sourcePluginId !== pluginId) {
                         handler(payload.data, payload.sourcePluginId);
@@ -1061,7 +1676,7 @@ class PluginLoader {
             },
 
             onPlugin(sourcePluginId, event, handler) {
-                self._requirePermission(pluginId, 'events');
+                requirePerm('events');
                 const fullEvent = `plugin:${sourcePluginId}:${event}`;
                 const wrappedHandler = (payload) => {
                     handler(payload.data, payload.sourcePluginId);
@@ -1088,7 +1703,7 @@ class PluginLoader {
             },
 
             once(event, handler) {
-                self._requirePermission(pluginId, 'events');
+                requirePerm('events');
                 const unsubscribe = this.on(event, (data, sourceId) => {
                     unsubscribe();
                     handler(data, sourceId);
@@ -1097,7 +1712,7 @@ class PluginLoader {
             },
 
             reportStatus(status) {
-                self._requirePermission(pluginId, 'status');
+                requirePerm('status');
                 self._pluginStatus.set(pluginId, {
                     ...status,
                     pluginId,
@@ -1106,7 +1721,7 @@ class PluginLoader {
             },
 
             sendCommand(instanceId, command) {
-                self._requirePermission(pluginId, 'command');
+                requirePerm('command');
                 const iid = instanceId || self.getActiveInstanceId();
                 const state = self.options.instancesState ? (self.options.instancesState.get ? self.options.instancesState.get(iid) : self.options.instancesState[iid]) : null;
                 if (!state || !state.process) return false;
@@ -1122,7 +1737,7 @@ class PluginLoader {
             },
 
             onLog(handler) {
-                self._requirePermission(pluginId, 'command');
+                requirePerm('command');
                 if (!self._logHandlers) self._logHandlers = [];
                 self._logHandlers.push({ pluginId, handler });
                 return () => {
@@ -1131,7 +1746,7 @@ class PluginLoader {
             },
 
             registerTask(name, options) {
-                self._requirePermission(pluginId, 'task');
+                requirePerm('task');
                 if (!name || typeof name !== 'string') {
                     throw new Error('Task name must be a non-empty string');
                 }
@@ -1153,6 +1768,7 @@ class PluginLoader {
                 }
 
                 const taskName = getDisplayName(manifest.name) + '/' + name;
+                const circuitKey = `${pluginId}:task:${name}`;
                 let abortController = new AbortController();
                 let taskStatus = 'idle';
                 let startPromise = null;
@@ -1160,7 +1776,22 @@ class PluginLoader {
                 const taskHandle = {
                     name,
                     get status() { return taskStatus; },
+                    get circuitBroken() { return self._isCircuitBroken(circuitKey); },
+                    async runOnce(...args) { return this.start(...args); },
+                    resetCircuit() {
+                        self._resetCircuit(circuitKey);
+                        if (taskStatus === 'circuit_broken') {
+                            taskStatus = 'idle';
+                            if (tasks.get(name)) tasks.get(name).status = 'idle';
+                        }
+                    },
                     async start(...args) {
+                        if (self._isCircuitBroken(circuitKey)) {
+                            console.warn(`[PluginLoader] Task "${taskName}" is suspended by circuit breaker. Call resetCircuit() before starting.`);
+                            taskStatus = 'circuit_broken';
+                            if (tasks.get(name)) tasks.get(name).status = 'circuit_broken';
+                            return;
+                        }
                         if (taskStatus === 'running') {
                             console.warn(`[PluginLoader] Task "${taskName}" is already running`);
                             return;
@@ -1178,9 +1809,16 @@ class PluginLoader {
                                     taskStatus = 'stopped';
                                     if (tasks.get(name)) tasks.get(name).status = 'stopped';
                                 } else {
-                                    taskStatus = 'error';
-                                    if (tasks.get(name)) tasks.get(name).status = 'error';
-                                    console.error(`[PluginLoader] Task "${taskName}" error:`, e.message);
+                                    const broken = self._recordCircuitFailure(circuitKey, 5, 60000);
+                                    if (broken) {
+                                        taskStatus = 'circuit_broken';
+                                        if (tasks.get(name)) tasks.get(name).status = 'circuit_broken';
+                                        console.error(`[PluginLoader] ⚡ Task "${taskName}" circuit breaker triggered! Suspended due to frequent crashes.`);
+                                    } else {
+                                        taskStatus = 'error';
+                                        if (tasks.get(name)) tasks.get(name).status = 'error';
+                                    }
+                                    self._recordPluginError(pluginId, `task:${name}`, e);
                                 }
                             } finally {
                                 startPromise = null;
@@ -1196,6 +1834,7 @@ class PluginLoader {
                         }
                     },
                     async restart(...args) {
+                        this.resetCircuit();
                         if (taskStatus === 'running' || taskStatus === 'stopping') {
                             this.stop();
                             if (startPromise) {
@@ -1231,7 +1870,7 @@ class PluginLoader {
             },
 
             registerCron(name, expression, handler, options = {}) {
-                self._requirePermission(pluginId, 'task');
+                requirePerm('task');
                 if (!name || typeof name !== 'string') {
                     throw new Error('Cron name must be a non-empty string');
                 }
@@ -1256,6 +1895,7 @@ class PluginLoader {
                 }
 
                 const cronName = getDisplayName(manifest.name) + '/' + name;
+                const circuitKey = `${pluginId}:cron:${name}`;
                 const interval = self._parseCronExpression(expression);
                 let cronStatus = 'idle';
                 let timer = null;
@@ -1263,12 +1903,27 @@ class PluginLoader {
                 let runCount = 0;
 
                 const executeHandler = async () => {
+                    if (self._isCircuitBroken(circuitKey)) {
+                        cronHandle.stop();
+                        cronStatus = 'circuit_broken';
+                        if (crons.get(name)) crons.get(name).status = 'circuit_broken';
+                        console.warn(`[PluginLoader] Cron "${cronName}" stopped by circuit breaker.`);
+                        return;
+                    }
                     try {
                         lastRun = new Date();
                         runCount++;
                         await handler();
                     } catch (e) {
                         console.error(`[PluginLoader] Cron "${cronName}" error:`, e.message);
+                        self._recordPluginError(pluginId, `cron:${name}`, e);
+                        const broken = self._recordCircuitFailure(circuitKey, 5, 60000);
+                        if (broken) {
+                            cronHandle.stop();
+                            cronStatus = 'circuit_broken';
+                            if (crons.get(name)) crons.get(name).status = 'circuit_broken';
+                            console.error(`[PluginLoader] ⚡ Cron "${cronName}" circuit breaker triggered! Suspended.`);
+                        }
                     }
                 };
 
@@ -1278,7 +1933,18 @@ class PluginLoader {
                     get lastRun() { return lastRun; },
                     get runCount() { return runCount; },
                     get expression() { return expression; },
+                    resetCircuit() {
+                        self._resetCircuit(circuitKey);
+                        if (cronStatus === 'circuit_broken') {
+                            cronStatus = 'idle';
+                            if (crons.get(name)) crons.get(name).status = 'idle';
+                        }
+                    },
                     start() {
+                        if (self._isCircuitBroken(circuitKey)) {
+                            console.warn(`[PluginLoader] Cron "${cronName}" is circuit broken. Call resetCircuit() first.`);
+                            return;
+                        }
                         if (cronStatus === 'running') return;
                         cronStatus = 'running';
                         if (crons.get(name)) crons.get(name).status = 'running';
@@ -1298,6 +1964,7 @@ class PluginLoader {
                     },
                     restart() {
                         this.stop();
+                        this.resetCircuit();
                         runCount = 0;
                         lastRun = null;
                         this.start();
@@ -1342,7 +2009,9 @@ class PluginLoader {
                 color: m.color || 'primary',
                 enabled: m._enabled,
                 loaded: plugin.loaded,
+                status: plugin.error ? 'error' : (!m._enabled ? 'disabled' : (plugin.loaded ? 'active' : 'inactive')),
                 error: plugin.error || null,
+                errorHistory: this.getPluginErrors(id),
                 installed: true,
                 permissions: m.permissions || [],
                 homepage: m.homepage || '',
@@ -1492,3 +2161,5 @@ class PluginLoader {
 }
 
 module.exports = PluginLoader;
+PluginLoader.PluginLoader = PluginLoader;
+PluginLoader.default = PluginLoader;

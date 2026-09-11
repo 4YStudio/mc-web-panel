@@ -1,0 +1,189 @@
+[
+    {
+        "id": "auto-cleaner",
+        "name": "智能扫地姬",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "定期清理地面掉落物以优化服务端流畅度，清理前全服倒计时广播预警，避免玩家误删贵重物品。",
+        "category": "tools",
+        "icon": "fa-broom",
+        "color": "#8b5cf6",
+        "configSchema": [
+            {
+                "key": "intervalMinutes",
+                "label": "清理周期 (分钟)",
+                "type": "number",
+                "min": 5,
+                "max": 240,
+                "default": 30
+            },
+            {
+                "key": "warningSeconds",
+                "label": "提前预警时间 (秒)",
+                "type": "number",
+                "min": 10,
+                "max": 120,
+                "default": 60
+            },
+            {
+                "key": "warningMessage",
+                "label": "预警广播文字 ({sec} 代表秒数)",
+                "type": "string",
+                "default": "§c[扫地姬] 提示：地面掉落物将在 {sec} 秒后集中清理，请及时捡起贵重物品！"
+            },
+            {
+                "key": "doneMessage",
+                "label": "清理完成提示文字",
+                "type": "string",
+                "default": "§a[扫地姬] 地面垃圾与掉落物已全部清理完毕，服务器重回丝滑！"
+            }
+        ],
+        "fileSize": 1499,
+        "downloadUrl": "./scrolls_shop/auto-cleaner.zip"
+    },
+    {
+        "id": "death-coords",
+        "name": {
+            "zh": "阵亡坐标私信守护",
+            "en": "Death Coordinates"
+        },
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": {
+            "zh": "玩家阵亡时，自动通过私信与 ActionBar 安全提示阵亡时刻与关怀指引，再也不用担心找不到遗落的贵重物品！",
+            "en": "Records and privately informs players of their death coordinates upon death."
+        },
+        "category": "utility",
+        "icon": "fa-skull-crossbones",
+        "color": "#ef4444",
+        "configSchema": {
+            "sendPrivateMsg": {
+                "type": "boolean",
+                "title": "私信发送提示",
+                "default": true,
+                "description": "通过私信仅向阵亡玩家本人发送死亡与回程提示"
+            },
+            "actionBarTip": {
+                "type": "boolean",
+                "title": "ActionBar 底部提醒",
+                "default": true,
+                "description": "复活后通过屏幕下方 ActionBar 持续提示"
+            }
+        },
+        "fileSize": 1412,
+        "downloadUrl": "./scrolls_shop/death-coords.zip"
+    },
+    {
+        "id": "fast-sleep",
+        "name": {
+            "zh": "单人快速跳过夜晚",
+            "en": "Fast Sleep"
+        },
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": {
+            "zh": "多人联机时，只要有一名玩家上床睡觉，即可触发全服倒计时并自动切换至白昼，解决多人服无法跳过黑夜的痛点。",
+            "en": "Allows a single player sleeping in bed to skip the night after a short countdown."
+        },
+        "category": "interactive",
+        "icon": "fa-bed",
+        "color": "#3b82f6",
+        "configSchema": {
+            "countdownSec": {
+                "type": "number",
+                "title": "倒计时时长 (秒)",
+                "default": 3,
+                "description": "检测到玩家入睡后等待多少秒跳过黑夜"
+            },
+            "announceTitle": {
+                "type": "boolean",
+                "title": "全屏大标题提示",
+                "default": true,
+                "description": "跳过夜晚时是否向全服玩家屏幕展示醒目的大标题"
+            }
+        },
+        "fileSize": 1621,
+        "downloadUrl": "./scrolls_shop/fast-sleep.zip"
+    },
+    {
+        "id": "health-guardian",
+        "name": "健康防沉迷守护",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "统计玩家连续在线时长，到达设定时间后通过快捷栏操作区 (ActionBar) 发送温和的护眼与休息提示。",
+        "category": "utility",
+        "icon": "fa-heart-pulse",
+        "color": "#8b5cf6",
+        "configSchema": [
+            {
+                "key": "remindIntervalMinutes",
+                "label": "提醒间隔 (分钟)",
+                "type": "number",
+                "min": 15,
+                "max": 240,
+                "default": 60
+            },
+            {
+                "key": "remindMessage",
+                "label": "提醒文字 ({hours} 代表已在线小时数)",
+                "type": "string",
+                "default": "您已连续开荒 {hours} 小时啦，站起来活动一下，保护视力哦！"
+            }
+        ],
+        "fileSize": 1499,
+        "downloadUrl": "./scrolls_shop/health-guardian.zip"
+    },
+    {
+        "id": "welcome-scroll",
+        "name": "新手迎宾大标题",
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": "当玩家进入服务器时，在屏幕中央展示华丽的全屏金色大标题，并在聊天栏向全服发送欢迎公告。",
+        "category": "interactive",
+        "icon": "fa-wand-magic-sparkles",
+        "color": "#8b5cf6",
+        "configSchema": [
+            {
+                "key": "title",
+                "label": "主标题内容",
+                "type": "string",
+                "default": "欢迎来到服务器！"
+            },
+            {
+                "key": "subtitle",
+                "label": "副标题内容",
+                "type": "string",
+                "default": "祝你游戏愉快，探索开心~"
+            },
+            {
+                "key": "color",
+                "label": "主标题颜色",
+                "type": "select",
+                "options": [
+                    "gold",
+                    "yellow",
+                    "aqua",
+                    "green",
+                    "light_purple",
+                    "red",
+                    "white"
+                ],
+                "default": "gold"
+            },
+            {
+                "key": "showBroadcast",
+                "label": "聊天框发送全服欢迎",
+                "type": "boolean",
+                "default": true
+            },
+            {
+                "key": "broadcastMessage",
+                "label": "全服欢迎公告格式 ({player} 代表玩家名)",
+                "type": "string",
+                "default": "[系统] 欢迎冒险家 §e{player}§r 踏入这片大陆！"
+            }
+        ],
+        "fileSize": 1470,
+        "downloadUrl": "./scrolls_shop/welcome-scroll.zip"
+    }
+]
