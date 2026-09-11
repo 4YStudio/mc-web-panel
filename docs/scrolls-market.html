@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="./favicon.ico" type="image/x-icon">
-    <title>MC Web Panel - 卷轴工坊市场</title>
+    <title>MC Web Panel - 卷轴市场</title>
     <meta name="description" content="浏览、搜索和获取 MC Web Panel 自动化卷轴脚本，免侵入提升你的 Minecraft 服务器管理体验。">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16,41 +16,31 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/landing.css?v=2">
     <link rel="stylesheet" href="css/market.css?v=2">
-    <style>
-        :root {
-            --primary: #8b5cf6;
-            --primary-glow: rgba(139, 92, 246, 0.25);
-        }
-        .market-hero-badge {
-            background: rgba(139, 92, 246, 0.15);
-            color: #a78bfa;
-            border-color: rgba(139, 92, 246, 0.3);
-        }
-        .filter-btn.active {
-            background: #8b5cf6;
-            border-color: #8b5cf6;
-        }
-    </style>
 </head>
 <body>
     <nav class="navbar scrolled" id="navbar">
         <div class="container nav-container">
             <a href="./index.html" class="nav-brand">
-                <div class="nav-logo" style="background: linear-gradient(135deg, #8b5cf6, #ec4899);">
-                    <i class="fa-solid fa-scroll"></i>
+                <div class="nav-logo">
+                    <i class="fa-solid fa-cube"></i>
                 </div>
                 <span class="nav-brand-text">MC Web Panel</span>
             </a>
             <div class="nav-links" id="navLinks">
                 <a href="./index.html#features">特性</a>
+                <a href="./index.html#screenshots">截图</a>
+                <a href="./index.html#quickstart">快速开始</a>
                 <a href="./market.html">
                     <i class="fa-solid fa-puzzle-piece"></i> 插件市场
                 </a>
-                <a href="./scrolls-market.html" class="active" style="color: #a78bfa;">
+                <a href="./scrolls-market.html" class="active">
                     <i class="fa-solid fa-scroll"></i> 卷轴市场
                 </a>
                 <a href="./scrolls-guide/" class="nav-link-doc">
-                    <i class="fa-solid fa-book-journal-whills"></i> 卷轴开发文档
+                    <i class="fa-solid fa-book-journal-whills"></i> 卷轴文档
+                </a>
+                <a href="./dev-guide/" class="nav-link-doc">
+                    <i class="fa-solid fa-book"></i> 插件文档
                 </a>
                 <a href="https://github.com/4ystudio/mc-web-panel" target="_blank" class="nav-link-github">
                     <i class="fa-brands fa-github"></i> GitHub
@@ -66,21 +56,21 @@
     <header class="market-hero">
         <div class="market-hero-bg">
             <div class="market-hero-grid"></div>
-            <div class="market-hero-glow" style="background: radial-gradient(circle, rgba(139,92,246,0.3) 0%, rgba(0,0,0,0) 70%);"></div>
+            <div class="market-hero-glow"></div>
         </div>
         <div class="container market-hero-content">
             <div class="market-hero-badge">
                 <i class="fa-solid fa-scroll"></i>
-                <span>官方与社区卷轴市场 (Scroll Market)</span>
+                <span>官方与社区卷轴市场</span>
             </div>
             <h1 class="market-hero-title">全核心通用的自动化脚本</h1>
-            <p class="market-hero-desc">免安装服务端 Mod/Plugin、永不崩服、零侵入式的控制台自动化脚本库。一键导入，毫秒级热生效！</p>
+            <p class="market-hero-desc">免安装服务端 Mod/Plugin、永不崩服、零侵入式的 Minecraft 控制台自动化脚本库。一键导入，毫秒级热生效！</p>
         </div>
     </header>
 
     <!-- Main Content Area -->
     <main class="market-main container">
-        <!-- Controls -->
+        <!-- Controls: Search & Category Filters & Order -->
         <section class="controls-panel">
             <div class="search-wrapper">
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
@@ -110,7 +100,7 @@
         <!-- Loading Indicator / Empty State -->
         <div class="market-status" id="marketStatus" style="display: none;">
             <div class="empty-state">
-                <i class="fa-solid fa-scroll empty-icon" style="color: #a78bfa;"></i>
+                <i class="fa-solid fa-scroll empty-icon"></i>
                 <p>未找到符合条件的卷轴脚本</p>
                 <button class="btn btn-outline btn-sm" id="resetFiltersBtn">重置过滤条件</button>
             </div>
@@ -127,6 +117,7 @@
         <div class="modal-content">
             <button class="modal-close" id="modalCloseBtn" aria-label="关闭">&times;</button>
             <div class="modal-body" id="modalBody">
+                <!-- Modal content will be generated dynamically -->
             </div>
         </div>
     </dialog>
@@ -139,22 +130,25 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-brand">
-                    <div class="nav-logo" style="background: linear-gradient(135deg, #8b5cf6, #ec4899);">
-                        <i class="fa-solid fa-scroll"></i>
+                    <div class="nav-logo">
+                        <i class="fa-solid fa-cube"></i>
                     </div>
                     <span class="footer-brand-text">MC Web Panel</span>
                 </div>
                 <div class="footer-links">
                     <a href="./index.html#features">特性</a>
+                    <a href="./index.html#screenshots">截图</a>
+                    <a href="./index.html#quickstart">快速开始</a>
                     <a href="./market.html">插件市场</a>
                     <a href="./scrolls-market.html">卷轴市场</a>
                     <a href="./scrolls-guide/">卷轴开发文档</a>
+                    <a href="./dev-guide/">插件开发文档</a>
                     <a href="https://github.com/4ystudio/mc-web-panel" target="_blank">GitHub</a>
                 </div>
             </div>
             <div class="footer-bottom">
                 <p>Released under the <a href="https://github.com/4ystudio/mc-web-panel/blob/main/LICENSE" target="_blank">MIT License</a></p>
-                <p>Made with <i class="fa-solid fa-heart" style="color: #a78bfa;"></i> by <a href="https://github.com/4ystudio" target="_blank">4ystudio</a></p>
+                <p>Made with <i class="fa-solid fa-heart" style="color: #ef4444;"></i> by <a href="https://github.com/4ystudio" target="_blank">4ystudio</a></p>
             </div>
         </div>
     </footer>

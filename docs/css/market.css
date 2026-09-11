@@ -285,6 +285,8 @@ body {
 .badge-backups { background: var(--c-backup-bg); color: var(--c-backup); }
 .badge-network { background: var(--c-network-bg); color: var(--c-network); }
 .badge-security { background: var(--c-security-bg); color: var(--c-security); }
+.badge-interactive { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.badge-utility { background: rgba(6, 182, 212, 0.12); color: #06b6d4; }
 
 .plugin-version-badge {
     background: var(--c-bg);
