@@ -54,8 +54,15 @@ export const messages = {
             edit_note: '编辑备注',
             processing: '处理中...',
             no_data: '暂无数据',
-            reset: '重置'
+            reset: '重置',
+            install: '安装',
+            installing: '正在安装...',
+            dont_show_again: '不再提示',
+            unsaved_changes: '您有未保存的更改，确定要离开吗？',
+            export: '导出'
         },
+        cancel: '取消',
+        close: '关闭',
         login: {
             title: 'MC 面板',
             prompt_scan: '请使用 Google Authenticator 扫描此二维码。',
@@ -107,11 +114,36 @@ export const messages = {
             title: '卷轴管理',
             description: '管理和配置自动化脚本卷轴，通过控制台事件与指令注入实现游戏自动化',
             guide_button: '开发文档',
+            market_button: '官方商店',
             install: '安装卷轴',
             market_link: '前往卷轴市场',
             market_hint: '想要发现更多免侵入自动化玩法？欢迎访问官方卷轴市场。',
-            upload_desc: '请上传 .zip 格式的卷轴包。卷轴将被上传并自动解压部署。',
+            market_title: '发现更多官方与社区卷轴？',
+            market_desc: '访问 GitHub 托管的官方卷轴市场，免费浏览下载扫地姬、防沉迷、快速天亮等丰富脚本。',
+            official_market: '官方卷轴市场',
+            disclaimer_title: '卷轴安全免责声明',
+            disclaimer_line1: '卷轴系统基于 Minecraft 服务端控制台命令与事件驱动执行，具备向服务器下发控制台指令、广播消息及管理实例存储等能力。',
+            disclaimer_line2: '安装第三方卷轴前，请务必确认脚本来源可信。因使用未知或恶意卷轴导致的服务器崩溃、存档异常或数据丢失，本面板概不承担责任。',
+            disclaimer_line3: '使用本卷轴系统即表示您已了解并同意上述风险提示，所有因卷轴脚本运行产生的后果由用户自行承担。',
+            disclaimer_confirm: '我已阅读并理解上述风险提示与免责声明',
+            disclaimer_agree: '确认并继续',
+            upload_desc: '请上传 .zip 格式的卷轴包。系统将对卷轴包进行结构与元数据解析。',
             install_file_label: '选择卷轴 ZIP 文件',
+            install_confirm_title: '确认安装卷轴',
+            update_title: '更新卷轴: {name}',
+            new_badge: '新卷轴',
+            update_badge: '更新',
+            update_comparison: '版本对比',
+            current_version: '当前版本',
+            new_version: '准备安装',
+            downgrade_warning: '注意：准备安装的版本低于当前已安装版本。',
+            install_confirm_hint: '请确认以上卷轴信息，确认无误后点击下方按钮开始部署安装。',
+            confirm_update: '确认更新',
+            confirm_install: '确认安装',
+            upload_analyze: '上传并解析',
+            analyzing: '正在解析...',
+            installed_success_toast: '卷轴 {name} 安装成功！',
+            config_schema_title: '可配置参数',
             running: '运行中',
             stopped: '已停止',
             error: '加载错误',
@@ -296,7 +328,8 @@ export const messages = {
             extracting: '正在解压...',
             upload_confirm_title: '确认上传文件',
             upload_confirm_desc: '请确认并选择需要上传的文件列表（已自动选中所有项目）：',
-            upload_list_title: '待上传文件列表'
+            upload_list_title: '待上传文件列表',
+            error_read: '读取文件失败'
         },
         mods: {
             title: '模组列表',
@@ -406,7 +439,8 @@ export const messages = {
             no_conflicts: '当前没有检测到任何版本冲突的模组',
             skip_confirm: '选择版本后不要弹出确认提示框',
             confirm_keep_title: '确认保留版本',
-            confirm_keep_msg: '确定要保留模组版本 [{name}] 并删除其他 {count} 个旧/冲突版本吗？'
+            confirm_keep_msg: '确定要保留模组版本 [{name}] 并删除其他 {count} 个旧/冲突版本吗？',
+            no_info: '该模组暂无更多详细说明'
         },
 
         players: {
@@ -854,6 +888,7 @@ export const messages = {
             guide_step2_desc: '使用 JavaScript 编写后端逻辑与前端界面。',
             guide_step3_title: '打包发布',
             guide_step3_desc: '将文件夹压缩为 .zip 包即可在面板中安装。',
+            guide_structure_title: '标准目录结构',
             guide_structure_desc: '一个标准的插件包应包含以下文件：',
             guide_file_json: '清单文件 (必须)',
             guide_file_main: '后端入口',
@@ -932,7 +967,8 @@ export const messages = {
             confirm_remove: '确定要删除 {name} 吗？此操作不可撤销。',
             system_not_found: '未检测到系统 Java',
             system_found: '检测到系统 Java',
-            add_to_list: '是否添加到管理列表？'
+            add_to_list: '是否添加到管理列表？',
+            task_running: '已有正在进行的安装任务'
         },
         instance_manager: {
             title: '实例管理',
@@ -1077,8 +1113,15 @@ export const messages = {
             edit_note: 'Edit Note',
             processing: 'Processing...',
             no_data: 'No data',
-            reset: 'Reset'
+            reset: 'Reset',
+            install: 'Install',
+            installing: 'Installing...',
+            dont_show_again: "Don't show again",
+            unsaved_changes: 'You have unsaved changes. Are you sure you want to leave?',
+            export: 'Export'
         },
+        cancel: 'Cancel',
+        close: 'Close',
         login: {
             title: 'MC Panel',
             prompt_scan: 'Use Google Authenticator to scan this QR code.',
@@ -1130,11 +1173,36 @@ export const messages = {
             title: 'Scrolls',
             description: 'Manage and configure console event-driven automation scrolls for your server',
             guide_button: 'Dev Guide',
+            market_button: 'Official Store',
             install: 'Install Scroll',
             market_link: 'Visit Scroll Market',
             market_hint: 'Looking for more crash-proof automation? Visit the official Scroll Market.',
-            upload_desc: 'Please upload a .zip scroll package. It will be extracted and deployed automatically.',
+            market_title: 'Discover More Official & Community Scrolls?',
+            market_desc: 'Browse and download auto-cleaner, anti-addiction, fast-sleep and more from GitHub.',
+            official_market: 'Official Scrolls Market',
+            disclaimer_title: 'Scroll Security Disclaimer',
+            disclaimer_line1: 'The scroll system executes via Minecraft server console commands and events, with permissions to dispatch console commands, broadcast messages, and manage instance data.',
+            disclaimer_line2: 'Before installing third-party scrolls, please ensure the source is trustworthy. The panel is not responsible for any server crashes, world corruption, or data loss caused by third-party scripts.',
+            disclaimer_line3: 'By using this scroll system, you acknowledge and accept the risks. All consequences arising from running scrolls are borne by the user.',
+            disclaimer_confirm: 'I have read and understand the risk warnings and disclaimer',
+            disclaimer_agree: 'Confirm and Continue',
+            upload_desc: 'Please upload a .zip scroll package. The panel will parse the package structure and manifest.',
             install_file_label: 'Choose Scroll ZIP File',
+            install_confirm_title: 'Confirm Scroll Installation',
+            update_title: 'Update Scroll: {name}',
+            new_badge: 'New Scroll',
+            update_badge: 'Update',
+            update_comparison: 'Version Comparison',
+            current_version: 'Current',
+            new_version: 'Target',
+            downgrade_warning: 'Warning: The target version is lower than the current installed version.',
+            install_confirm_hint: 'Please review the scroll information above and click confirm to proceed with installation.',
+            confirm_update: 'Confirm Update',
+            confirm_install: 'Confirm Installation',
+            upload_analyze: 'Upload & Analyze',
+            analyzing: 'Analyzing...',
+            installed_success_toast: 'Scroll {name} installed successfully!',
+            config_schema_title: 'Configurable Options',
             running: 'Running',
             stopped: 'Stopped',
             error: 'Error',
@@ -1319,7 +1387,8 @@ export const messages = {
             extracting: 'Extracting...',
             upload_confirm_title: 'Confirm Uploading Files',
             upload_confirm_desc: 'Please confirm and select the files to upload (all items are checked by default):',
-            upload_list_title: 'Pending Files List'
+            upload_list_title: 'Pending Files List',
+            error_read: 'Failed to read file'
         },
         mods: {
             title: 'Mods List',
@@ -1429,7 +1498,8 @@ export const messages = {
             no_conflicts: 'No conflicting mod versions detected at the moment.',
             skip_confirm: 'Do not show confirmation dialog after selecting a version',
             confirm_keep_title: 'Confirm Keeping Version',
-            confirm_keep_msg: 'Are you sure you want to keep mod version [{name}] and delete the other {count} old/conflicting versions?'
+            confirm_keep_msg: 'Are you sure you want to keep mod version [{name}] and delete the other {count} old/conflicting versions?',
+            no_info: 'No additional information available for this mod.'
         },
 
         players: {
@@ -1743,6 +1813,10 @@ export const messages = {
             webhook_settings: 'Event Webhook',
             webhook_urls: 'Webhook Receivers (one URL per line)',
             webhook_desc: 'The panel will send POST event notifications to these URLs when the server starts, stops, crashes, or players join/leave.',
+            console_info_position: 'Console Info Position',
+            pos_top: 'Top',
+            pos_sidebar: 'Sidebar',
+            pos_hide: 'Hide',
             github_proxy: 'GitHub Proxy',
             github_proxy_desc: 'Proxy for faster updates and Java downloads',
             backup_maintenance: 'Backup & Maintenance',
@@ -1952,7 +2026,8 @@ export const messages = {
             confirm_remove: 'Are you sure you want to remove {name}? This cannot be undone.',
             system_not_found: 'System Java not detected',
             system_found: 'System Java detected',
-            add_to_list: 'Add to managed list?'
+            add_to_list: 'Add to managed list?',
+            task_running: 'An installation task is already running'
         },
         instance_manager: {
             title: 'Instance Manager',

@@ -24,7 +24,7 @@ const downloadFile = (url, dest) => {
 
 async function prepareBuildDir() {
     console.log('Preparing clean build directory...');
-    if (fs.existsSync(DIST_ROOT)) fs.rmSync(DIST_ROOT, { recursive: true, force: true });
+    if (fs.existsSync(BUILD_DIR)) fs.rmSync(BUILD_DIR, { recursive: true, force: true });
     fs.mkdirSync(DIST_ROOT, { recursive: true });
     fs.mkdirSync(BUILD_DIR, { recursive: true });
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -32,7 +32,7 @@ async function prepareBuildDir() {
 
     console.log('Copying project files...');
     const manifest = {
-        files: ['server.js', 'plugin-loader.js', 'package.json', 'server-icon.png'],
+        files: ['server.js', 'plugin-loader.js', 'scroll-engine.js', 'package.json', 'server-icon.png'],
         dirs: ['public', 'plugins']
     };
     manifest.files.forEach(f => { 

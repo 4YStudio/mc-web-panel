@@ -537,7 +537,7 @@ export default {
                                 </div>
                             </div>
                             <div class="modal-footer border-top pt-3 px-4 pb-4">
-                                <button class="btn btn-outline-secondary rounded-pill px-4" @click="closeGiveModal">{{ $t('cancel') }}</button>
+                                <button class="btn btn-outline-secondary rounded-pill px-4" @click="closeGiveModal">{{ $t('common.cancel') }}</button>
                                 <button class="btn btn-primary rounded-pill px-4 fw-bold shadow" @click="confirmGiveItem" :disabled="!selectedItem || !giveQuantity">
                                     <i class="fa-solid fa-circle-check me-1"></i> {{ $t('players.give_item') }}
                                 </button>
@@ -611,7 +611,7 @@ export default {
                                     <i class="fa-solid fa-trash me-1"></i> {{ $t('players.clear_effects') }}
                                 </button>
                                 <div class="d-flex gap-2">
-                                    <button class="btn btn-outline-secondary rounded-pill px-3" @click="closeEffectModal">{{ $t('cancel') }}</button>
+                                    <button class="btn btn-outline-secondary rounded-pill px-3" @click="closeEffectModal">{{ $t('common.cancel') }}</button>
                                     <button class="btn btn-primary rounded-pill px-3 fw-bold shadow" @click="confirmGiveEffect">
                                         <i class="fa-solid fa-circle-check me-1"></i> {{ $t('common.confirm') }}
                                     </button>
@@ -691,7 +691,7 @@ export default {
                                 </div>
                             </div>
                             <div class="modal-footer border-top pt-3 px-4 pb-4">
-                                <button class="btn btn-outline-secondary rounded-pill px-4" @click="closeInventoryModal">{{ $t('close') }}</button>
+                                <button class="btn btn-outline-secondary rounded-pill px-4" @click="closeInventoryModal">{{ $t('common.close') }}</button>
                                 <button class="btn btn-outline-danger rounded-pill px-4" @click="confirmClearInventory" v-if="!inventoryLoading && inventoryItems.length > 0">
                                     <i class="fa-solid fa-trash me-1"></i> {{ $t('players.clear_inv') }}
                                 </button>

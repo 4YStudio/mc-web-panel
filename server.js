@@ -272,6 +272,24 @@ const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const LOG_FILE = path.join(DATA_DIR, 'panel.log');
 const PLUGINS_DIR = path.join(BASE_DIR, 'plugins');
 
+// 保证后台模式与异常退出时致命错误能落盘追踪
+const logFatalError = (type, err) => {
+    try {
+        fs.ensureDirSync(DATA_DIR);
+        const msg = `[${new Date().toISOString()}] [FATAL:${type}] ${err?.stack || err?.message || err}\n`;
+        fs.appendFileSync(LOG_FILE, msg);
+    } catch (_) { }
+};
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL uncaughtException]', err);
+    logFatalError('uncaughtException', err);
+    process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[Unhandled Rejection]', reason);
+    logFatalError('unhandledRejection', reason);
+});
+
 const loadUsers = () => {
     try {
         if (fs.existsSync(USERS_FILE)) return fs.readJsonSync(USERS_FILE);
@@ -721,9 +739,14 @@ function doStart() {
     }
     if (existingPid) cleanPid(); // stale PID file
     // 以 daemon 模式后台启动
+    let logFd = 'ignore';
+    try {
+        fs.ensureDirSync(DATA_DIR);
+        logFd = fs.openSync(LOG_FILE, 'a');
+    } catch (_) { }
     const child = spawn(APP_EXECUTABLE, ['--daemon'], {
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', logFd, logFd],
         cwd: path.dirname(APP_EXECUTABLE)
     });
     child.on('error', (err) => {
@@ -1101,9 +1124,12 @@ if (cluster.isPrimary) {
 
 
     app.use(express.static(path.join(__dirname, 'public')));
-    app.use('/dev-guide', express.static(path.join(__dirname, 'docs', 'dev-guide')));
-    app.use('/scrolls-guide', express.static(path.join(__dirname, 'docs', 'scrolls-guide')));
-    app.use('/scrolls_shop', express.static(path.join(__dirname, 'docs', 'scrolls_shop')));
+    app.use('/dev-guide', (req, res) => res.redirect('https://4ystudio.github.io/mc-web-panel/'));
+    app.use('/scrolls-guide', (req, res) => res.redirect('https://4ystudio.github.io/mc-web-panel/scrolls-guide/'));
+    app.use('/scrolls-market.html', (req, res) => res.redirect('https://4ystudio.github.io/mc-web-panel/scrolls-market.html'));
+    app.use('/scrolls-market', (req, res) => res.redirect('https://4ystudio.github.io/mc-web-panel/scrolls-market.html'));
+    app.use('/market.html', (req, res) => res.redirect('https://4ystudio.github.io/mc-web-panel/market.html'));
+    app.use('/market', (req, res) => res.redirect('https://4ystudio.github.io/mc-web-panel/market.html'));
     app.use(bodyParser.json());
     app.use(session({
         secret: appConfig.sessionSecret,
@@ -1173,7 +1199,7 @@ if (cluster.isPrimary) {
     // --- Scroll Engine (卷轴系统) ---
     const ScrollEngine = require('./scroll-engine.js');
     scrollEngine = new ScrollEngine({
-        projectRoot: __dirname,
+        projectRoot: BASE_DIR,
         instancesDir: INSTANCES_DIR,
         getInstanceDir,
         getInstances: () => instanceConfig.instances,

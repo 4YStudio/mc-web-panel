@@ -235,19 +235,7 @@ export default {
                             <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.name_label') }}</label>
                             <input type="text" class="form-control" v-model="form.name" :placeholder="$t('instance_manager.name_placeholder')">
                         </div>
-                        <div v-if="!isEditing" class="mb-3">
-                            <label class="form-label small fw-bold text-muted">{{ $t('instance_manager.preset_label') || '一键傻瓜预设 / Quick Preset' }}</label>
-                            <select class="form-select" v-model="form.preset">
-                                <option value="">{{ $t('instance_manager.preset_none') || '自定义核心 (不使用预设) / Custom Core' }}</option>
-                                <option value="vanilla-1.20.4">Paper (1.20.4) 极简生存预设 (推荐 / Java 17)</option>
-                                <option value="fabric-1.20.1">Fabric (1.20.1) 模组生存预设 (Java 17)</option>
-                                <option value="paper-1.12.2">Paper (1.12.2) 经典旧版联机预设 (Java 8)</option>
-                            </select>
-                            <div class="form-text small text-primary mt-1" v-if="form.preset">
-                                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>
-                                {{ $t('instance_manager.preset_help') || '面板将在后台自动为您下载核心并同意 EULA 协议，创建后直接点【启动】即可。' }}
-                            </div>
-                        </div>
+
                         <div v-if="isEditing" class="mb-3">
                             <label class="form-label small fw-bold text-muted">{{ $t('properties.loader_type') }}</label>
                             <div class="form-control-plaintext small fw-bold">
@@ -277,7 +265,7 @@ export default {
         // const { t } = VueI18n.useI18n(); // global mixin used in template, maybe not needed here if not used in script? 
         // usage in script: t is used in showToast. imported from utils.
         const form = ref({
-            id: '', name: '', jarName: '', javaArgs: '', javaPath: '', preset: ''
+            id: '', name: '', jarName: '', javaArgs: '', javaPath: ''
         });
         const isEditing = ref(false);
         const modal = ref(null);
@@ -314,7 +302,7 @@ export default {
         const showCreateModal = () => {
             isEditing.value = false;
             form.value = {
-                id: '', name: '', jarName: '', javaArgs: '', javaPath: '', preset: ''
+                id: '', name: '', jarName: '', javaArgs: '', javaPath: ''
             };
             modal.value.show();
         };

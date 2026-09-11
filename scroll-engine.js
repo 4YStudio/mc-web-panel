@@ -700,7 +700,7 @@ class ScrollEngine {
             }
         });
 
-        // 8. 上传本地 ZIP 卷轴并安装至当前实例
+        // 8. 上传本地 ZIP 卷轴并解析 (第一阶段：解析元数据与预览)
         const scrollUpload = multer({ dest: this.tmpUploadDir });
 
         router.post('/upload', requireAuth, withInstance, scrollUpload.single('scroll'), async (req, res) => {
@@ -717,21 +717,75 @@ class ScrollEngine {
                 const scrollId = meta.id;
                 if (!scrollId) throw new Error('scroll.json 中缺少有效 id');
 
+                // 解压到临时目录以备预览和二次确认安装
+                const tempDirName = `scroll_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const tempDir = path.join(this.tmpUploadDir, tempDirName);
+                fs.mkdirSync(tempDir, { recursive: true });
+                zip.extractAllTo(tempDir, true);
+
+                // 检查是否为已有卷轴更新
+                const holder = this.getOrCreateHolder(req.instanceId);
+                const existing = holder.scrolls.get(scrollId);
+
+                try { fs.unlinkSync(req.file.path); } catch (e) {}
+
+                res.json({
+                    success: true,
+                    analysis: {
+                        manifest: meta,
+                        existing: existing ? { version: existing.version, name: existing.name, description: existing.description } : null,
+                        isUpdate: !!existing,
+                        tempDir,
+                        scrollId
+                    }
+                });
+            } catch (err) {
+                try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) {}
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // 8.1 确认安装卷轴 (第二阶段：正式部署到实例并热加载)
+        router.post('/install-confirm', requireAuth, withInstance, async (req, res) => {
+            try {
+                const { tempDir, scrollId } = req.body;
+                if (!tempDir || !scrollId) return res.status(400).json({ error: '缺少必要安装信息' });
+
+                // 安全路径校验：tempDir 必须在 tmpUploadDir 内部
+                const resolvedTempDir = path.resolve(tempDir);
+                const resolvedTmpUpload = path.resolve(this.tmpUploadDir);
+                if (!resolvedTempDir.startsWith(resolvedTmpUpload) || resolvedTempDir === resolvedTmpUpload) {
+                    return res.status(400).json({ error: '非法的临时部署路径' });
+                }
+
+                if (!fs.existsSync(resolvedTempDir)) {
+                    return res.status(400).json({ error: '安装临时文件已失效，请重新上传' });
+                }
+
                 const holder = this.getOrCreateHolder(req.instanceId);
                 const targetDir = path.join(holder.scrollsDir, scrollId);
+
+                // 如果存在旧版本，先卸载并清理
                 if (fs.existsSync(targetDir)) {
                     this.unloadScroll(req.instanceId, scrollId);
+                    try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch (e) {}
                 }
+
                 fs.mkdirSync(targetDir, { recursive: true });
-                zip.extractAllTo(targetDir, true);
+                fs.cpSync(resolvedTempDir, targetDir, { recursive: true });
 
-                await this.loadScroll(req.instanceId, scrollId);
+                // 加载并激活卷轴
+                const scrollRecord = await this.loadScroll(req.instanceId, scrollId);
 
-                try { fs.unlinkSync(req.file.path); } catch (e) {}
+                // 清理临时目录
+                try { fs.rmSync(resolvedTempDir, { recursive: true, force: true }); } catch (e) {}
 
-                res.json({ success: true, id: scrollId, manifest: meta });
+                res.json({
+                    success: true,
+                    id: scrollId,
+                    scroll: scrollRecord?.manifest || { id: scrollId }
+                });
             } catch (err) {
-                try { fs.unlinkSync(req.file.path); } catch (e) {}
                 res.status(500).json({ error: err.message });
             }
         });

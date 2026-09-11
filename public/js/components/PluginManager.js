@@ -20,7 +20,10 @@ export default {
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="/dev-guide/" target="_blank" class="btn btn-outline-primary rounded-pill px-3 px-md-4">
+                <a href="https://4ystudio.github.io/mc-web-panel/market.html" target="_blank" class="btn btn-outline-info rounded-pill px-3 px-md-4">
+                    <i class="fa-solid fa-store"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.market_button') }}</span>
+                </a>
+                <a href="https://4ystudio.github.io/mc-web-panel/" target="_blank" class="btn btn-outline-primary rounded-pill px-3 px-md-4">
                     <i class="fa-solid fa-book"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.guide_button') }}</span>
                 </a>
                 <button class="btn btn-primary rounded-pill px-3 px-md-4 fw-bold shadow-sm" @click="openInstallModal">
