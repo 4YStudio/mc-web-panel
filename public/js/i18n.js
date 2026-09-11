@@ -1066,7 +1066,23 @@ export const messages = {
             proxy_url: '代理加速地址',
             proxy_url_placeholder: '例如：https://ghfast.top/ 或 https://mirror.ghproxy.com/',
             proxy_tips: '国内网络下载慢或超时可开启代理加速',
-            proxy_presets: '常用预设'
+            proxy_presets: '常用预设',
+            import_config: '导入配置',
+            config_format: '配置格式',
+            format_toml: 'TOML 格式 (.toml)',
+            format_ini: 'INI 格式 (.ini)',
+            import_file: '导入文件',
+            import_file_tip: '支持导入 .ini、.toml、.conf、.txt 等内网穿透配置文件',
+            import_clipboard: '剪贴板导入',
+            import_clipboard_tip: '一键粘贴来自内网穿透平台的配置内容',
+            clipboard_modal_title: '从剪贴板粘贴配置',
+            clipboard_modal_desc: '请将内网穿透平台（如 SakuraFrp、ME Frp、OpenFrp 等）提供的配置内容粘贴到下方：',
+            clipboard_modal_confirm: '确认导入',
+            import_success: '导入成功 (已识别为 {format} 格式)',
+            import_fail: '导入失败：未能解析有效配置',
+            clipboard_empty: '剪贴板内容为空',
+            clipboard_denied: '浏览器未授予剪贴板读取权限，已打开手动粘贴输入框',
+            format_switch_tip: '切换格式时将自动转换当前配置内容'
         }
     },
     en: {
@@ -2134,7 +2150,23 @@ export const messages = {
             proxy_url: 'Proxy URL',
             proxy_url_placeholder: 'e.g. https://ghfast.top/ or https://mirror.ghproxy.com/',
             proxy_tips: 'Recommended if GitHub download is slow or timing out',
-            proxy_presets: 'Presets'
+            proxy_presets: 'Presets',
+            import_config: 'Import Config',
+            config_format: 'Config Format',
+            format_toml: 'TOML Format (.toml)',
+            format_ini: 'INI Format (.ini)',
+            import_file: 'Import File',
+            import_file_tip: 'Supports importing .ini, .toml, .conf, .txt config files',
+            import_clipboard: 'Clipboard',
+            import_clipboard_tip: 'Paste tunnel config directly from clipboard',
+            clipboard_modal_title: 'Paste Config from Clipboard',
+            clipboard_modal_desc: 'Paste your tunnel configuration (from SakuraFrp, ME Frp, OpenFrp, etc.) below:',
+            clipboard_modal_confirm: 'Confirm Import',
+            import_success: 'Imported successfully (detected as {format} format)',
+            import_fail: 'Import failed: Unable to parse valid config',
+            clipboard_empty: 'Clipboard is empty',
+            clipboard_denied: 'Clipboard access denied, opened paste dialog instead',
+            format_switch_tip: 'Configuration will be converted when switching formats'
         }
     }
 };
