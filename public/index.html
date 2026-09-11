@@ -81,6 +81,13 @@
                 </div>
             </div>
 
+            <div v-else-if="store.view === 'panel-backup'"
+                class="w-100 vh-100 p-4 p-md-5 overflow-auto" key="panel-backup">
+                <div class="container-xxl p-0">
+                    <panel-backup></panel-backup>
+                </div>
+            </div>
+
             <div v-else-if="store.view === 'about'" class="w-100 vh-100 p-4 p-md-5 overflow-auto"
                 key="about">
                 <div class="container-xxl p-0">
@@ -124,8 +131,9 @@
                             <file-manager v-else-if="store.view === 'files'" key="files"></file-manager>
 
                             <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
+                            <scroll-manager v-else-if="store.view === 'scrolls'" key="scrolls"></scroll-manager>
                             <about v-else-if="store.view === 'about'" key="about"></about>
-                            <div v-else-if="isPluginView" :key="'plugin-' + store.view" class="animate-in">
+                            <div v-else-if="isPluginView" :key="'plugin-' + store.view" class="h-100">
                                 <component :is="pluginViewComponent"></component>
                             </div>
                         </Transition>

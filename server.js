@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.3.1';
+const APP_VERSION = '2.4.1';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -408,7 +408,20 @@ if (!fs.existsSync(CONFIG_FILE) || !appConfig.cliSecret) {
     fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
 }
 
+function isPathInside(target, base) {
+    if (!target || !base) return false;
+    const resolvedTarget = path.resolve(target);
+    const resolvedBase = path.resolve(base);
+    if (process.platform === 'win32') {
+        const lowerTarget = resolvedTarget.toLowerCase();
+        const lowerBase = resolvedBase.toLowerCase();
+        return lowerTarget === lowerBase || lowerTarget.startsWith(lowerBase + path.sep);
+    }
+    return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path.sep);
+}
+
 function nativeHttpGet(urlStr, options = {}) {
+    const maxRedirects = options.maxRedirects !== undefined ? options.maxRedirects : 10;
     return new Promise((resolve, reject) => {
         const parsed = new URL(urlStr);
         const mod = parsed.protocol === 'https:' ? https : http;
@@ -423,8 +436,8 @@ function nativeHttpGet(urlStr, options = {}) {
         const req = mod.request(reqOptions, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                 const redirectUrl = new URL(res.headers.location, urlStr).href;
-                if (options.maxRedirects > 0) {
-                    nativeHttpGet(redirectUrl, { ...options, maxRedirects: (options.maxRedirects || 10) - 1 })
+                if (maxRedirects > 0) {
+                    nativeHttpGet(redirectUrl, { ...options, maxRedirects: maxRedirects - 1 })
                         .then(resolve).catch(reject);
                 } else {
                     reject(new Error(`Too many redirects, last status: ${res.statusCode}`));
@@ -863,6 +876,7 @@ if (cluster.isPrimary) {
 
     // (Moved to top level)
     const app = express();
+    app.set('trust proxy', true);
     const server = http.createServer(app);
     const io = new Server(server);
 
@@ -1063,6 +1077,8 @@ if (cluster.isPrimary) {
         } catch (e) { }
     }
 
+    let scrollEngine = null;
+
     const appendLog = (instanceId, msg) => {
         const state = getOrCreateInstanceState(instanceId);
         state.logHistory.push(msg);
@@ -1080,10 +1096,14 @@ if (cluster.isPrimary) {
 
         // Notify plugin system's log handlers
         if (pluginLoader.notifyLogHandlers) pluginLoader.notifyLogHandlers(instanceId, msg);
+        if (scrollEngine) scrollEngine.handleConsoleLog(instanceId, msg);
     };
 
 
     app.use(express.static(path.join(__dirname, 'public')));
+    app.use('/dev-guide', express.static(path.join(__dirname, 'docs', 'dev-guide')));
+    app.use('/scrolls-guide', express.static(path.join(__dirname, 'docs', 'scrolls-guide')));
+    app.use('/scrolls_shop', express.static(path.join(__dirname, 'docs', 'scrolls_shop')));
     app.use(bodyParser.json());
     app.use(session({
         secret: appConfig.sessionSecret,
@@ -1101,8 +1121,26 @@ if (cluster.isPrimary) {
         res.status(401).json({ error: '未授权' });
     };
 
+    const requireAdmin = (req, res, next) => {
+        const cliSecret = req.headers['x-cli-secret'];
+        if (cliSecret && cliSecret === appConfig.cliSecret) {
+            return next();
+        }
+        if (!req.session.authenticated) {
+            return res.status(401).json({ error: '未授权' });
+        }
+        if (req.session.isSubAccount) {
+            return res.status(403).json({ error: '仅限主管理员访问' });
+        }
+        next();
+    };
+
     const requirePermission = (permission) => {
         return (req, res, next) => {
+            const cliSecret = req.headers['x-cli-secret'];
+            if (cliSecret && cliSecret === appConfig.cliSecret) {
+                return next();
+            }
             if (!req.session.authenticated) {
                 return res.status(401).json({ error: '未授权' });
             }
@@ -1131,6 +1169,21 @@ if (cluster.isPrimary) {
         instanceConfig,
         saveInstances
     });
+
+    // --- Scroll Engine (卷轴系统) ---
+    const ScrollEngine = require('./scroll-engine.js');
+    scrollEngine = new ScrollEngine({
+        projectRoot: __dirname,
+        instancesDir: INSTANCES_DIR,
+        getInstanceDir,
+        getInstances: () => instanceConfig.instances,
+        instancesState,
+        getActiveInstanceId: () => instanceConfig.activeInstanceId,
+        appendLog,
+        io
+    });
+    scrollEngine.init().catch(err => console.error('[ScrollEngine] 初始化异常:', err));
+    scrollEngine.registerRoutes(app, requireAuth, withInstance);
 
     const getPluginPermission = (pluginId) => {
         if (pluginId.includes('backup')) {
@@ -1198,54 +1251,69 @@ if (cluster.isPrimary) {
                     const state = getOrCreateInstanceState(inst.id);
                     const instDir = getInstanceDir(inst.id);
 
-                    let versionInfo = { mc: 'Unknown', loader: 'Unknown' };
-                    let serverInfo = { port: '25565', maxPlayers: '20', motd: 'Loading...' };
-                    let hasBackupMod = false, hasEasyAuth = false, hasVoicechat = false;
-                    let isSetup = false;
-                    let hasIcon = false;
+                    const now = Date.now();
+                    if (!state.metaCache || (now - state.metaCache.timestamp > 10000)) {
+                        let versionInfo = { mc: 'Unknown', loader: 'Unknown' };
+                        let serverInfo = { port: '25565', maxPlayers: '20', motd: 'Loading...' };
+                        let hasBackupMod = false, hasEasyAuth = false, hasVoicechat = false;
+                        let isSetup = false;
+                        let hasIcon = false;
 
-                    if (instDir && fs.existsSync(instDir)) {
-                        const dirEntries = fs.readdirSync(instDir);
-                        isSetup = dirEntries.length > 2;
+                        if (instDir && fs.existsSync(instDir)) {
+                            const dirEntries = fs.readdirSync(instDir);
+                            isSetup = dirEntries.length > 2;
 
-                        // Version
-                        try {
-                            const vFile = path.join(instDir, 'server-version.json');
-                            if (fs.existsSync(vFile)) {
-                                const vData = await fs.readJson(vFile);
-                                versionInfo = { mc: vData.gameVersion, loader: vData.loaderVersion };
-                                if (vData.loaderType) inst.loaderType = vData.loaderType;
-                            } else if (state.detectedVersion.mc !== 'Unknown') {
-                                versionInfo = state.detectedVersion;
+                            // Version
+                            try {
+                                const vFile = path.join(instDir, 'server-version.json');
+                                if (fs.existsSync(vFile)) {
+                                    const vData = await fs.readJson(vFile);
+                                    versionInfo = { mc: vData.gameVersion, loader: vData.loaderVersion };
+                                    if (vData.loaderType) inst.loaderType = vData.loaderType;
+                                } else if (state.detectedVersion.mc !== 'Unknown') {
+                                    versionInfo = state.detectedVersion;
+                                }
+                            } catch (e) { }
+
+                            // Properties
+                            const propsFile = path.join(instDir, 'server.properties');
+                            if (fs.existsSync(propsFile)) {
+                                try {
+                                    const props = PropertiesReader(propsFile);
+                                    serverInfo.port = props.get('server-port') || '25565';
+                                    serverInfo.maxPlayers = props.get('max-players') || '20';
+                                    serverInfo.motd = props.get('motd') || 'Minecraft Server';
+                                } catch (e) { }
                             }
-                        } catch (e) { }
 
-                        // Properties
-                        const propsFile = path.join(instDir, 'server.properties');
-                        if (fs.existsSync(propsFile)) {
-                            try {
-                                const props = PropertiesReader(propsFile);
-                                serverInfo.port = props.get('server-port') || '25565';
-                                serverInfo.maxPlayers = props.get('max-players') || '20';
-                                serverInfo.motd = props.get('motd') || 'Minecraft Server';
-                            } catch (e) { }
+                            // Mods
+                            const modsDir = path.join(instDir, 'mods');
+                            if (fs.existsSync(modsDir)) {
+                                try {
+                                    const modFiles = fs.readdirSync(modsDir).map(f => f.toLowerCase());
+                                    hasBackupMod = modFiles.some(f => f.includes('advancedbackups') || f.includes('advanced-backups') || f.includes('advanced_backups'));
+                                    hasEasyAuth = modFiles.some(f => f.includes('easyauth') || f.includes('easy-auth') || f.includes('easy_auth'));
+                                    hasVoicechat = modFiles.some(f => f.includes('voicechat') || f.includes('voice-chat') || f.includes('voice_chat'));
+                                } catch (e) { }
+                            }
+                            // Check for icon
+                            const iconFile = path.join(instDir, 'server-icon.png');
+                            hasIcon = fs.existsSync(iconFile);
                         }
 
-                        // Mods
-                        const modsDir = path.join(instDir, 'mods');
-                        if (fs.existsSync(modsDir)) {
-                            try {
-                                const modFiles = fs.readdirSync(modsDir).map(f => f.toLowerCase());
-                                hasBackupMod = modFiles.some(f => f.includes('advancedbackups') || f.includes('advanced-backups') || f.includes('advanced_backups'));
-                                hasEasyAuth = modFiles.some(f => f.includes('easyauth') || f.includes('easy-auth') || f.includes('easy_auth'));
-                                hasVoicechat = modFiles.some(f => f.includes('voicechat') || f.includes('voice-chat') || f.includes('voice_chat'));
-                            } catch (e) { }
-                        }
-                        // Check for icon
-                        const iconFile = path.join(instDir, 'server-icon.png');
-                        hasIcon = fs.existsSync(iconFile);
-
+                        state.metaCache = {
+                            timestamp: now,
+                            versionInfo,
+                            serverInfo,
+                            hasBackupMod,
+                            hasEasyAuth,
+                            hasVoicechat,
+                            isSetup,
+                            hasIcon
+                        };
                     }
+
+                    const { versionInfo, serverInfo, hasBackupMod, hasEasyAuth, hasVoicechat, isSetup, hasIcon } = state.metaCache;
 
                     const instStatus = {
                         id: inst.id,
@@ -1316,7 +1384,7 @@ if (cluster.isPrimary) {
         res.json({ instances: instanceConfig.instances, activeInstanceId: instanceConfig.activeInstanceId });
     });
 
-    app.post('/api/instances/create', requireAuth, async (req, res) => {
+    app.post('/api/instances/create', requireAdmin, async (req, res) => {
         const { name, jarName, javaArgs, javaPath, loaderType, preset } = req.body;
         if (!name) return res.status(400).json({ error: '实例名称不能为空' });
 
@@ -1383,7 +1451,13 @@ if (cluster.isPrimary) {
                 createdAt: new Date().toISOString()
             });
             saveInstances(instanceConfig);
+            if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                pluginLoader.emitLifecycleEvent('instanceCreated', {
+                    instance: { id, name, dir, loaderType: finalLoaderType }
+                });
+            }
             const instState = getOrCreateInstanceState(id); // Initialize state
+            if (scrollEngine) scrollEngine.loadInstanceScrolls(id).catch(() => {});
 
             // If preset, start download in background
             if (preset && PRESETS[preset]) {
@@ -1400,7 +1474,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/instances/update', requireAuth, (req, res) => {
+    app.post('/api/instances/update', requirePermission('instance.properties'), (req, res) => {
         const { id, name, jarName, javaArgs, javaPath, loaderType, backupStrategy, autoBackupEnabled, autoBackupInterval, maxBackupCount,
             autoBackupMode, autoBackupIntervalHours, autoBackupIntervalMinutes, autoBackupScheduleTime, autoBackupScheduleDays, autoBackupOnlyIfPlayersOnline
         } = req.body;
@@ -1438,7 +1512,7 @@ if (cluster.isPrimary) {
         res.json({ success: true });
     });
 
-    app.post('/api/instances/rename', requireAuth, (req, res) => {
+    app.post('/api/instances/rename', requireAdmin, (req, res) => {
         const { id, name } = req.body;
         const inst = instanceConfig.instances.find(i => i.id === id);
         if (!inst) return res.status(404).json({ error: '实例不存在' });
@@ -1447,7 +1521,7 @@ if (cluster.isPrimary) {
         res.json({ success: true });
     });
 
-    app.post('/api/instances/delete', requireAuth, async (req, res) => {
+    app.post('/api/instances/delete', requireAdmin, async (req, res) => {
         const { id } = req.body;
         if (instanceConfig.instances.length <= 1) {
             return res.status(400).json({ error: '无法删除最后一个实例' });
@@ -1469,6 +1543,10 @@ if (cluster.isPrimary) {
             }
             saveInstances(instanceConfig);
             instancesState.delete(id);
+            if (scrollEngine) scrollEngine.unloadInstance(id);
+            if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                pluginLoader.emitLifecycleEvent('instanceDeleted', { instanceId: id });
+            }
             res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -1632,7 +1710,7 @@ if (cluster.isPrimary) {
     });
 
     // POST /api/java/install — 下载并安装 Java
-    app.post('/api/java/install', requireAuth, async (req, res) => {
+    app.post('/api/java/install', requireAdmin, async (req, res) => {
         const { featureVersion, downloadUrl, version, source, fallbackUrl } = req.body;
         if (!downloadUrl || !featureVersion) return res.status(400).json({ error: '参数不完整' });
 
@@ -1850,7 +1928,7 @@ if (cluster.isPrimary) {
     });
 
     // POST /api/java/install/cancel
-    app.post('/api/java/install/cancel', requireAuth, (req, res) => {
+    app.post('/api/java/install/cancel', requireAdmin, (req, res) => {
         const { featureVersion } = req.body;
         const key = `java-${featureVersion}`;
         if (activeDownloads.has(key)) {
@@ -1863,7 +1941,7 @@ if (cluster.isPrimary) {
     });
 
     // POST /api/java/remove — 删除已安装的 Java
-    app.post('/api/java/remove', requireAuth, async (req, res) => {
+    app.post('/api/java/remove', requireAdmin, async (req, res) => {
         const { id } = req.body;
         if (!id) return res.status(400).json({ error: '参数不完整' });
 
@@ -1886,7 +1964,7 @@ if (cluster.isPrimary) {
     });
 
     // POST /api/java/add-local — 添加本地 Java 路径
-    app.post('/api/java/add-local', requireAuth, async (req, res) => {
+    app.post('/api/java/add-local', requireAdmin, async (req, res) => {
         const { javaPath: localPath } = req.body;
         if (!localPath) return res.status(400).json({ error: '参数不完整' });
 
@@ -1938,7 +2016,7 @@ if (cluster.isPrimary) {
     });
 
     // GET /api/java/sources — 获取可用下载源列表
-    app.post('/api/probe-url', requireAuth, async (req, res) => {
+    app.post('/api/probe-url', requireAdmin, async (req, res) => {
         const { url } = req.body;
         if (!url) return res.status(400).json({ error: '缺少 URL' });
         try {
@@ -2170,10 +2248,10 @@ if (cluster.isPrimary) {
             const normalizedPluginsDir = path.resolve(PLUGINS_DIR);
             const resolvedFinalDir = path.resolve(finalDir);
             const resolvedTempDir = path.resolve(tempDir);
-            if (!resolvedFinalDir.startsWith(normalizedPluginsDir)) {
+            if (!isPathInside(resolvedFinalDir, normalizedPluginsDir) || resolvedFinalDir === normalizedPluginsDir) {
                 return res.status(400).json({ error: '非法的安装路径' });
             }
-            if (!resolvedTempDir.startsWith(normalizedPluginsDir)) {
+            if (!isPathInside(resolvedTempDir, normalizedPluginsDir) || resolvedTempDir === normalizedPluginsDir) {
                 return res.status(400).json({ error: '非法的临时路径' });
             }
 
@@ -2755,8 +2833,15 @@ if (cluster.isPrimary) {
         const { instDir, instanceId } = req;
         const { url, filename } = req.body;
         if (!url || !filename) return res.status(400).json({ error: 'URL and filename required' });
+        if (typeof filename !== 'string' || path.basename(filename) !== filename) {
+            return res.status(400).json({ error: 'Invalid filename' });
+        }
 
-        const dest = path.join(instDir, 'mods', filename);
+        const modsDir = path.join(instDir, 'mods');
+        await fs.ensureDir(modsDir);
+        const dest = path.join(modsDir, filename);
+        if (!isPathInside(dest, modsDir)) return res.status(403).json({ error: 'Access Denied' });
+
         appendLog(instanceId, `Installing mod: ${filename}...`);
 
         try {
@@ -2765,19 +2850,19 @@ if (cluster.isPrimary) {
             response.data.pipe(writer);
 
             writer.on('finish', () => {
-                appendLog(`Successfully installed ${filename}`);
+                appendLog(instanceId, `Successfully installed ${filename}\n`);
                 res.json({ success: true });
             });
 
             writer.on('error', (err) => {
                 console.error('Download failed', err);
-                appendLog('Installation failed: ' + err.message);
+                appendLog(instanceId, 'Installation failed: ' + err.message + '\n');
                 res.status(500).json({ error: err.message });
             });
 
         } catch (e) {
             console.error(e);
-            appendLog(instanceId, 'Installation error: ' + e.message);
+            appendLog(instanceId, 'Installation error: ' + e.message + '\n');
             res.status(500).json({ error: e.message });
         }
     });
@@ -2816,7 +2901,7 @@ if (cluster.isPrimary) {
         }
     });
 
-    app.post('/api/panel/ai/test', requireAuth, async (req, res) => {
+    app.post('/api/panel/ai/test', requirePermission('panel.settings'), async (req, res) => {
         const { aiEndpoint, aiKey, aiModel } = req.body;
         if (!aiEndpoint || !aiModel) return res.status(400).json({ error: 'Endpoint and Model required' });
 
@@ -2898,10 +2983,12 @@ if (cluster.isPrimary) {
 
     app.get('/api/mods/local/metadata', requirePermission('instance.mods'), withInstance, async (req, res) => {
         const { file } = req.query;
-        if (!file) return res.status(400).json({ error: 'File name required' });
+        if (!file || typeof file !== 'string') return res.status(400).json({ error: 'File name required' });
+        if (path.basename(file) !== file) return res.status(400).json({ error: 'Invalid file name' });
 
         const modsDir = path.join(req.instDir, 'mods');
         const filePath = path.join(modsDir, file);
+        if (!isPathInside(filePath, modsDir)) return res.status(403).json({ error: 'Access Denied' });
 
         try {
             if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
@@ -2954,7 +3041,7 @@ if (cluster.isPrimary) {
     });
 
     // 2. 保存面板配置
-    app.post('/api/panel/config', requireAuth, async (req, res) => {
+    app.post('/api/panel/config', requirePermission('panel.settings'), async (req, res) => {
         try {
             const { port, defaultLang, theme, consoleInfoPosition, loaderType, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance, webhooks } = req.body;
 
@@ -3099,6 +3186,353 @@ if (cluster.isPrimary) {
             // Exit with 100 to signal master to restart this worker
             process.exit(100);
         }, 1000);
+    });
+
+    // ==================== 全局面板备份与回档原生集成 ====================
+    const BACKUP_CHUNK_TEMP_DIR = path.join(DATA_DIR, 'backup_chunks');
+    fs.ensureDirSync(BACKUP_CHUNK_TEMP_DIR);
+
+    const isSafeBackupFile = (filename) => {
+        if (!filename || typeof filename !== 'string') return false;
+        const base = path.basename(filename);
+        if (base !== filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) return false;
+        if (!filename.toLowerCase().endsWith('.zip')) return false;
+        const fullPath = path.resolve(path.join(GLOBAL_BACKUP_DIR, filename));
+        return isPathInside(fullPath, GLOBAL_BACKUP_DIR);
+    };
+
+    const requireBackupAccess = (req, res, next) => {
+        if (appConfig && appConfig.isSetup) {
+            if (!req.session || !req.session.authenticated) {
+                return res.status(401).json({ error: '未授权' });
+            }
+            if (req.session.isSubAccount) {
+                const perms = req.session.permissions || [];
+                if (!perms.includes('instance.backups') && !perms.includes('panel.settings')) {
+                    return res.status(403).json({ error: '无权操作面板备份' });
+                }
+            }
+        }
+        next();
+    };
+
+    const createGlobalBackup = async (options = { configs: true, java: [], instances: [] }, note = '') => {
+        await fs.ensureDir(GLOBAL_BACKUP_DIR);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `global_backup_${timestamp}.zip`;
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+
+        const instConf = await fs.readJson(path.join(DATA_DIR, 'instances.json')).catch(() => ({ instances: [] }));
+        instConf.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份开始: ${filename}...\n`));
+
+        return new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(zipPath);
+            const archive = archiver('zip', { zlib: { level: 5 } });
+
+            output.on('close', async () => {
+                const metaPath = zipPath + '.meta.json';
+                await fs.writeJson(metaPath, { note, options, createdAt: new Date() }, { spaces: 2 });
+                instConf.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份完成！大小: ${(archive.pointer() / 1024 / 1024).toFixed(1)} MB\n`));
+                resolve({ filename, size: archive.pointer() });
+            });
+
+            archive.on('error', (err) => {
+                instConf.instances.forEach(inst => appendLog(inst.id, `[错误] 全局备份失败: ${err.message}\n`));
+                reject(err);
+            });
+
+            archive.pipe(output);
+
+            if (options.configs) {
+                if (fs.existsSync(DATA_DIR)) {
+                    const files = fs.readdirSync(DATA_DIR);
+                    for (const file of files) {
+                        const fullPath = path.join(DATA_DIR, file);
+                        if (fs.statSync(fullPath).isFile() && (file.endsWith('.json') || file === 'executable_path.txt')) {
+                            archive.file(fullPath, { name: `data/${file}` });
+                        }
+                    }
+                }
+            }
+
+            if (Array.isArray(options.java)) {
+                for (const javaId of options.java) {
+                    const javaPath = path.join(DATA_DIR, 'java', javaId);
+                    if (fs.existsSync(javaPath)) {
+                        archive.directory(javaPath, `data/java/${javaId}`);
+                    }
+                }
+            } else if (options.java === true) {
+                const javaDir = path.join(DATA_DIR, 'java');
+                if (fs.existsSync(javaDir)) archive.directory(javaDir, 'data/java');
+            }
+
+            if (Array.isArray(options.instances)) {
+                for (const instId of options.instances) {
+                    const instPath = path.join(INSTANCES_DIR, instId);
+                    if (fs.existsSync(instPath)) {
+                        archive.directory(instPath, `instances/${instId}`);
+                    }
+                }
+            } else if (options.instances === true) {
+                archive.directory(INSTANCES_DIR, 'instances');
+            }
+
+            archive.finalize();
+        });
+    };
+
+    app.get('/api/panel/backups/list', requireBackupAccess, async (req, res) => {
+        try {
+            const backups = [];
+            if (fs.existsSync(GLOBAL_BACKUP_DIR)) {
+                const files = await fs.readdir(GLOBAL_BACKUP_DIR);
+                for (const file of files) {
+                    if (file.endsWith('.zip')) {
+                        const filePath = path.join(GLOBAL_BACKUP_DIR, file);
+                        const stat = await fs.stat(filePath);
+                        const metaPath = filePath + '.meta.json';
+                        let meta = { note: '', options: {} };
+                        if (fs.existsSync(metaPath)) {
+                            try { meta = await fs.readJson(metaPath); } catch (e) { }
+                        }
+                        backups.push({
+                            name: file,
+                            size: stat.size,
+                            mtime: stat.mtime,
+                            note: meta.note || '',
+                            options: meta.options || {}
+                        });
+                    }
+                }
+            }
+            backups.sort((a, b) => b.mtime - a.mtime);
+            res.json(backups);
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/panel/backups/create', requireBackupAccess, async (req, res) => {
+        const { options, note } = req.body;
+        try {
+            const result = await createGlobalBackup(options, note);
+            res.json({ success: true, ...result });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/panel/backups/delete', requireBackupAccess, async (req, res) => {
+        const { filename } = req.body;
+        if (!isSafeBackupFile(filename)) {
+            return res.status(400).json({ error: '非法的文件名' });
+        }
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+        try {
+            if (fs.existsSync(zipPath)) {
+                await fs.remove(zipPath);
+                const metaPath = zipPath + '.meta.json';
+                if (fs.existsSync(metaPath)) await fs.remove(metaPath).catch(() => { });
+                res.json({ success: true });
+            } else {
+                res.status(404).json({ error: '备份文件不存在' });
+            }
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.get('/api/panel/backups/download', requireBackupAccess, (req, res) => {
+        const { filename } = req.query;
+        if (!isSafeBackupFile(filename)) {
+            return res.status(400).send('非法的文件名');
+        }
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+        if (!fs.existsSync(zipPath)) return res.status(404).send('备份未找到');
+        res.download(zipPath);
+    });
+
+    app.post('/api/panel/backups/import', requireBackupAccess, upload.single('backup'), async (req, res) => {
+        if (!req.file) return res.status(400).json({ error: '未上传文件' });
+        const safeName = path.basename(req.file.originalname).replace(/[\\/:*?"<>|]/g, '_');
+        if (!isSafeBackupFile(safeName)) return res.status(400).json({ error: '非法的备份压缩包文件' });
+        const targetPath = path.join(GLOBAL_BACKUP_DIR, safeName);
+        if (!isPathInside(targetPath, GLOBAL_BACKUP_DIR)) return res.status(403).json({ error: 'Access Denied' });
+        try {
+            await fs.move(req.file.path, targetPath, { overwrite: true });
+            const metaPath = targetPath + '.meta.json';
+            await fs.writeJson(metaPath, { note: '导入的备份', createdAt: new Date() }, { spaces: 2 });
+            res.json({ success: true, filename: path.basename(targetPath) });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/panel/backups/import-chunk/init', requireBackupAccess, async (req, res) => {
+        const { fileName, fileSize, totalChunks } = req.body;
+        const safeName = path.basename(fileName).replace(/[\\/:*?"<>|]/g, '_');
+        if (!isSafeBackupFile(safeName)) return res.status(400).json({ error: '非法的备份压缩包文件名' });
+        const uploadId = crypto.randomBytes(16).toString('hex');
+        const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
+        await fs.ensureDir(chunkDir);
+        await fs.writeJson(path.join(chunkDir, '.meta'), {
+            fileName: safeName,
+            fileSize,
+            totalChunks,
+            createdAt: Date.now()
+        });
+        res.json({ uploadId });
+    });
+
+    app.post('/api/panel/backups/import-chunk/upload', requireBackupAccess, upload.single('chunk'), async (req, res) => {
+        const { uploadId, chunkIndex } = req.body;
+        if (!uploadId || chunkIndex === undefined) return res.status(400).json({ error: '缺少分片参数' });
+        const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
+        const metaPath = path.join(chunkDir, '.meta');
+        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: '上传会话已失效' });
+
+        try {
+            const chunkFile = path.join(chunkDir, String(chunkIndex).padStart(6, '0'));
+            await fs.move(req.file.path, chunkFile, { overwrite: true });
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/panel/backups/import-chunk/complete', requireBackupAccess, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) return res.status(400).json({ error: '缺少 uploadId' });
+        const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
+        const metaPath = path.join(chunkDir, '.meta');
+        if (!fs.existsSync(metaPath)) return res.status(404).json({ error: '上传会话已失效' });
+
+        try {
+            const meta = await fs.readJson(metaPath);
+            const { fileName, totalChunks } = meta;
+            if (!isSafeBackupFile(fileName)) return res.status(400).json({ error: '非法的备份文件' });
+            const finalPath = path.join(GLOBAL_BACKUP_DIR, fileName);
+            if (!isPathInside(finalPath, GLOBAL_BACKUP_DIR)) return res.status(403).json({ error: 'Access Denied' });
+            await fs.ensureDir(GLOBAL_BACKUP_DIR);
+
+            const writeStream = fs.createWriteStream(finalPath);
+            for (let i = 0; i < totalChunks; i++) {
+                const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
+                if (!fs.existsSync(chunkFile)) {
+                    writeStream.close();
+                    await fs.remove(finalPath).catch(() => { });
+                    return res.status(400).json({ error: `缺少分片 ${i}` });
+                }
+                const data = fs.readFileSync(chunkFile);
+                writeStream.write(data);
+            }
+            await new Promise((resolve, reject) => {
+                writeStream.end(resolve);
+                writeStream.on('error', reject);
+            });
+
+            const metaJsonPath = finalPath + '.meta.json';
+            await fs.writeJson(metaJsonPath, { note: '导入的备份', createdAt: new Date() }, { spaces: 2 });
+            await fs.remove(chunkDir);
+            res.json({ success: true, filename: path.basename(finalPath) });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+            try { await fs.remove(path.join(BACKUP_CHUNK_TEMP_DIR, uploadId)); } catch (_) { }
+        }
+    });
+
+    app.post('/api/panel/backups/import-chunk/cancel', requireBackupAccess, async (req, res) => {
+        const { uploadId } = req.body;
+        if (!uploadId) return res.status(400).json({ error: '缺少 uploadId' });
+        try {
+            const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
+            if (fs.existsSync(chunkDir)) await fs.remove(chunkDir);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.post('/api/panel/backups/restore', requireBackupAccess, async (req, res) => {
+        const { filename } = req.body;
+        if (!isSafeBackupFile(filename)) return res.status(400).json({ error: '非法的备份压缩包' });
+        const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
+        if (!isPathInside(zipPath, GLOBAL_BACKUP_DIR)) return res.status(403).json({ error: 'Access Denied' });
+        if (!fs.existsSync(zipPath)) return res.status(404).json({ error: '备份文件不存在' });
+
+        // 先返回响应告知前端回档已开始
+        res.json({ success: true, message: '回档流程已启动' });
+
+        // 异步执行完整的安全停机、解压与覆盖
+        (async () => {
+            const tempExtractDir = path.join(os.tmpdir(), `panel-restore-${Date.now()}`);
+            try {
+                // 1. 安全停机所有运行中的 Minecraft 服务器
+                const runningServers = [];
+                for (const [id, state] of instancesState) {
+                    if (state.process) {
+                        runningServers.push({ id, state });
+                    }
+                }
+
+                if (runningServers.length > 0) {
+                    io.emit('restore_progress', { percent: 10, message: '正在安全保存并停止所有运行中的实例...' });
+                    for (const { id, state } of runningServers) {
+                        try {
+                            appendLog(id, '[系统] 全局备份回档中，正在保存世界并停止服务器...\n');
+                            state.stopping = true;
+                            if (state.process.stdin && !state.process.stdin.destroyed) {
+                                state.process.stdin.write('stop\n');
+                            }
+                        } catch (e) { }
+                    }
+
+                    // 等待所有实例退出，最多等待 15 秒
+                    const waitStartTime = Date.now();
+                    while (Date.now() - waitStartTime < 15000) {
+                        const stillRunning = runningServers.some(({ state }) => state.process !== null);
+                        if (!stillRunning) break;
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+
+                    // 如果仍有实例未退出，强制终止
+                    for (const { id, state } of runningServers) {
+                        if (state.process) {
+                            try {
+                                appendLog(id, '[系统] 服务端未在预期时间内退出，强制终止以完成回档\n');
+                                state.process.kill('SIGKILL');
+                            } catch (e) { }
+                        }
+                    }
+                }
+
+                // 2. 解压备份到临时目录
+                io.emit('restore_progress', { percent: 35, message: '正在解压备份文件...' });
+                await fs.ensureDir(tempExtractDir);
+                const zip = new AdmZip(zipPath);
+                zip.extractAllTo(tempExtractDir, true);
+
+                // 3. 还原系统配置与数据
+                io.emit('restore_progress', { percent: 65, message: '正在还原面板配置与运行时数据...' });
+                const dataRestoreDir = path.join(tempExtractDir, 'data');
+                if (fs.existsSync(dataRestoreDir)) {
+                    const files = fs.readdirSync(dataRestoreDir);
+                    for (const file of files) {
+                        await fs.copy(path.join(dataRestoreDir, file), path.join(DATA_DIR, file), { overwrite: true });
+                    }
+                }
+
+                // 4. 还原实例数据
+                io.emit('restore_progress', { percent: 85, message: '正在还原 Minecraft 实例数据...' });
+                const instancesRestoreDir = path.join(tempExtractDir, 'instances');
+                if (fs.existsSync(instancesRestoreDir)) {
+                    await fs.copy(instancesRestoreDir, INSTANCES_DIR, { overwrite: true });
+                }
+
+                // 5. 完成并准备重启
+                await fs.remove(tempExtractDir).catch(() => { });
+                io.emit('restore_progress', { percent: 100, message: '还原完成，面板即将重启...' });
+                io.emit('restore_completed');
+
+                setTimeout(() => {
+                    process.exit(100);
+                }, 1500);
+
+            } catch (err) {
+                console.error('[Restore Error]', err);
+                await fs.remove(tempExtractDir).catch(() => { });
+                io.emit('restore_error', err.message || '回档执行失败');
+            }
+        })();
     });
 
     app.get('/api/auth/check', (req, res) => {
@@ -3301,13 +3735,6 @@ if (cluster.isPrimary) {
         }
     });
 
-    const requireAdmin = (req, res, next) => {
-        if (req.session.authenticated && !req.session.isSubAccount) {
-            return next();
-        }
-        res.status(403).json({ error: '仅限主管理员访问' });
-    };
-
     // 子账号管理 API (仅限主管理员)
     app.get('/api/users', requireAdmin, (req, res) => {
         const users = loadUsers();
@@ -3476,10 +3903,21 @@ if (cluster.isPrimary) {
             const url = req.query.url;
             if (!url) return res.status(400).json({ error: 'Missing url parameter' });
             // 只允许已知的皮肤域名
-            const allowedHosts = ['crafatar.com', 'littleskin.cn', 'textures.minecraft.net'];
+            const allowedHosts = [
+                'crafatar.com',
+                'crafthead.net',
+                'mc-heads.net',
+                'minotar.net',
+                'littleskin.cn',
+                'textures.minecraft.net',
+                'playerdb.co'
+            ];
             let parsedUrl;
             try { parsedUrl = new URL(url); } catch { return res.status(400).json({ error: 'Invalid url' }); }
-            if (!allowedHosts.some(h => parsedUrl.hostname.endsWith(h))) {
+            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+                return res.status(400).json({ error: 'Invalid protocol' });
+            }
+            if (!allowedHosts.some(h => parsedUrl.hostname === h || parsedUrl.hostname.endsWith('.' + h))) {
                 return res.status(403).json({ error: 'Domain not allowed' });
             }
             const axios = require('axios');
@@ -3489,6 +3927,78 @@ if (cluster.isPrimary) {
             res.send(response.data);
         } catch (e) {
             res.status(502).json({ error: 'Failed to fetch skin: ' + e.message });
+        }
+    });
+
+    // 统一玩家头像 API（多源容灾 + 本地磁盘持久缓存）
+    app.get('/api/avatar', async (req, res) => {
+        try {
+            const player = (req.query.player || '').trim();
+            const size = Math.min(Math.max(parseInt(req.query.size) || 64, 16), 256);
+            if (!player || player.length > 36 || !/^[a-zA-Z0-9_-]+$/.test(player)) {
+                return res.status(400).send('Invalid player');
+            }
+
+            const cacheDir = path.join(__dirname, 'data', 'avatar_cache');
+            if (!fs.existsSync(cacheDir)) {
+                fs.mkdirSync(cacheDir, { recursive: true });
+            }
+
+            const safeKey = player.toLowerCase();
+            const cacheFile = path.join(cacheDir, `${safeKey}_${size}.png`);
+
+            // 本地缓存 24 小时有效
+            if (fs.existsSync(cacheFile)) {
+                const stat = fs.statSync(cacheFile);
+                if (Date.now() - stat.mtimeMs < 24 * 3600 * 1000) {
+                    res.set('Content-Type', 'image/png');
+                    res.set('Cache-Control', 'public, max-age=86400');
+                    return res.sendFile(cacheFile);
+                }
+            }
+
+            const axios = require('axios');
+            const candidateUrls = [
+                `https://crafthead.net/avatar/${encodeURIComponent(player)}/${size}`,
+                `https://mc-heads.net/avatar/${encodeURIComponent(player)}/${size}`,
+                `https://littleskin.cn/avatar/player/${encodeURIComponent(player)}?size=${size}`,
+                `https://minotar.net/helm/${encodeURIComponent(player)}/${size}`,
+                `https://crafatar.com/avatars/${encodeURIComponent(player)}?size=${size}&overlay`
+            ];
+
+            let fetched = false;
+            for (const url of candidateUrls) {
+                try {
+                    const resp = await axios.get(url, {
+                        responseType: 'arraybuffer',
+                        timeout: 3000,
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) mc-web-panel/2.4.0' }
+                    });
+                    if (resp.status === 200 && resp.data && resp.data.length > 100) {
+                        const contentType = resp.headers['content-type'] || 'image/png';
+                        await fs.promises.writeFile(cacheFile, resp.data);
+                        res.set('Content-Type', contentType);
+                        res.set('Cache-Control', 'public, max-age=86400');
+                        res.send(resp.data);
+                        fetched = true;
+                        break;
+                    }
+                } catch {
+                    // 尝试下一个候选源
+                }
+            }
+
+            if (!fetched) {
+                // 如果抓取失败但本地存在旧缓存，直接使用旧缓存
+                if (fs.existsSync(cacheFile)) {
+                    res.set('Content-Type', 'image/png');
+                    res.set('Cache-Control', 'public, max-age=300');
+                    return res.sendFile(cacheFile);
+                }
+                res.status(404).send('Avatar not found');
+            }
+        } catch (e) {
+            res.status(500).json({ error: e.message });
         }
     });
     app.get('/api/server/player-pings', requireAuth, withInstance, async (req, res) => {
@@ -3707,16 +4217,28 @@ if (cluster.isPrimary) {
             let spawnCmd, spawnArgs, spawnOpts = { cwd: instDir };
 
             const runSh = path.join(instDir, 'run.sh');
+            const runBat = path.join(instDir, 'run.bat');
             const userJvmArgs = path.join(instDir, 'user_jvm_args.txt');
+            const isWindows = process.platform === 'win32';
+            const hasRunScript = (loaderType === 'forge' || loaderType === 'neoforge') && (isWindows ? (fs.existsSync(runBat) || fs.existsSync(runSh)) : fs.existsSync(runSh));
 
-            if ((loaderType === 'forge' || loaderType === 'neoforge') && fs.existsSync(runSh)) {
+            if (hasRunScript) {
                 const jvmArgsContent = javaArgs.map(a => a.trim()).filter(a => a).join('\n') + '\n';
                 await fs.writeFile(userJvmArgs, jvmArgsContent);
-                appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : 'Forge'} (run.sh 模式)\n`);
+                const scriptName = (isWindows && fs.existsSync(runBat)) ? 'run.bat' : 'run.sh';
+                appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : 'Forge'} (${scriptName} 模式)\n`);
                 appendLog(instanceId, `[系统] JVM 参数已写入 user_jvm_args.txt\n`);
-                spawnCmd = '/bin/bash';
-                spawnArgs = [runSh, 'nogui'];
-                try { await fs.chmod(runSh, 0o755); } catch (e) { }
+                if (isWindows && scriptName === 'run.bat') {
+                    spawnCmd = 'cmd.exe';
+                    spawnArgs = ['/c', 'run.bat', 'nogui'];
+                } else if (isWindows) {
+                    spawnCmd = 'bash';
+                    spawnArgs = [runSh, 'nogui'];
+                } else {
+                    spawnCmd = '/bin/bash';
+                    spawnArgs = [runSh, 'nogui'];
+                    try { await fs.chmod(runSh, 0o755); } catch (e) { }
+                }
             } else {
                 appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : loaderType.charAt(0).toUpperCase() + loaderType.slice(1)} (jar 模式)\n`);
                 spawnCmd = javaPath;
@@ -3733,12 +4255,24 @@ if (cluster.isPrimary) {
                     instState.onlinePlayers.add(join[1]);
                     io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
                     triggerWebhook('player_change', { instanceId, type: 'join', player: join[1], onlinePlayers: Array.from(instState.onlinePlayers) });
+                    if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                        pluginLoader.emitLifecycleEvent('playerJoin', { instanceId, player: join[1], onlinePlayers: Array.from(instState.onlinePlayers) });
+                    }
+                    if (scrollEngine) {
+                        scrollEngine.handlePlayerJoin(instanceId, join[1]);
+                    }
                 }
                 const leave = line.match(/:\s(\w+)\sleft the game/);
                 if (leave) {
                     instState.onlinePlayers.delete(leave[1]);
                     io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
                     triggerWebhook('player_change', { instanceId, type: 'leave', player: leave[1], onlinePlayers: Array.from(instState.onlinePlayers) });
+                    if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                        pluginLoader.emitLifecycleEvent('playerQuit', { instanceId, player: leave[1], onlinePlayers: Array.from(instState.onlinePlayers) });
+                    }
+                    if (scrollEngine) {
+                        scrollEngine.handlePlayerQuit(instanceId, leave[1]);
+                    }
                 }
 
                 // Auto-detect Version
@@ -3863,11 +4397,17 @@ if (cluster.isPrimary) {
                     }
                 }
 
-                // Webhook event triggers on stop/crash
+                // Webhook & Plugin event triggers on stop/crash
                 if (code !== 0 && !instState.stopping) {
                     triggerWebhook('server_state_change', { instanceId, isRunning: false, state: 'crash', code });
+                    if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                        pluginLoader.emitLifecycleEvent('serverCrash', { instanceId, code });
+                    }
                 } else {
                     triggerWebhook('server_state_change', { instanceId, isRunning: false, state: 'stop', code });
+                    if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                        pluginLoader.emitLifecycleEvent('serverStop', { instanceId, code });
+                    }
                 }
 
                 io.emit(`status:${instanceId}`, { isRunning: false });
@@ -3879,6 +4419,9 @@ if (cluster.isPrimary) {
 
             io.emit(`status:${instanceId}`, { isRunning: true });
             triggerWebhook('server_state_change', { instanceId, isRunning: true, state: 'start' });
+            if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                pluginLoader.emitLifecycleEvent('serverStart', { instanceId });
+            }
             res.json({ success: true });
         } catch (e) {
             appendLog(instanceId, `[错误] 启动异常: ${e.message}\n`);
@@ -3952,7 +4495,7 @@ if (cluster.isPrimary) {
     app.get('/api/files/list', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const targetPath = path.join(instDir, req.query.path || '');
-        if (!targetPath.startsWith(instDir)) return res.status(403).send('Denied');
+        if (!isPathInside(targetPath, instDir)) return res.status(403).send('Denied');
         try {
             if (!fs.existsSync(targetPath)) return res.status(404).json({ error: 'Folder not found' });
             const files = await fs.readdir(targetPath);
@@ -3990,16 +4533,16 @@ if (cluster.isPrimary) {
     app.post('/api/files/upload', requirePermission('instance.files'), withInstance, upload.array('files'), async (req, res) => {
         const { instDir } = req;
         const targetDir = req.body.path ? path.join(instDir, req.body.path) : instDir;
-        if (!targetDir.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
+        if (!isPathInside(targetDir, instDir)) return res.status(403).json({ error: 'Access Denied' });
         let fileNames = [];
         try { if (req.body.fileNames) fileNames = JSON.parse(req.body.fileNames); } catch (e) {}
         try {
             for (let i = 0; i < req.files.length; i++) {
                 const file = req.files[i];
-                const originalName = fileNames[i] || fixFileName(file.originalname);
+                const originalName = fixFileName(fileNames[i] || file.originalname);
                 const destPath = path.join(targetDir, originalName);
                 const destDir = path.dirname(destPath);
-                if (!destDir.startsWith(instDir)) continue;
+                if (!isPathInside(destDir, instDir) || !isPathInside(destPath, instDir)) continue;
                 await fs.ensureDir(destDir);
                 await fs.move(file.path, destPath, { overwrite: true });
             }
@@ -4014,7 +4557,7 @@ if (cluster.isPrimary) {
         const { instDir } = req;
         const { fileName, fileSize, totalChunks, targetPath } = req.body;
         const destDir = targetPath ? path.join(instDir, targetPath) : instDir;
-        if (!destDir.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
+        if (!isPathInside(destDir, instDir)) return res.status(403).json({ error: 'Access Denied' });
 
         const uploadId = crypto.randomBytes(16).toString('hex');
         const chunkDir = path.join(CHUNK_TEMP_DIR, uploadId);
@@ -4055,9 +4598,10 @@ if (cluster.isPrimary) {
         try {
             const meta = await fs.readJson(metaPath);
             const { fileName, totalChunks, destDir } = meta;
-            if (!destDir.startsWith(req.instDir)) return res.status(403).json({ error: 'Access Denied' });
+            if (!isPathInside(destDir, req.instDir)) return res.status(403).json({ error: 'Access Denied' });
 
             const finalPath = path.join(destDir, fileName);
+            if (!isPathInside(finalPath, req.instDir)) return res.status(403).json({ error: 'Access Denied' });
             await fs.ensureDir(path.dirname(finalPath));
 
             const writeStream = fs.createWriteStream(finalPath);
@@ -4112,44 +4656,65 @@ if (cluster.isPrimary) {
         const { instDir } = req;
         const { action, sources, destination, compressName } = req.body;
         const destPath = destination ? path.join(instDir, destination) : instDir;
-        if (!destPath.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
+        if (!isPathInside(destPath, instDir)) return res.status(403).json({ error: 'Access Denied' });
 
         try {
             if (action === 'delete') {
-                for (const src of sources) {
+                for (const src of (sources || [])) {
                     const p = path.join(instDir, src);
-                    if (!p.startsWith(instDir)) throw new Error('Access Denied');
+                    if (!isPathInside(p, instDir) || path.resolve(p) === path.resolve(instDir)) {
+                        throw new Error('Access Denied');
+                    }
                     await fs.remove(p);
                 }
             }
             else if (action === 'move' || action === 'copy') {
-                for (const src of sources) {
+                for (const src of (sources || [])) {
                     const srcPath = path.join(instDir, src);
-                    if (!srcPath.startsWith(instDir)) throw new Error('Access Denied');
+                    if (!isPathInside(srcPath, instDir) || path.resolve(srcPath) === path.resolve(instDir)) throw new Error('Access Denied');
 
                     const finalDest = path.join(destPath, path.basename(src));
-                    if (!finalDest.startsWith(instDir)) throw new Error('Access Denied');
+                    if (!isPathInside(finalDest, instDir)) throw new Error('Access Denied');
 
                     if (action === 'move') await fs.move(srcPath, finalDest, { overwrite: true });
                     else await fs.copy(srcPath, finalDest, { overwrite: true });
                 }
             }
             else if (action === 'compress') {
+                const archiveFileName = compressName ? path.basename(compressName) : `archive_${Date.now()}.zip`;
+                const zipPath = path.join(destPath, archiveFileName);
+                if (!isPathInside(zipPath, instDir)) throw new Error('Access Denied');
+
                 const archive = archiver('zip', { zlib: { level: 9 } });
-                const output = fs.createWriteStream(path.join(destPath, compressName || `archive_${Date.now()}.zip`));
-                archive.pipe(output);
-                for (const src of sources) {
-                    const srcPath = path.join(instDir, src);
-                    if (!srcPath.startsWith(instDir)) continue;
-                    if ((await fs.stat(srcPath)).isDirectory()) archive.directory(srcPath, path.basename(srcPath));
-                    else archive.file(srcPath, { name: path.basename(srcPath) });
-                }
-                await archive.finalize();
+                const output = fs.createWriteStream(zipPath);
+
+                await new Promise(async (resolve, reject) => {
+                    output.on('close', resolve);
+                    output.on('error', reject);
+                    archive.on('error', reject);
+                    archive.pipe(output);
+
+                    try {
+                        for (const src of (sources || [])) {
+                            const srcPath = path.join(instDir, src);
+                            if (!isPathInside(srcPath, instDir)) continue;
+                            const stat = await fs.stat(srcPath);
+                            if (stat.isDirectory()) {
+                                archive.directory(srcPath, path.basename(srcPath));
+                            } else {
+                                archive.file(srcPath, { name: path.basename(srcPath) });
+                            }
+                        }
+                        await archive.finalize();
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
             }
             else if (action === 'extract') {
-                for (const src of sources) {
+                for (const src of (sources || [])) {
                     const srcPath = path.join(instDir, src);
-                    if (!srcPath.startsWith(instDir)) continue;
+                    if (!isPathInside(srcPath, instDir)) continue;
                     const ext = src.toLowerCase();
                     const zip = new AdmZip(srcPath);
                     let extractDir;
@@ -4160,7 +4725,7 @@ if (cluster.isPrimary) {
                             ? srcPath.replace(/\.(tar\.gz|tgz)$/i, '')
                             : srcPath.replace(/\.(zip|tar|gz)$/i, '');
                     }
-                    if (!extractDir.startsWith(instDir)) continue;
+                    if (!isPathInside(extractDir, instDir)) continue;
                     await fs.ensureDir(extractDir);
                     const entries = zip.getEntries();
                     for (const entry of entries) {
@@ -4178,7 +4743,7 @@ if (cluster.isPrimary) {
                             }
                         } catch (_) {}
                         const outputPath = path.join(extractDir, entryName);
-                        if (!outputPath.startsWith(extractDir)) continue;
+                        if (!isPathInside(outputPath, extractDir)) continue;
                         if (entry.isDirectory) {
                             await fs.ensureDir(outputPath);
                         } else {
@@ -4189,19 +4754,19 @@ if (cluster.isPrimary) {
                 }
             }
             else if (action === 'disable') {
-                for (const src of sources) {
+                for (const src of (sources || [])) {
                     const p = path.join(instDir, src);
-                    if (!p.startsWith(instDir)) continue;
+                    if (!isPathInside(p, instDir) || path.resolve(p) === path.resolve(instDir)) continue;
                     if (!src.endsWith('.disabled')) await fs.rename(p, p + '.disabled');
                 }
             }
             else if (action === 'enable') {
-                for (const src of sources) {
+                for (const src of (sources || [])) {
                     if (src.endsWith('.disabled')) {
                         const newPath = src.slice(0, -9);
                         const p = path.join(instDir, src);
                         const np = path.join(instDir, newPath);
-                        if (!p.startsWith(instDir) || !np.startsWith(instDir)) continue;
+                        if (!isPathInside(p, instDir) || !isPathInside(np, instDir) || path.resolve(p) === path.resolve(instDir)) continue;
 
                         await fs.rename(p, np);
                     }
@@ -4216,7 +4781,7 @@ if (cluster.isPrimary) {
         const { oldPath, newPath } = req.body;
         const op = path.join(instDir, oldPath);
         const np = path.join(instDir, newPath);
-        if (!op.startsWith(instDir) || !np.startsWith(instDir)) return res.status(403).json({ error: 'Access Denied' });
+        if (!isPathInside(op, instDir) || !isPathInside(np, instDir) || path.resolve(op) === path.resolve(instDir)) return res.status(403).json({ error: 'Access Denied' });
 
         try {
             await fs.rename(op, np);
@@ -4227,7 +4792,7 @@ if (cluster.isPrimary) {
     app.post('/api/files/mkdir', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const targetPath = path.join(instDir, req.body.path);
-        if (!targetPath.startsWith(instDir)) return res.status(403).json({ error: 'Denied' });
+        if (!isPathInside(targetPath, instDir)) return res.status(403).json({ error: 'Denied' });
         try { await fs.ensureDir(targetPath); res.json({ success: true }); }
         catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -4235,7 +4800,7 @@ if (cluster.isPrimary) {
     app.post('/api/files/create', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const targetPath = path.join(instDir, req.body.path);
-        if (!targetPath.startsWith(instDir)) return res.status(403).json({ error: 'Denied' });
+        if (!isPathInside(targetPath, instDir)) return res.status(403).json({ error: 'Denied' });
         try {
             if (await fs.pathExists(targetPath)) return res.status(400).json({ error: 'File exists' });
             await fs.outputFile(targetPath, '');
@@ -4247,14 +4812,14 @@ if (cluster.isPrimary) {
     app.get('/api/files/download', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         const filePath = path.join(instDir, req.query.path);
-        if (!filePath.startsWith(instDir)) return res.status(403).send('Denied');
+        if (!isPathInside(filePath, instDir)) return res.status(403).send('Denied');
         if (fs.existsSync(filePath)) res.download(filePath); else res.status(404).send('Not Found');
     });
     app.get('/api/files/content', requirePermission('instance.files'), withInstance, async (req, res) => {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.query.path);
-            if (!filepath.startsWith(instDir)) return res.status(403).send('Denied');
+            if (!isPathInside(filepath, instDir)) return res.status(403).send('Denied');
             if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
             res.json({ content: await fs.readFile(filepath, 'utf8') });
         } catch (e) { res.status(500).send('Err'); }
@@ -4264,7 +4829,7 @@ if (cluster.isPrimary) {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.query.path);
-            if (!filepath.startsWith(instDir)) return res.status(403).send('Denied');
+            if (!isPathInside(filepath, instDir)) return res.status(403).send('Denied');
             if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
             const zip = new AdmZip(filepath);
             const entries = zip.getEntries().map(e => {
@@ -4297,7 +4862,7 @@ if (cluster.isPrimary) {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.query.path);
-            if (!filepath.startsWith(instDir)) return res.status(403).send('Denied');
+            if (!isPathInside(filepath, instDir)) return res.status(403).send('Denied');
             if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
             const ext = path.extname(filepath).toLowerCase();
             const mimeMap = {
@@ -4315,7 +4880,7 @@ if (cluster.isPrimary) {
         const { instDir } = req;
         try {
             const filepath = path.join(instDir, req.body.filepath);
-            if (!filepath.startsWith(instDir)) return res.status(403).send('Denied');
+            if (!isPathInside(filepath, instDir)) return res.status(403).send('Denied');
             await fs.writeFile(filepath, req.body.content);
             res.json({ success: true });
         } catch (e) { res.status(500).send('Err'); }
@@ -4470,15 +5035,21 @@ if (cluster.isPrimary) {
         }
     });
 
+    const ALLOWED_LIST_TYPES = ['ops', 'whitelist', 'banned-players', 'banned-ips'];
+
     app.get('/api/lists/:type', requirePermission('instance.players'), withInstance, async (req, res) => {
         const { instDir } = req;
-        try { res.json(await fs.readJson(path.join(instDir, `${req.params.type}.json`))); } catch (e) { res.json([]); }
+        const type = req.params.type;
+        if (!ALLOWED_LIST_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid list type' });
+        try { res.json(await fs.readJson(path.join(instDir, `${type}.json`))); } catch (e) { res.json([]); }
     });
     app.post('/api/lists/:type', requirePermission('instance.players'), withInstance, async (req, res) => {
         const { instDir } = req;
+        const type = req.params.type;
+        if (!ALLOWED_LIST_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid list type' });
         try {
-            const f = path.join(instDir, `${req.params.type}.json`);
-            if (!f.startsWith(instDir)) return res.status(403).json({ error: 'Denied' });
+            const f = path.join(instDir, `${type}.json`);
+            if (!isPathInside(f, instDir)) return res.status(403).json({ error: 'Denied' });
             await fs.writeJson(f, req.body, { spaces: 2 });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -4751,5 +5322,6 @@ if (cluster.isPrimary) {
     });
 
 
-    server.listen(appConfig.port, () => console.log(`MC Panel v${APP_VERSION} running on http://localhost:${appConfig.port}`));
+    const listenPort = process.env.PORT || appConfig.port || 3000;
+    server.listen(listenPort, () => console.log(`MC Panel v${APP_VERSION} running on http://localhost:${listenPort}`));
 }

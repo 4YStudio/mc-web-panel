@@ -22,6 +22,9 @@ export default {
                         <i class="fa-solid fa-circle-half-stroke"></i>
                     </button>
                     <div class="vr mx-2 opacity-10"></div>
+                    <button @click="store.view = 'panel-backup'" class="btn btn-sm btn-outline-warning px-3 py-2 fw-bold">
+                        <i class="fa-solid fa-box-archive me-2"></i>{{ $t('panel_backup.title') || '面板备份' }}
+                    </button>
                     <button @click="store.view = 'panel-settings'" class="btn btn-sm btn-primary px-3 py-2 fw-bold">
                         <i class="fa-solid fa-gear text-white me-2"></i>{{ $t('panel_settings.title') }}
                     </button>
@@ -78,6 +81,7 @@ export default {
                                     style="border-radius: 12px; min-width: 180px; position: fixed; right: 10px; top: 50px; z-index: 1070;">
                                     <li><button class="dropdown-item rounded-3 py-2" @click="toggleLang(); showMobileMenu = false"><i class="fa-solid fa-language me-2 w-20 text-primary"></i>{{ store.lang === 'zh' ? 'English' : '中文' }}</button></li>
                                     <li><hr class="dropdown-divider opacity-10"></li>
+                                    <li><button class="dropdown-item rounded-3 py-2 fw-bold text-warning" @click="store.view = 'panel-backup'; showMobileMenu = false"><i class="fa-solid fa-box-archive me-2 w-20 text-warning"></i>{{ $t('panel_backup.title') || '面板备份' }}</button></li>
                                     <li><button class="dropdown-item rounded-3 py-2 font-weight-bold" @click="store.view = 'panel-settings'; showMobileMenu = false"><i class="fa-solid fa-gear me-2 w-20 text-primary"></i>{{ $t('panel_settings.title') }}</button></li>
                                     <li><button class="dropdown-item rounded-3 py-2 fw-bold" @click="store.view = 'java'; showMobileMenu = false"><i class="fa-brands fa-java me-2 w-20 text-primary"></i>{{ $t('instance_manager.manage_java') }}</button></li>
                                     <li v-if="store.pluginSidebarItems.some(i => i.location === 'global' || i.location === 'both')">
@@ -102,7 +106,7 @@ export default {
 
         <div class="flex-grow-1 overflow-auto custom-scrollbar p-3 p-md-5">
             <div class="container-xxl p-0">
-                <div class="page-header d-flex justify-content-between align-items-center">
+                <div class="page-header d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h2 class="fw-black m-0 tracking-tight" style="font-size: 1.75rem;">{{ $t('instance_manager.title') }}</h2>
                         <p class="text-muted fw-medium m-0 opacity-75 small">{{ $t('instance_manager.instance_count', { count: store.instanceList.length }) }}</p>

@@ -6,6 +6,7 @@ import { showToast, openModal, waitForPanel, uploadFileWithChunk, isLargeFile } 
 export default {
     template: `
     <div class="h-100 d-flex flex-column animate-in overflow-hidden">
+        <!-- 页面顶部 Header -->
         <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0">
             <div class="d-flex align-items-center overflow-hidden">
                 <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-3">
@@ -17,203 +18,405 @@ export default {
                 </h3>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-success btn-sm px-3 px-md-4 py-2 fw-bold" @click="saveConfig" :disabled="saving">
-                    <i class="fa-solid fa-save me-md-2"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
+                <button class="btn btn-primary btn-sm px-3 px-md-4 py-2 fw-bold shadow-sm d-flex align-items-center gap-2" @click="saveConfig" :disabled="saving">
+                    <span v-if="saving" class="spinner-border spinner-border-sm"></span>
+                    <i v-else class="fa-solid fa-floppy-disk"></i>
+                    <span class="d-none d-md-inline">{{ $t('common.save') }}</span>
                 </button>
             </div>
         </div>
 
+        <!-- 加载状态 -->
         <div v-if="loading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status"></div>
             <p class="mt-2 text-muted fw-medium">{{ $t('common.loading') }}</p>
         </div>
 
-        <div v-else class="row g-0 flex-grow-1 overflow-hidden rounded-4 border bg-surface" style="background-color: var(--c-surface); border-radius: 16px;">
-            <!-- Settings Sidebar -->
-            <div class="col-md-3 border-end h-100 settings-sidebar p-3 d-flex flex-column gap-2 flex-shrink-0" style="min-width: 200px;">
-                <button v-for="tab in settingsTabs" :key="tab.id" class="btn btn-sm text-start py-2.5 px-3 rounded-3 border-0 d-flex align-items-center gap-2.5 w-100 settings-tab-btn"
-                    :class="{ active: activeSettingsTab === tab.id }"
-                    @click="activeSettingsTab = tab.id"
-                    style="font-size: 0.85rem; font-weight: 600; line-height: 1.5; text-decoration: none;">
-                    <i class="fa-solid" :class="tab.icon" style="width: 18px; text-align: center;"></i>
-                    <span>{{ tab.label }}</span>
-                </button>
+        <!-- 设置主体自适应容器 -->
+        <div v-else class="d-flex flex-grow-1 overflow-hidden settings-container">
+            <!-- 优雅固定侧边栏 (Fixed Harmonious Sidebar) -->
+            <div class="settings-sidebar d-flex flex-column p-3 h-100">
+                <div class="settings-nav-section-title">设置导航</div>
+                <div class="d-flex flex-column gap-1 mt-1">
+                    <button v-for="tab in settingsTabs" :key="tab.id" 
+                        class="btn w-100 settings-tab-btn d-flex align-items-center gap-2.5"
+                        :class="{ active: activeSettingsTab === tab.id }"
+                        @click="activeSettingsTab = tab.id">
+                        <div class="settings-tab-icon">
+                            <i class="fa-solid" :class="tab.icon"></i>
+                        </div>
+                        <span class="text-truncate">{{ tab.label }}</span>
+                    </button>
+                </div>
             </div>
-            <!-- Settings Panels -->
-            <div class="col-md-9 h-100 overflow-auto custom-scrollbar p-4 d-flex flex-column">
+
+            <!-- 右侧自适应居中内容区 (Harmonized Centered Content Area) -->
+            <div class="settings-content-area custom-scrollbar">
+                <div class="settings-content-wrapper">
                 
-                <!-- Basic Settings Panel -->
-                <div v-show="activeSettingsTab === 'basic'" class="animate-in">
-                    <h5 class="fw-bold mb-4 d-flex align-items-center">
-                        <i class="fa-solid fa-sliders text-primary me-2"></i>
-                        {{ $t('panel_settings.basic') }}
-                    </h5>
-                    <div class="row g-4" style="max-width: 680px;">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.port') }}</label>
-                            <input type="number" class="form-control" v-model.number="config.port" min="1024" max="65535">
-                            <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.port_desc') }}</div>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.default_lang') }}</label>
-                            <CustomSelect v-model="config.defaultLang" :options="[{value: 'zh', label: '中文'}, {value: 'en', label: 'English'}]" />
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.theme') }}</label>
-                            <CustomSelect v-model="config.theme" :options="[{value: 'light', label: $t('panel_settings.theme_light')}, {value: 'dark', label: $t('panel_settings.theme_dark')}, {value: 'auto', label: $t('panel_settings.theme_auto')}]" />
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.console_info_position') }}</label>
-                            <CustomSelect v-model="config.consoleInfoPosition" :options="[{value: 'top', label: $t('panel_settings.pos_top')}, {value: 'sidebar', label: $t('panel_settings.pos_sidebar')}]" />
-                        </div>
-
-                        <div class="col-12 mt-4 pt-3 border-top">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.github_proxy') }}</label>
-                            <div class="input-group input-group-sm">
-                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fa-solid fa-list-ul"></i>
-                                </button>
-                                <ul class="dropdown-menu shadow-sm border-0">
-                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = ''"><i class="fa-solid fa-ban me-2 opacity-50"></i>{{ $t('common.disabled') }}</a></li>
-                                    <li><hr class="dropdown-divider opacity-50"></li>
-                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://gh-proxy.org'">gh-proxy.org</a></li>
-                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://hk.gh-proxy.org'">hk.gh-proxy.org</a></li>
-                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://cdn.gh-proxy.org'">cdn.gh-proxy.org</a></li>
-                                    <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://edgeone.gh-proxy.org'">edgeone.gh-proxy.org</a></li>
-                                </ul>
-                                <input type="text" class="form-control" v-model="config.githubProxy" :placeholder="$t('panel_settings.github_proxy_desc')">
+                    <!-- 1. 基本设置 Panel -->
+                    <div v-show="activeSettingsTab === 'basic'" class="animate-in">
+                        <div class="settings-panel-header d-flex align-items-center gap-3">
+                            <div class="settings-header-icon">
+                                <i class="fa-solid fa-sliders"></i>
                             </div>
-                            <div class="form-text small opacity-75 mt-1" style="font-size: 0.7rem;">{{ $t('panel_settings.github_proxy_desc') }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Security Panel -->
-                <div v-show="activeSettingsTab === 'security'" class="animate-in">
-                    <h5 class="fw-bold mb-4 d-flex align-items-center">
-                        <i class="fa-solid fa-shield-halved text-danger me-2"></i>
-                        {{ $t('panel_settings.security') }}
-                    </h5>
-                    <div style="max-width: 600px;">
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.secret') }}</label>
-                            <div class="input-group input-group-sm mb-2">
-                                <input type="text" class="form-control" :value="config.secret || '未启用 / Disabled'" readonly>
-                                <button class="btn btn-outline-success" @click="reset2FA">
-                                    <i class="fa-solid fa-key me-1"></i>{{ config.secret ? $t('panel_settings.reset_2fa') : $t('panel_settings.enable_2fa') }}
-                                </button>
-                                <button v-if="config.secret" class="btn btn-outline-danger" @click="disable2FA">
-                                    <i class="fa-solid fa-trash me-1"></i>{{ $t('panel_settings.disable_2fa') }}
-                                </button>
+                            <div>
+                                <h4 class="settings-panel-title">{{ $t('panel_settings.basic') }}</h4>
+                                <p class="settings-panel-subtitle">配置面板核心运行参数、监听端口、显示语言及主题偏好</p>
                             </div>
-                            <div class="form-text small opacity-75" style="font-size: 0.7rem;">{{ $t('panel_settings.secret_masked') }}</div>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.session_timeout') }}</label>
-                            <input type="number" class="form-control" v-model.number="config.sessionTimeout" min="1" max="365">
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Account Management Panel -->
-                <div v-show="activeSettingsTab === 'account'" class="animate-in">
-                    <h5 class="fw-bold mb-4 d-flex align-items-center" style="color: var(--c-accent);">
-                        <i class="fa-solid fa-user-gear me-2"></i>
-                        {{ $t('panel_settings.account_mgmt') }}
-                    </h5>
-                    <div style="max-width: 500px;">
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.admin_user') }}</label>
-                            <input type="text" class="form-control" v-model="accountForm.username">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.current_pass') }}</label>
-                            <input type="password" class="form-control" v-model="accountForm.currentPassword" placeholder="******">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.new_pass') }}</label>
-                            <input type="password" class="form-control" v-model="accountForm.newPassword" placeholder="******">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.confirm_new_pass') }}</label>
-                            <input type="password" class="form-control" v-model="accountForm.confirmNewPassword" placeholder="******">
-                        </div>
-                        <div class="d-grid mt-4">
-                            <button class="btn btn-outline-primary fw-bold" @click="updateAccount" :disabled="updatingAccount">
-                                <span v-if="updatingAccount" class="spinner-border spinner-border-sm me-2"></span>
-                                <i v-else class="fa-solid fa-user-pen me-2"></i>{{ $t('common.save') }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Integrations Panel -->
-                <div v-show="activeSettingsTab === 'integrations'" class="animate-in">
-                    <h5 class="fw-bold mb-4 d-flex align-items-center text-info">
-                        <i class="fa-solid fa-link me-2"></i>
-                        集成与回调 (Webhook & AI Integrations)
-                    </h5>
-                    <div class="row g-4" style="max-width: 780px;">
-                        <!-- Webhook section -->
-                        <div class="col-md-6 border-end">
-                            <h6 class="fw-bold mb-3 text-warning">
-                                <i class="fa-solid fa-envelope-open me-2"></i>事件回调 (Webhook)
-                            </h6>
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.webhook_urls') || 'Webhook 接收端点 (每行一个)' }}</label>
-                                <textarea class="form-control font-monospace small" rows="7" v-model="webhookText" :placeholder="'http://example.com/webhook'"></textarea>
-                                <div class="form-text small opacity-75 mt-1" style="font-size: 0.7rem;">
-                                    {{ $t('panel_settings.webhook_desc') || '当服务器启动、停止、崩溃或有玩家进出游戏时，面板会向这些 URL 发送 POST 事件通知。' }}
+                        <!-- 卡片 1: 服务与网络 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-network-wired text-primary"></i>网络与服务配置
+                                </h6>
+                                <p class="settings-card-desc">面板对外服务的网络端口及控制台日志展示偏好</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.port') }}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fa-solid fa-plug text-muted"></i></span>
+                                            <input type="number" class="form-control" v-model.number="config.port" min="1024" max="65535">
+                                        </div>
+                                        <div class="form-text small opacity-75 mt-1">{{ $t('panel_settings.port_desc') }}</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.console_info_position') }}</label>
+                                        <CustomSelect v-model="config.consoleInfoPosition" :options="[{value: 'top', label: $t('panel_settings.pos_top')}, {value: 'sidebar', label: $t('panel_settings.pos_sidebar')}]" />
+                                        <div class="form-text small opacity-75 mt-1">控制实例详情页中性能数据的呈现位置</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <!-- AI Section -->
-                        <div class="col-md-6">
-                            <h6 class="fw-bold mb-3 text-info">
-                                <i class="fa-solid fa-robot me-2"></i>{{ $t('panel_settings.ai_settings') }}
-                            </h6>
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_endpoint') }}</label>
-                                <input type="text" class="form-control" v-model="config.aiEndpoint" :placeholder="$t('panel_settings.ai_endpoint_desc')">
+
+                        <!-- 卡片 2: 界面偏好与语言 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-language text-info"></i>界面偏好与语言
+                                </h6>
+                                <p class="settings-card-desc">个性化设定面板界面的默认系统语言与明暗色彩主题</p>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_key') }}</label>
-                                <input type="password" class="form-control" v-model="config.aiKey" :placeholder="$t('panel_settings.ai_key_desc')">
+                            <div class="settings-card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.default_lang') }}</label>
+                                        <CustomSelect v-model="config.defaultLang" :options="[{value: 'zh', label: '中文'}, {value: 'en', label: 'English'}]" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.theme') }}</label>
+                                        <CustomSelect v-model="config.theme" :options="[{value: 'light', label: $t('panel_settings.theme_light')}, {value: 'dark', label: $t('panel_settings.theme_dark')}, {value: 'auto', label: $t('panel_settings.theme_auto')}]" />
+                                    </div>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_model') }}</label>
-                                <input type="text" class="form-control" v-model="config.aiModel" :placeholder="$t('panel_settings.ai_model_placeholder')">
+                        </div>
+
+                        <!-- 卡片 3: GitHub 代理加速 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-brands fa-github text-secondary"></i>GitHub 代理加速通道
+                                </h6>
+                                <p class="settings-card-desc">{{ $t('panel_settings.github_proxy_desc') }}</p>
                             </div>
-                            <div class="d-grid mt-3">
-                                <button class="btn btn-outline-info btn-sm fw-bold" @click="testAI" :disabled="testingAI">
-                                    <span v-if="testingAI" class="spinner-border spinner-border-sm me-2"></span>
-                                    <i v-else class="fa-solid fa-vial me-2"></i>{{ $t('panel_settings.ai_test') }}
+                            <div class="settings-card-body">
+                                <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.github_proxy') }}</label>
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fa-solid fa-bolt-lightning text-warning"></i>
+                                        <span>快速选择</span>
+                                    </button>
+                                    <ul class="dropdown-menu shadow-sm border-0">
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = ''"><i class="fa-solid fa-ban me-2 opacity-50"></i>{{ $t('common.disabled') }} (不使用代理)</a></li>
+                                        <li><hr class="dropdown-divider opacity-50"></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://gh-proxy.org'">gh-proxy.org</a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://hk.gh-proxy.org'">hk.gh-proxy.org</a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://cdn.gh-proxy.org'">cdn.gh-proxy.org</a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://edgeone.gh-proxy.org'">edgeone.gh-proxy.org</a></li>
+                                    </ul>
+                                    <input type="text" class="form-control" v-model="config.githubProxy" :placeholder="$t('panel_settings.github_proxy_desc')">
+                                </div>
+                                <div class="form-text small opacity-75 mt-1.5">支持填入自定义的反代地址，以 https:// 开头</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. 安全设置 Panel -->
+                    <div v-show="activeSettingsTab === 'security'" class="animate-in">
+                        <div class="settings-panel-header d-flex align-items-center gap-3">
+                            <div class="settings-header-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2);">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <div>
+                                <h4 class="settings-panel-title">{{ $t('panel_settings.security') }}</h4>
+                                <p class="settings-panel-subtitle">增强控制台防御，配置两步身份验证 (2FA/TOTP) 及会话生命周期</p>
+                            </div>
+                        </div>
+
+                        <!-- 2FA 卡片 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-mobile-screen-button text-success"></i>两步验证 (2FA / TOTP)
+                                </h6>
+                                <p class="settings-card-desc">为管理员登录启用动态验证码二次验证，杜绝暴力破解威胁</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 p-3 rounded-3 border bg-surface" style="border-color: var(--c-border) !important;">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center" :class="config.secret ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary'" style="width: 44px; height: 44px; flex-shrink: 0;">
+                                            <i class="fa-solid" :class="config.secret ? 'fa-shield-check' : 'fa-shield-xmark'" style="font-size: 1.3rem;"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold d-flex align-items-center gap-2">
+                                                <span>双重认证状态</span>
+                                                <span v-if="config.secret" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-2 py-0.5" style="font-size: 0.72rem;">已保护</span>
+                                                <span v-else class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-20 px-2 py-0.5" style="font-size: 0.72rem;">未启用</span>
+                                            </div>
+                                            <div class="small text-muted mt-0.5">
+                                                {{ config.secret ? '管理员已绑定 2FA 认证器 (密钥已隐藏受保护)' : '尚未绑定认证器应用 (推荐使用 Google Authenticator 或 微软认证器)' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-success btn-sm px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5" @click="reset2FA">
+                                            <i class="fa-solid fa-qrcode"></i>
+                                            <span>{{ config.secret ? $t('panel_settings.reset_2fa') : $t('panel_settings.enable_2fa') }}</span>
+                                        </button>
+                                        <button v-if="config.secret" class="btn btn-outline-danger btn-sm px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5" @click="disable2FA">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                            <span>{{ $t('panel_settings.disable_2fa') }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 会话超时卡片 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-stopwatch text-warning"></i>会话安全与有效期
+                                </h6>
+                                <p class="settings-card-desc">配置登录凭证在客户端的有效期，超时后需重新输入凭证登录</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-7">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.session_timeout') }}</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" v-model.number="config.sessionTimeout" min="1" max="365">
+                                            <span class="input-group-text">天 (Days)</span>
+                                        </div>
+                                        <div class="form-text small opacity-75 mt-1">建议设置为 7 到 30 天，兼顾安全性与免密便利</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. 账号管理 Panel (重点美化) -->
+                    <div v-show="activeSettingsTab === 'account'" class="animate-in">
+                        <div class="settings-panel-header d-flex align-items-center gap-3">
+                            <div class="settings-header-icon" style="color: #6366f1; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);">
+                                <i class="fa-solid fa-user-gear"></i>
+                            </div>
+                            <div>
+                                <h4 class="settings-panel-title">{{ $t('panel_settings.account_mgmt') }}</h4>
+                                <p class="settings-panel-subtitle">管理面板超级管理员账户档案、修改登录用户名及安全访问密码</p>
+                            </div>
+                        </div>
+
+                        <!-- 卡片 1: 管理员身份概览 (Profile Card) -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-id-badge text-primary"></i>管理员身份概览
+                                </h6>
+                                <p class="settings-card-desc">当前面板最高特权管理员账户信息</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-4 mb-4">
+                                    <div class="settings-avatar-badge">
+                                        <span>{{ (accountForm.username || 'A').charAt(0).toUpperCase() }}</span>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                            <span class="fw-bold fs-6">{{ accountForm.username || 'Admin' }}</span>
+                                            <span class="settings-role-tag">
+                                                <i class="fa-solid fa-crown text-warning"></i>超级管理员
+                                            </span>
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-2 py-0.5" style="font-size: 0.7rem;">全部特权</span>
+                                        </div>
+                                        <div class="text-muted small">拥有系统环境、网络监听、游戏实例生命周期及用户授权的完全管理权限</div>
+                                    </div>
+                                </div>
+
+                                <div class="pt-3 border-top">
+                                    <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.admin_user') }}</label>
+                                    <div class="input-group" style="max-width: 480px;">
+                                        <span class="input-group-text"><i class="fa-solid fa-at text-muted"></i></span>
+                                        <input type="text" class="form-control" v-model="accountForm.username" placeholder="请输入管理员用户名">
+                                    </div>
+                                    <div class="form-text small opacity-75 mt-1">此用户名作为面板登录的超级管理员唯一账号</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 卡片 2: 密码与凭据修改 (Password Card) -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-key text-warning"></i>修改登录密码
+                                </h6>
+                                <p class="settings-card-desc">若仅修改管理员用户名，可将新密码项留空；如需更改密码，需验证当前密码</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <div class="row g-3" style="max-width: 680px;">
+                                    <!-- 当前密码 -->
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">
+                                            {{ $t('panel_settings.current_pass') }} <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fa-solid fa-lock text-muted"></i></span>
+                                            <input :type="showPass.current ? 'text' : 'password'" class="form-control" v-model="accountForm.currentPassword" placeholder="输入当前正在使用的管理员密码">
+                                            <button class="btn btn-outline-secondary" type="button" @click="showPass.current = !showPass.current">
+                                                <i class="fa-solid" :class="showPass.current ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-text small opacity-75 mt-1">任何账号信息变更均需验证当前密码，以确保账户安全</div>
+                                    </div>
+
+                                    <!-- 新密码 -->
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.new_pass') }}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fa-solid fa-shield-halved text-muted"></i></span>
+                                            <input :type="showPass.next ? 'text' : 'password'" class="form-control" v-model="accountForm.newPassword" placeholder="留空表示不修改密码">
+                                            <button class="btn btn-outline-secondary" type="button" @click="showPass.next = !showPass.next">
+                                                <i class="fa-solid" :class="showPass.next ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-text small opacity-75 mt-1">若修改，长度不能少于 6 位字符</div>
+                                    </div>
+
+                                    <!-- 确认新密码 -->
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.confirm_new_pass') }}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fa-solid fa-check text-muted"></i></span>
+                                            <input :type="showPass.confirm ? 'text' : 'password'" class="form-control" v-model="accountForm.confirmNewPassword" placeholder="再次输入新密码以确认">
+                                            <button class="btn btn-outline-secondary" type="button" @click="showPass.confirm = !showPass.confirm">
+                                                <i class="fa-solid" :class="showPass.confirm ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-text small opacity-75 mt-1">需与上方新密码输入完全一致</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-card-footer">
+                                <button class="btn btn-primary px-4 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm" @click="updateAccount" :disabled="updatingAccount">
+                                    <span v-if="updatingAccount" class="spinner-border spinner-border-sm"></span>
+                                    <i v-else class="fa-solid fa-user-check"></i>
+                                    <span>保存账号与密码变更</span>
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Appearance Panel -->
-                <div v-show="activeSettingsTab === 'appearance'" class="animate-in">
-                    <h5 class="fw-bold mb-4 d-flex align-items-center" style="color: var(--c-accent);">
-                        <i class="fa-solid fa-palette me-2"></i>
-                        {{ $t('panel_settings.appearance') }}
-                    </h5>
-                    
-                    <div class="d-flex border-bottom mb-4 gap-1 overflow-auto" style="flex-shrink: 0;">
-                        <button v-for="tab in appearanceTabs" :key="tab.id" class="btn btn-sm px-3 py-2 fw-bold rounded-top border-0" 
-                            :class="activeAppearanceTab === tab.id ? 'btn-primary shadow-sm' : 'btn-link text-muted'" 
-                            @click="activeAppearanceTab = tab.id" style="font-size: 0.8rem; border-radius: 8px 8px 0 0 !important;">
-                            <i class="fa-solid me-1" :class="tab.icon"></i><span>{{ $t(tab.labelKey) }}</span>
-                        </button>
+                    <!-- 4. 集成与回调 Panel -->
+                    <div v-show="activeSettingsTab === 'integrations'" class="animate-in">
+                        <div class="settings-panel-header d-flex align-items-center gap-3">
+                            <div class="settings-header-icon" style="color: #06b6d4; background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.2);">
+                                <i class="fa-solid fa-link"></i>
+                            </div>
+                            <div>
+                                <h4 class="settings-panel-title">集成与回调 (Integrations)</h4>
+                                <p class="settings-panel-subtitle">配置外部 Webhook 事件通知端点及 OpenAI 兼容的智能 AI 辅助服务</p>
+                            </div>
+                        </div>
+
+                        <!-- Webhook 卡片 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-envelope-open-text text-warning"></i>事件回调通知 (Webhook)
+                                </h6>
+                                <p class="settings-card-desc">当服务器启动、停止、崩溃或有玩家进出游戏时，面板会向这些 URL 发送 POST 事件通知</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.webhook_urls') || 'Webhook 接收端点 (每行一个)' }}</label>
+                                <textarea class="form-control font-monospace small" rows="5" v-model="webhookText" placeholder="https://example.com/api/webhook&#10;https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."></textarea>
+                                <div class="form-text small opacity-75 mt-1.5">支持多个端点，换行分隔。面板将以标准 JSON 格式投递事件 Payload。</div>
+                            </div>
+                        </div>
+
+                        <!-- AI 服务卡片 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <h6 class="settings-card-title">
+                                    <i class="fa-solid fa-robot text-info"></i>{{ $t('panel_settings.ai_settings') }}
+                                </h6>
+                                <p class="settings-card-desc">接入大语言模型，用于智能日志排错、游戏崩溃诊断与服主配置建议</p>
+                            </div>
+                            <div class="settings-card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_endpoint') }}</label>
+                                        <input type="text" class="form-control" v-model="config.aiEndpoint" :placeholder="$t('panel_settings.ai_endpoint_desc')">
+                                        <div class="form-text small opacity-75 mt-1">例如 https://api.openai.com/v1</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_model') }}</label>
+                                        <input type="text" class="form-control" v-model="config.aiModel" :placeholder="$t('panel_settings.ai_model_placeholder')">
+                                        <div class="form-text small opacity-75 mt-1">例如 gpt-4o-mini 或 deepseek-chat</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.ai_key') }}</label>
+                                        <input type="password" class="form-control" v-model="config.aiKey" :placeholder="$t('panel_settings.ai_key_desc')">
+                                        <div class="form-text small opacity-75 mt-1">如果接口为本地模型或无需 Key 可留空</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="settings-card-footer">
+                                <button class="btn btn-outline-info btn-sm px-3 py-1.5 fw-bold d-flex align-items-center gap-2" @click="testAI" :disabled="testingAI">
+                                    <span v-if="testingAI" class="spinner-border spinner-border-sm"></span>
+                                    <i v-else class="fa-solid fa-vial"></i>
+                                    <span>{{ $t('panel_settings.ai_test') }}</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="p-1">
+                    <!-- 5. 外观自定义 Panel -->
+                    <div v-show="activeSettingsTab === 'appearance'" class="animate-in">
+                        <div class="settings-panel-header d-flex align-items-center gap-3">
+                            <div class="settings-header-icon" style="color: #ec4899; background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2);">
+                                <i class="fa-solid fa-palette"></i>
+                            </div>
+                            <div>
+                                <h4 class="settings-panel-title">{{ $t('panel_settings.appearance') }}</h4>
+                                <p class="settings-panel-subtitle">自定义面板品牌 Logo、登录与主界面背景图及各模块透明度</p>
+                            </div>
+                        </div>
+
+                        <!-- 选项卡导航 -->
+                        <div class="d-flex border-bottom mb-4 gap-2 overflow-auto" style="flex-shrink: 0;">
+                            <button v-for="tab in appearanceTabs" :key="tab.id" class="btn btn-sm px-3 py-2 fw-semibold rounded-3 border-0 d-flex align-items-center gap-1.5" 
+                                :class="activeAppearanceTab === tab.id ? 'btn-primary shadow-sm' : 'text-muted'" 
+                                @click="activeAppearanceTab = tab.id">
+                                <i class="fa-solid" :class="tab.icon"></i>
+                                <span>{{ $t(tab.labelKey) }}</span>
+                            </button>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-card-body">
                         <div v-if="activeAppearanceTab === 'general'" class="row g-4">
                             <div class="col-md-7">
                                 <div class="mb-3 mb-md-4">
@@ -406,7 +609,7 @@ export default {
                                             <div class="rounded-3 p-3 mb-2" :style="{ opacity: appearance.cardOpacity, background: 'var(--c-surface)' }">
                                                 <div class="text-center" :style="{ opacity: appearance.contentOpacity }">
                                                     <i class="fa-solid fa-puzzle-piece text-muted mb-2" style="font-size: 1.2rem;"></i>
-                                                    <div style="width: 40px; height: 4px; border-radius: 2px; background: var(--c-border); margin: 0 auto;"></div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -417,17 +620,23 @@ export default {
                     </div>
                 </div>
 
-                <!-- Sub-accounts Management Panel -->
-                <div v-show="activeSettingsTab === 'subaccounts'" class="animate-in">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold m-0 d-flex align-items-center">
-                            <i class="fa-solid fa-users-gear text-primary me-2"></i>
-                            子账号管理
-                        </h5>
-                        <button class="btn btn-primary btn-sm fw-bold px-3 py-1.5" @click="openCreateUserModal">
-                            <i class="fa-solid fa-user-plus me-1.5"></i>新建子账号
-                        </button>
-                    </div>
+                    <!-- 6. 子账号管理 Panel -->
+                    <div v-show="activeSettingsTab === 'subaccounts'" class="animate-in">
+                        <div class="settings-panel-header d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="settings-header-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
+                                    <i class="fa-solid fa-users-gear"></i>
+                                </div>
+                                <div>
+                                    <h4 class="settings-panel-title">子账号管理</h4>
+                                    <p class="settings-panel-subtitle">为运维团队或助手分配受限权限的子管理账号</p>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-sm fw-bold px-3 py-2 d-flex align-items-center gap-1.5 shadow-sm" @click="openCreateUserModal">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <span>新建子账号</span>
+                            </button>
+                        </div>
 
                     <!-- Sub-accounts List -->
                     <div v-if="users.length === 0" class="text-center py-5 border rounded-4 mb-4" style="background-color: var(--c-surface); border-color: var(--c-border) !important;">
@@ -543,6 +752,7 @@ export default {
 
                 </div>
 
+                </div>
             </div>
         </div>
     </div>
@@ -560,6 +770,12 @@ export default {
             currentPassword: '',
             newPassword: '',
             confirmNewPassword: ''
+        });
+
+        const showPass = reactive({
+            current: false,
+            next: false,
+            confirm: false
         });
 
         const config = reactive({
@@ -612,7 +828,7 @@ export default {
                 { id: 'basic', label: $t('panel_settings.basic') || '基本设置', icon: 'fa-sliders' },
                 { id: 'security', label: $t('panel_settings.security') || '安全与认证', icon: 'fa-shield-halved' },
                 { id: 'account', label: $t('panel_settings.account_mgmt') || '账户管理', icon: 'fa-user-gear' },
-                { id: 'integrations', label: '集成与回调 (Integrations)', icon: 'fa-link' },
+                { id: 'integrations', label: $t('panel_settings.integrations') || '集成与回调', icon: 'fa-link' },
                 { id: 'appearance', label: $t('panel_settings.appearance') || '个性化外观', icon: 'fa-palette' }
             ];
             if (!store.auth.isSubAccount) {
@@ -1156,7 +1372,7 @@ export default {
         return {
             store, loading, saving, testingAI, config, javaArgsText, webhookText, jars,
             saveConfig, testAI, reset2FA, disable2FA,
-            updatingAccount, accountForm, updateAccount,
+            updatingAccount, accountForm, updateAccount, showPass,
             appearance, activeAppearanceTab, appearanceTabs,
             logoInput, bgInput, triggerLogoUpload, triggerBgUpload,
             handleLogoUpload, handleBgUpload, removeLogo, removeBackground,

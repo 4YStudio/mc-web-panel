@@ -86,7 +86,7 @@
     {
         "id": "mc-panel-plugin-map",
         "name": "服务器地图",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "author": "4YStudio",
         "description": "渲染服务器地图并显示玩家的实时坐标雷达。",
         "category": "tools",
@@ -96,7 +96,7 @@
             "command"
         ],
         "icon": "fa-map-location-dot",
-        "fileSize": 730370,
+        "fileSize": 730976,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-map.zip"
     },
     {

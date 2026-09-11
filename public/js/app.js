@@ -16,10 +16,12 @@ import ProgressModal from './components/ProgressModal.js';
 import ServerPropertiesManager from './components/ServerPropertiesManager.js';
 import Avatar from './components/Avatar.js';
 import PanelSettings from './components/PanelSettings.js';
+import PanelBackup from './components/PanelBackup.js';
 import About from './components/About.js?v=1.5.0';
 import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
 import CustomSelect from './components/CustomSelect.js';
+import ScrollManager from './components/ScrollManager.js';
 import { createI18n, messages } from './i18n.js?v=1.5.0';
 import { socket } from './socket.js';
 
@@ -37,11 +39,13 @@ const app = createApp({
         ServerPropertiesManager,
         Avatar,
         PanelSettings,
+        PanelBackup,
         About,
         JavaManager,
         InstanceManager,
         PluginManager,
-        CustomSelect
+        CustomSelect,
+        ScrollManager
     },
     setup() {
         const sidebarOpen = ref(false);
@@ -309,6 +313,9 @@ const app = createApp({
                     socket.off(`console:${oldId}`);
                     socket.off(`status:${oldId}`);
                     socket.off(`players_update:${oldId}`);
+                    socket.off(`restore_progress:${oldId}`);
+                    socket.off(`restore_completed:${oldId}`);
+                    socket.off(`restore_error:${oldId}`);
                 }
                 if (newId) {
                     store.logs = [];
@@ -339,6 +346,12 @@ const app = createApp({
                     socket.on(`restore_progress:${newId}`, handleRestoreProgress);
                     socket.on(`restore_completed:${newId}`, handleRestoreCompleted);
                     socket.on(`restore_error:${newId}`, handleRestoreError);
+                }
+            });
+
+            socket.on('connect', () => {
+                if (store.currentInstanceId) {
+                    socket.emit('req_history', store.currentInstanceId);
                 }
             });
 
@@ -394,11 +407,15 @@ const app = createApp({
             return store.pluginSidebarItems.some(item => item.view === store.view);
         });
 
+        let lastPluginComponent = null;
         const pluginViewComponent = computed(() => {
             const item = store.pluginSidebarItems.find(item => item.view === store.view);
-            if (!item) return null;
-            // Return the component object from our store
-            return store.pluginComponents[item.view] || item.view;
+            if (item) {
+                const comp = store.pluginComponents[item.view] || item.view;
+                lastPluginComponent = comp;
+                return comp;
+            }
+            return lastPluginComponent || 'div';
         });
 
         return {
@@ -415,6 +432,8 @@ const app = createApp({
 });
 
 app.component('CustomSelect', CustomSelect);
+app.component('Avatar', Avatar);
+app.component('avatar', Avatar);
 
 app.config.globalProperties.$t = createI18n(store);
 app.mount('#app');
