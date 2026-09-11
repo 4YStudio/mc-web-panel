@@ -1082,7 +1082,15 @@ export const messages = {
             import_fail: '导入失败：未能解析有效配置',
             clipboard_empty: '剪贴板内容为空',
             clipboard_denied: '浏览器未授予剪贴板读取权限，已打开手动粘贴输入框',
-            format_switch_tip: '切换格式时将自动转换当前配置内容'
+            format_switch_tip: '切换格式时将自动转换当前配置内容',
+            user: '用户标识 (User)',
+            user_desc: '部分穿透平台需要的用户标识 (如 SakuraFrp 的 user 字段)',
+            clear_logs: '清空日志',
+            logs_cleared: '日志已清空',
+            copy_logs: '复制日志',
+            logs_copied: '日志已复制到剪贴板',
+            auto_scroll: '自动滚动',
+            back_to_config: '返回配置'
         }
     },
     en: {
@@ -2166,7 +2174,15 @@ export const messages = {
             import_fail: 'Import failed: Unable to parse valid config',
             clipboard_empty: 'Clipboard is empty',
             clipboard_denied: 'Clipboard access denied, opened paste dialog instead',
-            format_switch_tip: 'Configuration will be converted when switching formats'
+            format_switch_tip: 'Configuration will be converted when switching formats',
+            user: 'User ID',
+            user_desc: 'User ID required by some tunnel platforms (e.g. user field in SakuraFrp)',
+            clear_logs: 'Clear Logs',
+            logs_cleared: 'Logs cleared',
+            copy_logs: 'Copy Logs',
+            logs_copied: 'Logs copied to clipboard',
+            auto_scroll: 'Auto Scroll',
+            back_to_config: 'Back to Config'
         }
     }
 };
