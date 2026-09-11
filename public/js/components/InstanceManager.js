@@ -151,8 +151,8 @@ export default {
                                 <div>
                                     <h5 class="fw-bold m-0 text-truncate" style="font-size: 0.9375rem;">{{ inst.name }}</h5>
                                     <div class="d-flex align-items-center mt-1" style="overflow: visible;">
-                                        <span class="status-indicator me-2" :class="inst.isRunning ? 'bg-success' : 'bg-danger'"></span>
-                                        <span class="small text-muted">{{ inst.isRunning ? $t('instance_manager.state_running') : $t('instance_manager.state_stopped') }}</span>
+                                        <span class="status-indicator me-2" :class="getInstanceStatusClass(inst)"></span>
+                                        <span class="small text-muted">{{ getInstanceStatusText(inst) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -194,7 +194,10 @@ export default {
                                     <button @click.stop="enterInstance(inst)" class="btn btn-primary px-3" :title="$t('instance_manager.select_btn')">
                                         <i class="fa-solid fa-arrow-right"></i>
                                     </button>
-                                    <button v-if="!inst.isRunning" @click.stop="quickAction(inst, 'start')" class="btn btn-success px-3" :title="$t('dashboard.start')">
+                                    <button v-if="inst.status === 'starting' || inst.status === 'stopping'" disabled class="btn btn-secondary px-3" :title="inst.status === 'starting' ? $t('instance_manager.state_starting') : $t('instance_manager.state_stopping')">
+                                        <i class="fa-solid fa-spinner fa-spin"></i>
+                                    </button>
+                                    <button v-else-if="!inst.isRunning && inst.status !== 'running'" @click.stop="quickAction(inst, 'start')" class="btn btn-success px-3" :title="$t('dashboard.start')">
                                         <i class="fa-solid fa-play"></i>
                                     </button>
                                     <button v-else @click.stop="quickAction(inst, 'stop')" class="btn btn-danger px-3" :title="$t('dashboard.stop')">
@@ -458,11 +461,43 @@ export default {
             });
         });
 
+        const getInstanceStatusClass = (inst) => {
+            const status = inst.status || (inst.isRunning ? 'running' : 'stopped');
+            switch (status) {
+                case 'running': return 'bg-success';
+                case 'starting': return 'bg-warning';
+                case 'stopping': return 'bg-warning';
+                case 'stopped':
+                default: return 'bg-danger';
+            }
+        };
+
+        const getInstanceStatusText = (inst) => {
+            const status = inst.status || (inst.isRunning ? 'running' : 'stopped');
+            switch (status) {
+                case 'running': return t('instance_manager.state_running');
+                case 'starting': return t('instance_manager.state_starting');
+                case 'stopping': return t('instance_manager.state_stopping');
+                case 'stopped':
+                default: return t('instance_manager.state_stopped');
+            }
+        };
+
         const quickAction = async (inst, act) => {
             try {
+                if (act === 'start') {
+                    inst.status = 'starting';
+                    inst.isRunning = true;
+                } else if (act === 'stop') {
+                    inst.status = 'stopping';
+                }
                 await api.post('/api/instances/select', { id: inst.id });
                 const res = await api.post(`/api/server/${act}`);
                 if (res.data && res.data.success === false) {
+                    if (act === 'start') {
+                        inst.status = 'stopped';
+                        inst.isRunning = false;
+                    }
                     if (res.data.errorType === 'port_in_use') {
                         openModal({
                             title: t('properties.port_conflict_title'),
@@ -472,10 +507,14 @@ export default {
                                     const reassignRes = await api.post('/api/server/reassign_port');
                                     if (reassignRes.data.success) {
                                         showToast(t('properties.port_reassign_success', { port: reassignRes.data.port }), 'success');
+                                        inst.status = 'starting';
+                                        inst.isRunning = true;
                                         await api.post('/api/server/start');
                                         setTimeout(fetchInstances, 1000);
                                     }
                                 } catch (err) {
+                                    inst.status = 'stopped';
+                                    inst.isRunning = false;
                                     showToast(err.response?.data?.error || 'common.error', 'danger');
                                 }
                             }
@@ -488,6 +527,10 @@ export default {
                     setTimeout(fetchInstances, 1000);
                 }
             } catch (e) {
+                if (act === 'start') {
+                    inst.status = 'stopped';
+                    inst.isRunning = false;
+                }
                 showToast(e.response?.data?.error || t('common.error'), 'danger');
             }
         };
@@ -499,7 +542,8 @@ export default {
             filteredInstances, toggleTheme, toggleLang, logout,
             showMobileMenu, showPluginMenu, togglePluginMenu, pluginDropdown,
             pluginMenuRight, pluginMenuTop, selectPlugin,
-            serverIconUrl, onNavIconError, getJavaLabel, formatLoader
+            serverIconUrl, onNavIconError, getJavaLabel, formatLoader,
+            getInstanceStatusClass, getInstanceStatusText
         };
     }
 };

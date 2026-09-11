@@ -1290,9 +1290,25 @@ export default {
                     <button @click="openStartupSettings" class="btn btn-outline-secondary px-2 px-md-3" :title="$t('instance_manager.settings_btn')">
                         <i class="fa-solid fa-gear"></i>
                     </button>
-                    <button v-if="!store.isRunning" @click="serverAction('start')" class="btn btn-success px-3 px-md-4 fw-bold">
+                    <button v-if="store.serverStatus === 'stopped' || (!store.serverStatus && !store.isRunning)" @click="serverAction('start')" class="btn btn-success px-3 px-md-4 fw-bold">
                         <i class="fa-solid fa-play me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.start') }}</span>
                     </button>
+                    <template v-else-if="store.serverStatus === 'starting'">
+                        <button disabled class="btn btn-warning px-3 px-md-4 fw-bold text-dark">
+                            <i class="fa-solid fa-spinner fa-spin me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.state_starting') }}</span>
+                        </button>
+                        <button @click="forceStop" class="btn btn-outline-danger px-2 px-md-3" :title="$t('dashboard.force_stop')">
+                            <i class="fa-solid fa-skull-crossbones"></i>
+                        </button>
+                    </template>
+                    <template v-else-if="store.serverStatus === 'stopping'">
+                        <button disabled class="btn btn-warning px-3 px-md-4 fw-bold text-dark">
+                            <i class="fa-solid fa-spinner fa-spin me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.state_stopping') }}</span>
+                        </button>
+                        <button @click="forceStop" class="btn btn-outline-danger px-2 px-md-3" :title="$t('dashboard.force_stop')">
+                            <i class="fa-solid fa-skull-crossbones"></i>
+                        </button>
+                    </template>
                     <template v-else>
                         <button @click="serverAction('stop')" class="btn btn-danger px-3 px-md-4 fw-bold">
                             <i class="fa-solid fa-stop me-md-2"></i><span class="d-none d-md-inline">{{ $t('dashboard.stop') }}</span>
@@ -1311,7 +1327,7 @@ export default {
                         <div class="stat-card-header">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-server me-2"></i>{{ $t('dashboard.server_info') }}</h6>
-                                 <span class="badge rounded-pill font-monospace" :class="store.isRunning?'bg-success-subtle text-success':'bg-danger-subtle text-danger'">{{ store.isRunning ? $t('dashboard.state_running') : $t('dashboard.state_stopped') }}</span>
+                                 <span class="badge rounded-pill font-monospace" :class="dashboardStatusClass">{{ dashboardStatusText }}</span>
                             </div>
                         </div>
                         <div class="stat-card-body">
@@ -1699,10 +1715,42 @@ export default {
             cmdParamModalInstance.value = new bootstrap.Modal(document.getElementById('cmdParamModal'));
         });
 
+        const dashboardStatusClass = computed(() => {
+            const s = store.serverStatus || (store.isRunning ? 'running' : 'stopped');
+            switch (s) {
+                case 'running': return 'bg-success-subtle text-success';
+                case 'starting': return 'bg-warning-subtle text-warning-emphasis';
+                case 'stopping': return 'bg-warning-subtle text-warning-emphasis';
+                case 'stopped':
+                default: return 'bg-danger-subtle text-danger';
+            }
+        });
+
+        const dashboardStatusText = computed(() => {
+            const s = store.serverStatus || (store.isRunning ? 'running' : 'stopped');
+            switch (s) {
+                case 'running': return t('dashboard.state_running');
+                case 'starting': return t('dashboard.state_starting');
+                case 'stopping': return t('dashboard.state_stopping');
+                case 'stopped':
+                default: return t('dashboard.state_stopped');
+            }
+        });
+
         const serverAction = async (act) => {
             try {
+                if (act === 'start') {
+                    store.serverStatus = 'starting';
+                    store.isRunning = true;
+                } else if (act === 'stop') {
+                    store.serverStatus = 'stopping';
+                }
                 const res = await api.post(`/api/server/${act}`);
                 if (res.data && res.data.success === false) {
+                    if (act === 'start') {
+                        store.serverStatus = 'stopped';
+                        store.isRunning = false;
+                    }
                     if (res.data.errorType === 'port_in_use') {
                         openModal({
                             title: t('properties.port_conflict_title'),
@@ -1712,9 +1760,13 @@ export default {
                                     const reassignRes = await api.post('/api/server/reassign_port');
                                     if (reassignRes.data.success) {
                                         showToast(t('properties.port_reassign_success', { port: reassignRes.data.port }), 'success');
+                                        store.serverStatus = 'starting';
+                                        store.isRunning = true;
                                         await api.post('/api/server/start');
                                     }
                                 } catch (err) {
+                                    store.serverStatus = 'stopped';
+                                    store.isRunning = false;
                                     showToast(err.response?.data?.error || 'common.error', 'danger');
                                 }
                             }
@@ -1726,6 +1778,10 @@ export default {
                     showToast('dashboard.toast_sent');
                 }
             } catch (e) {
+                if (act === 'start') {
+                    store.serverStatus = 'stopped';
+                    store.isRunning = false;
+                }
                 showToast('common.error', 'danger');
             }
         };
@@ -1737,6 +1793,7 @@ export default {
                 showAgainKey: 'skip_force_stop_confirm',
                 callback: async () => {
                     try {
+                        store.serverStatus = 'stopping';
                         await api.post('/api/server/force_stop');
                         showToast('dashboard.force_stop_sent');
                     } catch (e) {
@@ -1758,6 +1815,7 @@ export default {
             onSetupComplete, openStartupSettings, saveStartupSettings, saving, form, jars, fetchJars,
             showCmdPanel, cmdCategory, cmdSearch, cmdCategories, filteredCommands, quickCommands,
             useCommand, sendQuickCommand,
+            dashboardStatusClass, dashboardStatusText,
 
             // 指令助手参数配置相关返回
             selectedSchema, paramValues, assembledCommand, insertCommand, executeConfiguredCommand

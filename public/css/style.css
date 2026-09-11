@@ -1718,6 +1718,19 @@ h3 { font-size: 1.25rem; }
     animation: pulse-ring 2s ease-out infinite;
 }
 
+.status-indicator.bg-warning {
+    box-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
+}
+
+.status-indicator.bg-warning::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 2px solid rgba(234, 179, 8, 0.3);
+    animation: pulse-ring 1.5s ease-out infinite;
+}
+
 .bg-body-tertiary {
     background-color: var(--c-surface) !important;
 }

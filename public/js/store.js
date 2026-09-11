@@ -9,6 +9,7 @@ export const store = reactive({
     // 系统状态
     stats: { cpu: 0, mem: { total: 0, used: 0, percentage: 0 }, mc: { online: 0, maxPlayers: 20, port: '-', motd: '-' }, loaderType: 'fabric' },
     isRunning: false,
+    serverStatus: 'stopped', // 'starting' | 'running' | 'stopping' | 'stopped'
     hasBackupMod: false,
     hasEasyAuth: false,
     hasVoicechat: false,

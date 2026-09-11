@@ -96,7 +96,7 @@ export default {
                     <div class="stat-card-body p-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                              <span class="small fw-bold text-muted text-uppercase letter-spacing-1" style="font-size: 0.625rem;">{{ $t('dashboard.server_info') }}</span>
-                             <span class="badge rounded-pill" style="font-size: 9px;" :class="store.isRunning?'bg-success':'bg-danger'">{{ store.isRunning ? 'ON' : 'OFF' }}</span>
+                             <span class="badge rounded-pill" style="font-size: 9px;" :class="sidebarStatusClass">{{ sidebarStatusText }}</span>
                         </div>
                         <div v-if="store.stats && store.stats.mc" class="d-flex align-items-center mb-1">
                              <h4 class="m-0 fw-bold me-2" style="font-size: 1.25rem;">{{ store.stats.mc.online }}</h4>
@@ -320,9 +320,36 @@ export default {
             checkIcon();
         });
 
+        const sidebarStatusClass = computed(() => {
+            const s = store.serverStatus || (store.isRunning ? 'running' : 'stopped');
+            switch (s) {
+                case 'running': return 'bg-success';
+                case 'starting': return 'bg-warning text-dark';
+                case 'stopping': return 'bg-warning text-dark';
+                case 'stopped':
+                default: return 'bg-danger';
+            }
+        });
+
+        const sidebarStatusText = computed(() => {
+            const s = store.serverStatus || (store.isRunning ? 'running' : 'stopped');
+            switch (s) {
+                case 'running': return 'ON';
+                case 'starting': return 'STARTING';
+                case 'stopping': return 'STOPPING';
+                case 'stopped':
+                default: return 'OFF';
+            }
+        });
+
         const selectView = (view) => { store.view = view; emit('close-sidebar'); };
         const backToInstances = () => { store.view = 'instance-manager'; store.currentInstanceId = null; emit('close-sidebar'); };
 
-        return { store, hasIcon, currentInstance, selectView, backToInstances, showCustomize, editItems, visibleItems, applyConfig, resetConfig, onDragStart, onDragOver, onDragEnd, onDrop, dragOverIdx };
+        return {
+            store, hasIcon, currentInstance, selectView, backToInstances,
+            showCustomize, editItems, visibleItems, applyConfig, resetConfig,
+            onDragStart, onDragOver, onDragEnd, onDrop, dragOverIdx,
+            sidebarStatusClass, sidebarStatusText
+        };
     }
 };

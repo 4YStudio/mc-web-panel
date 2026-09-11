@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.4.2';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -915,7 +915,8 @@ if (cluster.isPrimary) {
                 logHistory: [],
                 detectedVersion: { mc: 'Unknown', loader: 'Unknown' },
                 javaVersion: '',
-                stopping: false
+                stopping: false,
+                status: 'stopped'
             };
             const instDir = getInstanceDir(instanceId);
             const logPath = instDir ? path.join(instDir, 'panel.log') : null;
@@ -1341,9 +1342,16 @@ if (cluster.isPrimary) {
 
                     const { versionInfo, serverInfo, hasBackupMod, hasEasyAuth, hasVoicechat, isSetup, hasIcon } = state.metaCache;
 
+                    if (!state.process) {
+                        state.status = 'stopped';
+                    } else if (!state.status) {
+                        state.status = 'running';
+                    }
+
                     const instStatus = {
                         id: inst.id,
                         name: inst.name,
+                        status: state.status || (state.process ? 'running' : 'stopped'),
                         isRunning: !!state.process,
                         onlinePlayers: state.onlinePlayers.size,
                         maxPlayers: serverInfo.maxPlayers,
@@ -1398,7 +1406,8 @@ if (cluster.isPrimary) {
                     hasVoicechat: activeStatus.hasVoicechat,
                     isSetup: activeStatus.isSetup,
                     javaVersion: activeInstState.javaVersion || globalJavaVersion || 'Checking...',
-                    isRunning: activeStatus.isRunning
+                    isRunning: activeStatus.isRunning,
+                    status: activeStatus.status
                 });
 
             } catch (e) { console.error('Monitor loop error:', e); }
@@ -2465,7 +2474,8 @@ if (cluster.isPrimary) {
             if (instState.process) {
                 instState.process.kill();
                 instState.process = null;
-                io.emit(`status:${instanceId}`, { isRunning: false });
+                instState.status = 'stopped';
+                io.emit(`status:${instanceId}`, { isRunning: false, status: 'stopped' });
             }
 
             const files = fs.readdirSync(instDir);
@@ -3865,7 +3875,11 @@ if (cluster.isPrimary) {
     app.post('/api/auth/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
     // 服务器控制
-    app.get('/api/server/status', requireAuth, withInstance, (req, res) => res.json({ running: !!req.instState.process, onlinePlayers: Array.from(req.instState.onlinePlayers) }));
+    app.get('/api/server/status', requireAuth, withInstance, (req, res) => res.json({
+        running: !!req.instState.process,
+        status: req.instState.status || (req.instState.process ? 'running' : 'stopped'),
+        onlinePlayers: Array.from(req.instState.onlinePlayers)
+    }));
 
     // Player Inventory API
     app.get('/api/server/player-inventory/:name', requirePermission('instance.players'), withInstance, async (req, res) => {
@@ -4172,6 +4186,7 @@ if (cluster.isPrimary) {
         const { instState, instDir, instanceId } = req;
         if (instState.process) return res.json({ message: '已运行' });
         instState.stopping = false;
+        instState.status = 'starting';
 
         // Port conflict detection
         const propsFile = path.join(instDir, 'server.properties');
@@ -4183,6 +4198,7 @@ if (cluster.isPrimary) {
             } catch (e) {}
         }
         if (await isPortInUse(port)) {
+            instState.status = 'stopped';
             return res.json({ success: false, errorType: 'port_in_use', port: port, message: `端口 ${port} 已被占用` });
         }
 
@@ -4227,6 +4243,7 @@ if (cluster.isPrimary) {
 
         const javaVer = await checkJavaVersion(javaPath);
         if (javaVer === 'Not Installed') {
+            instState.status = 'stopped';
             appendLog(instanceId, `[错误] Java 未找到: ${javaPath}\n`);
             return res.json({ success: false, message: `Java 未安装或二进制文件未找到: ${javaPath}` });
         }
@@ -4276,6 +4293,16 @@ if (cluster.isPrimary) {
             instState.process.stdout.on('data', (data) => {
                 const line = data.toString();
                 appendLog(instanceId, line);
+
+                // Lifecycle state detection (Vanilla, Fabric, Forge, NeoForge, Paper, etc.)
+                if (instState.status === 'starting' && /(?:Done \([0-9.]+s\)!|Done in [0-9.]+|Done! For help|Timings Reset)/i.test(line)) {
+                    instState.status = 'running';
+                    io.emit(`status:${instanceId}`, { isRunning: true, status: 'running' });
+                } else if (instState.status !== 'stopped' && /(?:Stopping (?:the )?server|Saving worlds|Saving players|Closing Server)/i.test(line)) {
+                    instState.status = 'stopping';
+                    io.emit(`status:${instanceId}`, { isRunning: true, status: 'stopping' });
+                }
+
                 const join = line.match(/:\s(\w+)\sjoined the game/);
                 if (join) {
                     instState.onlinePlayers.add(join[1]);
@@ -4335,8 +4362,10 @@ if (cluster.isPrimary) {
 
             instState.process.on('error', (err) => {
                 appendLog(instanceId, `[严重错误] 启动失败: ${err.message}\n`);
-                io.emit(`status:${instanceId}`, { isRunning: false });
+                instState.status = 'stopped';
                 instState.process = null;
+                instState.stopping = false;
+                io.emit(`status:${instanceId}`, { isRunning: false, status: 'stopped' });
             });
 
             instState.process.on('close', async (code) => {
@@ -4436,20 +4465,23 @@ if (cluster.isPrimary) {
                     }
                 }
 
-                io.emit(`status:${instanceId}`, { isRunning: false });
+                instState.status = 'stopped';
+                io.emit(`status:${instanceId}`, { isRunning: false, status: 'stopped' });
                 instState.onlinePlayers.clear();
                 io.emit(`players_update:${instanceId}`, []);
                 instState.process = null;
                 instState.stopping = false;
             });
 
-            io.emit(`status:${instanceId}`, { isRunning: true });
+            instState.status = 'starting';
+            io.emit(`status:${instanceId}`, { isRunning: true, status: 'starting' });
             triggerWebhook('server_state_change', { instanceId, isRunning: true, state: 'start' });
             if (pluginLoader && pluginLoader.emitLifecycleEvent) {
                 pluginLoader.emitLifecycleEvent('serverStart', { instanceId });
             }
             res.json({ success: true });
         } catch (e) {
+            instState.status = 'stopped';
             appendLog(instanceId, `[错误] 启动异常: ${e.message}\n`);
             res.status(500).json({ error: e.message });
         }
@@ -4490,6 +4522,8 @@ if (cluster.isPrimary) {
     app.post('/api/server/stop', requirePermission('instance.control'), withInstance, (req, res) => {
         if (req.instState.process) {
             req.instState.stopping = true;
+            req.instState.status = 'stopping';
+            io.emit(`status:${req.instanceId}`, { isRunning: true, status: 'stopping' });
             req.instState.process.stdin.write('stop\n');
         }
         res.json({ success: true });
@@ -4500,6 +4534,8 @@ if (cluster.isPrimary) {
         if (proc) {
             try {
                 req.instState.stopping = true;
+                req.instState.status = 'stopping';
+                io.emit(`status:${req.instanceId}`, { isRunning: true, status: 'stopping' });
                 proc.kill('SIGKILL');
                 appendLog(req.instanceId, '[系统] 服务器进程已被强制终止\n');
             } catch (e) {

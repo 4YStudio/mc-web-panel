@@ -190,7 +190,10 @@ const app = createApp({
         const postLogin = () => {
             syncConfig();
             loadAppearanceImages();
-            api.get('/api/server/status').then(res => store.isRunning = res.data.running);
+            api.get('/api/server/status').then(res => {
+                store.isRunning = res.data.running;
+                store.serverStatus = res.data.status || (res.data.running ? 'running' : 'stopped');
+            });
 
             // Load plugins
             loadPlugins();
@@ -206,7 +209,15 @@ const app = createApp({
                     if (store.logs.length > 1000) store.logs.shift();
                 }
             });
-            socket.on('status', s => store.isRunning = s);
+            socket.on('status', s => {
+                if (typeof s === 'boolean') {
+                    store.isRunning = s;
+                    store.serverStatus = s ? 'running' : 'stopped';
+                } else if (typeof s === 'object' && s !== null) {
+                    store.isRunning = (s.isRunning !== undefined) ? s.isRunning : (s.status === 'running' || s.status === 'starting');
+                    store.serverStatus = s.status || (store.isRunning ? 'running' : 'stopped');
+                }
+            });
             socket.on('players_update', p => store.onlinePlayers = p);
             socket.on('system_stats', d => {
                 // Partial update to preserve mc stats and instance-specific settings if missing in update
@@ -218,6 +229,8 @@ const app = createApp({
                     Object.assign(store.stats, d);
                     store.stats.mc = oldMc;
                 }
+                if (d.status !== undefined) store.serverStatus = d.status;
+                else if (d.isRunning !== undefined) store.serverStatus = d.isRunning ? 'running' : 'stopped';
                 if (d.hasBackupMod !== undefined) store.hasBackupMod = d.hasBackupMod;
                 if (d.hasEasyAuth !== undefined) store.hasEasyAuth = d.hasEasyAuth;
                 if (d.hasVoicechat !== undefined) store.hasVoicechat = d.hasVoicechat;
@@ -318,6 +331,11 @@ const app = createApp({
                     socket.off(`restore_error:${oldId}`);
                 }
                 if (newId) {
+                    const active = store.instanceList.find(i => i.id === newId);
+                    if (active) {
+                        store.isRunning = active.isRunning;
+                        if (active.status) store.serverStatus = active.status;
+                    }
                     store.logs = [];
                     socket.on(`console_history:${newId}`, history => {
                         store.logs = history;
@@ -329,6 +347,7 @@ const app = createApp({
                     });
                     socket.on(`status:${newId}`, s => {
                         store.isRunning = s.isRunning;
+                        store.serverStatus = s.status || (s.isRunning ? 'running' : 'stopped');
                         store.hasBackupMod = s.hasBackupMod;
                         store.hasEasyAuth = s.hasEasyAuth;
                         store.hasVoicechat = s.hasVoicechat;
@@ -361,8 +380,24 @@ const app = createApp({
                 if (!store.currentInstanceId && res.data.activeInstanceId) {
                     store.currentInstanceId = res.data.activeInstanceId;
                 }
+                if (store.currentInstanceId) {
+                    const active = store.instanceList.find(i => i.id === store.currentInstanceId);
+                    if (active) {
+                        store.isRunning = active.isRunning;
+                        if (active.status) store.serverStatus = active.status;
+                    }
+                }
             });
-            socket.on('instances_update', list => store.instanceList = list);
+            socket.on('instances_update', list => {
+                store.instanceList = list;
+                if (store.currentInstanceId) {
+                    const active = list.find(i => i.id === store.currentInstanceId);
+                    if (active) {
+                        store.isRunning = active.isRunning;
+                        if (active.status) store.serverStatus = active.status;
+                    }
+                }
+            });
         };
 
         watch(() => store.auth.loggedIn, (val) => {
@@ -403,17 +438,42 @@ const app = createApp({
             if (store.auth.loggedIn) postLogin();
         });
 
+        const currentPluginItem = computed(() => {
+            return store.pluginSidebarItems.find(item => item.view === store.view);
+        });
+
+        const isGlobalPluginView = computed(() => {
+            const item = currentPluginItem.value;
+            if (item) {
+                if (item.location === 'global') return true;
+                if (item.location === 'both') {
+                    return !store.currentInstanceId || store.prevView === 'instance-manager';
+                }
+                return false;
+            }
+            return store.view === 'frp-manager';
+        });
+
+        const isInstancePluginView = computed(() => {
+            const item = currentPluginItem.value;
+            if (!item) return false;
+            return !isGlobalPluginView.value;
+        });
+
         const isPluginView = computed(() => {
-            return store.pluginSidebarItems.some(item => item.view === store.view);
+            return isGlobalPluginView.value || isInstancePluginView.value;
         });
 
         let lastPluginComponent = null;
         const pluginViewComponent = computed(() => {
-            const item = store.pluginSidebarItems.find(item => item.view === store.view);
+            const item = currentPluginItem.value;
             if (item) {
                 const comp = store.pluginComponents[item.view] || item.view;
                 lastPluginComponent = comp;
                 return comp;
+            }
+            if (store.view === 'frp-manager') {
+                return store.pluginComponents['frp-manager'] || 'frp-manager';
             }
             return lastPluginComponent || 'div';
         });
@@ -426,6 +486,8 @@ const app = createApp({
             confirmModalAction,
             sidebarOpen,
             isPluginView,
+            isGlobalPluginView,
+            isInstancePluginView,
             pluginViewComponent
         };
     }

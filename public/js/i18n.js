@@ -189,7 +189,9 @@ export const messages = {
             force_stop_confirm_title: '强制关闭服务器',
             force_stop_confirm_msg: '确定要强制关闭服务器吗？<br><strong class="text-danger">此操作将立即终止服务器进程，可能导致数据丢失！</strong><br>请仅在服务器无法正常关闭时使用此功能。',
             force_stop_sent: '已发送强制关闭指令',
+            state_starting: '启动中',
             state_running: '运行中',
+            state_stopping: '停止中',
             state_stopped: '已停止',
             server_info: 'MC 服务器信息',
             online_players: '在线人数',
@@ -975,7 +977,9 @@ export const messages = {
             create_btn: '创建新实例',
             manage_java: '管理 Java',
             search_placeholder: '搜索实例...',
+            state_starting: '启动中',
             state_running: '运行中',
+            state_stopping: '停止中',
             state_stopped: '已停止',
             online_players: '人在线',
             select_btn: '进入面板',
@@ -1057,7 +1061,12 @@ export const messages = {
             auth_token_desc: '需与服务端配置的 token 一致',
             started_success: 'FRP 已启动',
             stopped_success: 'FRP 已停止',
-            start_fail: '启动失败'
+            start_fail: '启动失败',
+            use_github_proxy: '使用 GitHub 代理加速',
+            proxy_url: '代理加速地址',
+            proxy_url_placeholder: '例如：https://ghfast.top/ 或 https://mirror.ghproxy.com/',
+            proxy_tips: '国内网络下载慢或超时可开启代理加速',
+            proxy_presets: '常用预设'
         }
     },
     en: {
@@ -1248,7 +1257,9 @@ export const messages = {
             force_stop_confirm_title: 'Force Kill Server',
             force_stop_confirm_msg: 'Are you sure you want to force kill the server?<br><strong class="text-danger">This will immediately terminate the server process, which may cause data loss!</strong><br>Only use this when the server cannot be stopped normally.',
             force_stop_sent: 'Force kill command sent',
+            state_starting: 'Starting',
             state_running: 'Running',
+            state_stopping: 'Stopping',
             state_stopped: 'Stopped',
             server_info: 'Minecraft Server',
             online_players: 'Online Players',
@@ -2034,7 +2045,9 @@ export const messages = {
             create_btn: 'Create New Instance',
             manage_java: 'Manage Java',
             search_placeholder: 'Search instances...',
+            state_starting: 'Starting',
             state_running: 'Running',
+            state_stopping: 'Stopping',
             state_stopped: 'Stopped',
             online_players: ' players online',
             select_btn: 'Enter Panel',
@@ -2116,7 +2129,12 @@ export const messages = {
             auth_token_desc: 'Must match server token',
             started_success: 'FRP started',
             stopped_success: 'FRP stopped',
-            start_fail: 'Start failed'
+            start_fail: 'Start failed',
+            use_github_proxy: 'Use GitHub Proxy',
+            proxy_url: 'Proxy URL',
+            proxy_url_placeholder: 'e.g. https://ghfast.top/ or https://mirror.ghproxy.com/',
+            proxy_tips: 'Recommended if GitHub download is slow or timing out',
+            proxy_presets: 'Presets'
         }
     }
 };

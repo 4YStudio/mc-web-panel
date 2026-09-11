@@ -102,7 +102,7 @@
                 </div>
             </div>
 
-            <div v-else-if="isPluginView && !store.currentInstanceId" class="w-100 vh-100 p-4 p-md-5 overflow-auto"
+            <div v-else-if="isGlobalPluginView" class="w-100 vh-100 p-4 p-md-5 overflow-auto"
                 :key="'plugin-' + store.view">
                 <div class="container-xxl p-0">
                     <component :is="pluginViewComponent"></component>
@@ -133,7 +133,7 @@
                             <player-manager v-else-if="store.view === 'players'" key="players"></player-manager>
                             <scroll-manager v-else-if="store.view === 'scrolls'" key="scrolls"></scroll-manager>
                             <about v-else-if="store.view === 'about'" key="about"></about>
-                            <div v-else-if="isPluginView" :key="'plugin-' + store.view" class="h-100">
+                            <div v-else-if="isInstancePluginView" :key="'plugin-' + store.view" class="h-100">
                                 <component :is="pluginViewComponent"></component>
                             </div>
                         </Transition>
