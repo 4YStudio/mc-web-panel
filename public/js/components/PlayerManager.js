@@ -1194,15 +1194,28 @@ export default {
             } catch (e) { }
         };
 
+        const loadOnlinePlayers = async () => {
+            try {
+                const res = await api.get('/api/server/status');
+                if (res.data && Array.isArray(res.data.onlinePlayers)) {
+                    store.onlinePlayers = res.data.onlinePlayers;
+                }
+            } catch (e) { }
+        };
+
         let pingInterval = null;
 
         onMounted(() => {
+            loadOnlinePlayers();
             sendCmd('list');
             loadLists();
             loadCreativeItems();
             document.addEventListener('click', closeMenu);
             fetchPlayerPings();
-            pingInterval = setInterval(fetchPlayerPings, 5000);
+            pingInterval = setInterval(() => {
+                loadOnlinePlayers();
+                fetchPlayerPings();
+            }, 5000);
 
             // 动态加入 Minecraft 创造模式风格 CSS
             if (!document.getElementById('mc-creative-inv-style')) {

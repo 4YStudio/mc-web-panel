@@ -193,6 +193,9 @@ const app = createApp({
             api.get('/api/server/status').then(res => {
                 store.isRunning = res.data.running;
                 store.serverStatus = res.data.status || (res.data.running ? 'running' : 'stopped');
+                if (Array.isArray(res.data.onlinePlayers)) {
+                    store.onlinePlayers = res.data.onlinePlayers;
+                }
             });
 
             // Load plugins
@@ -200,6 +203,7 @@ const app = createApp({
 
             // Socket 监听
             socket.emit('req_history');
+            socket.emit('req_players');
             socket.on('console_history', history => {
                 if (!store.currentInstanceId) store.logs = history;
             });
@@ -216,6 +220,12 @@ const app = createApp({
                 } else if (typeof s === 'object' && s !== null) {
                     store.isRunning = (s.isRunning !== undefined) ? s.isRunning : (s.status === 'running' || s.status === 'starting');
                     store.serverStatus = s.status || (store.isRunning ? 'running' : 'stopped');
+                    if (Array.isArray(s.onlinePlayerList)) {
+                        store.onlinePlayers = s.onlinePlayerList;
+                    }
+                    if (s.onlinePlayers !== undefined) {
+                        store.stats.mc.online = s.onlinePlayers;
+                    }
                 }
             });
             socket.on('players_update', p => store.onlinePlayers = p);
@@ -223,6 +233,10 @@ const app = createApp({
                 // Partial update to preserve mc stats and instance-specific settings if missing in update
                 if (d.mc) {
                     Object.assign(store.stats, d);
+                    // 同步在线玩家列表
+                    if (Array.isArray(d.mc.onlinePlayerList) && (!store.currentInstanceId || store.currentInstanceId === d.activeInstanceId)) {
+                        store.onlinePlayers = d.mc.onlinePlayerList;
+                    }
                 } else {
                     // Preserve existing mc stats if backend didn't send them
                     const oldMc = store.stats.mc;
@@ -231,9 +245,9 @@ const app = createApp({
                 }
                 if (d.status !== undefined) store.serverStatus = d.status;
                 else if (d.isRunning !== undefined) store.serverStatus = d.isRunning ? 'running' : 'stopped';
-                if (d.hasBackupMod !== undefined) store.hasBackupMod = d.hasBackupMod;
-                if (d.hasEasyAuth !== undefined) store.hasEasyAuth = d.hasEasyAuth;
-                if (d.hasVoicechat !== undefined) store.hasVoicechat = d.hasVoicechat;
+                if (d.hasBackupMod !== undefined) { store.hasBackupMod = d.hasBackupMod; store.stats.hasBackupMod = d.hasBackupMod; }
+                if (d.hasEasyAuth !== undefined) { store.hasEasyAuth = d.hasEasyAuth; store.stats.hasEasyAuth = d.hasEasyAuth; }
+                if (d.hasVoicechat !== undefined) { store.hasVoicechat = d.hasVoicechat; store.stats.hasVoicechat = d.hasVoicechat; }
                 if (d.isSetup !== undefined) store.isSetup = d.isSetup;
             });
 
@@ -351,9 +365,14 @@ const app = createApp({
                         store.hasBackupMod = s.hasBackupMod;
                         store.hasEasyAuth = s.hasEasyAuth;
                         store.hasVoicechat = s.hasVoicechat;
+                        store.stats.hasBackupMod = s.hasBackupMod;
+                        store.stats.hasEasyAuth = s.hasEasyAuth;
+                        store.stats.hasVoicechat = s.hasVoicechat;
                         store.stats.mc.port = s.port;
                         store.stats.mc.maxPlayers = s.maxPlayers;
                         store.stats.mc.motd = s.motd;
+                        if (s.onlinePlayers !== undefined) store.stats.mc.online = s.onlinePlayers;
+                        if (Array.isArray(s.onlinePlayerList)) store.onlinePlayers = s.onlinePlayerList;
                         store.stats.version = s.version;
                         store.stats.loaderType = s.loaderType || 'fabric';
                         store.stats.backupStrategy = s.backupStrategy;
@@ -362,6 +381,13 @@ const app = createApp({
                         store.stats.maxBackupCount = s.maxBackupCount;
                     });
                     socket.on(`players_update:${newId}`, p => store.onlinePlayers = p);
+                    socket.emit('req_players', newId);
+                    // 主动拉取一次实例在线状态与玩家
+                    api.get('/api/server/status', { params: { instanceId: newId } }).then(res => {
+                        if (res.data && Array.isArray(res.data.onlinePlayers)) {
+                            store.onlinePlayers = res.data.onlinePlayers;
+                        }
+                    }).catch(() => {});
                     socket.on(`restore_progress:${newId}`, handleRestoreProgress);
                     socket.on(`restore_completed:${newId}`, handleRestoreCompleted);
                     socket.on(`restore_error:${newId}`, handleRestoreError);
@@ -371,6 +397,10 @@ const app = createApp({
             socket.on('connect', () => {
                 if (store.currentInstanceId) {
                     socket.emit('req_history', store.currentInstanceId);
+                    socket.emit('req_players', store.currentInstanceId);
+                } else {
+                    socket.emit('req_history');
+                    socket.emit('req_players');
                 }
             });
 

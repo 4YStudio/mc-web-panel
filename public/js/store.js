@@ -7,7 +7,7 @@ export const store = reactive({
     // 在线玩家列表
     onlinePlayers: [],
     // 系统状态
-    stats: { cpu: 0, mem: { total: 0, used: 0, percentage: 0 }, mc: { online: 0, maxPlayers: 20, port: '-', motd: '-' }, loaderType: 'fabric' },
+    stats: { cpu: 0, mem: { total: 0, used: 0, percentage: 0 }, mc: { online: 0, maxPlayers: 20, port: '-', motd: '-' }, loaderType: 'fabric', hasBackupMod: false, hasEasyAuth: false, hasVoicechat: false },
     isRunning: false,
     serverStatus: 'stopped', // 'starting' | 'running' | 'stopping' | 'stopped'
     hasBackupMod: false,
@@ -19,6 +19,8 @@ export const store = reactive({
     consoleInfoPosition: 'top', // 'top', 'sidebar', 'hide'
 
     currentInstanceId: null, // ID of the currently managed instance
+    get activeInstanceId() { return this.currentInstanceId; },
+    set activeInstanceId(v) { this.currentInstanceId = v; },
     instanceList: [],       // List of all instances
     javaInstallations: [],  // List of installed Java versions
 

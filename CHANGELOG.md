@@ -1,6 +1,50 @@
 # MC Web Panel 更新日志
 
 所有重要的项目变更都会记录在此文件中。
+## [2.4.3] - 2026-09-12
+
+### 🛠️ 优化与修复
+
+- **语音聊天插件 (Simple Voice Chat) 全方位配置适配与升级 (v1.1.0)**：
+  - **状态判定与加载时序修复**：修复前端检查 `store.stats.hasVoicechat` 导致始终误判为“未安装模组”且拦截配置加载的严重问题，实现 `store.hasVoicechat` 与 `store.stats.hasVoicechat` 双向无缝同步；支持即使模组尚未启动也可一键强制打开配置；
+  - **智能多路径嗅探与零 404 兜底**：
+    - 后端增加多环境、多加载器配置文件自动探测（覆盖 `config/voicechat/voicechat-server.properties`、`config/voicechat.properties`、`plugins/voicechat/` 等路径）；
+    - 若服务器尚未首次启动生成该文件，自动提供官方标准的默认配置模板（标明 `exists: false`），彻底消除 404 报错与 `# Error reading config` 页面覆盖异常；
+    - 保存配置时自动创建对应父级目录，支持向后写入真实探测路径。
+  - **全属性 GUI 配置模型重构**：
+    - 废除原界面中与 Simple Voice Chat 不符的废弃字段；
+    - 完整覆盖官方所有核心配置属性（网络连接、语音距离、耳语距离、广播范围、Opus 编码器、MTU 包大小、TCP 速率限制、群组开关、录音权限、旁观者通话、强制模组校验、原生动态库加速、多线程 Folia 支持等）；
+    - 智能兼容 `max_voice_distance` 与旧版 `voice_distance` 别名映射；
+  - **高保真双向转换引擎**：GUI 模式与文本模式切换或保存时，精确替换目标项并无损保留配置文件中的原版注释说明与结构；
+  - **全量多语言国际化**：在宿主 `i18n.js` 中补齐所有语音配置项的中英文双语翻译。
+
+- **认证管理插件 (EasyAuth) 数据库读取、Schema 适配与密码维护修复 (v1.2.0)**：
+  - **解除前端挂载与刷新阻断**：修复前端因检查未初始化的 `store.stats.hasEasyAuth` 导致组件挂载时不调用 `loadUsers()`、界面锁定为“未安装模组”的缺陷；
+  - **Linux 大小写与动态路径兼容查找**：
+    - 优先解析 `config/EasyAuth/storage.conf`，读取自定义的 `sqlite-path` 与 `sqlite-table`；
+    - 候选扫描全面兼顾 Linux 大小写敏感特性（同时支持 `EasyAuth/` 与 `easyauth/` 目录）；
+    - 增加备用目录 `.db` 文件自动兜底探测。
+  - **EasyAuth 真实表结构与 `data` JSON 列适配**：
+    - 针对 EasyAuth 表中无独立 `password` 列、密码与鉴权数据存于 `data` JSON 列的真实结构进行重构；
+    - 查询玩家列表时自动解析 `data` JSON，提取真实注册状态、最近登录 IP、最近活跃时间及注册时间；
+    - 彻底修复修改密码时因执行 `UPDATE easyauth SET password = ?` 抛出 `SQLITE_ERROR: no such column: password` 导致的 500 异常，实现对 `data` JSON 列的反序列化、BCrypt 哈希注入与无损回写；
+    - 注销/删除玩家增加 `username` 与 `username_lower` 大小写双重匹配。
+  - **SQLite 执行高可用双引擎降级**：
+    - 默认优先使用 Node 原生 `sqlite3` 模块；
+    - 若遇环境或 ABI 限制，自动降级启用系统原生 `sqlite3` CLI，确保任何环境下均能百分之百稳定读取数据库。
+  - **UI 呈现升级**：新增当前数据库路径状态徽章、玩家最后登录 IP / 注册时间展示，并在无数据时给出明确的注册指引提示。
+
+- **服务器地图插件 (mc-panel-plugin-map) 玩家雷达头像加载与动态校准修复 (v1.1.1)**：
+  - **地图雷达头像源对齐**：彻底修复地图内标记硬编码请求 `minotar.net` 导致的非正版/离线皮肤无法加载、退化为默认 Steve 面孔的问题；全面对齐宿主面板内置的 `/api/avatar` 接口（具备本地磁盘缓存与多源极速容灾机制）；
+  - **多源优雅容灾回退链路**：地图标记增加 `onerror` 级联回退机制（依次尝试 `/api/avatar` → Crafthead → LittleSkin → MC-Heads → 首字母圆标），确保任何网络环境下均能平滑展现；
+  - **玩家雷达标记动态同步增强**：在轮询更新玩家坐标时，实时同步更新高度 Y 坐标徽章、在线状态脉冲光圈、头像边框颜色与头像资源地址，并支持点击后定位最新动态位置。
+
+- **官方插件商店索引更新与发布包构建**：
+  - 同步更新 `mc-panel-plugin-voicechat` 至 `v1.1.0`，重新压缩打包 `mc-panel-plugin-voicechat.zip`；
+  - 同步更新 `mc-panel-plugin-easyauth` 至 `v1.2.0`，重新压缩打包 `mc-panel-plugin-easyauth.zip`；
+  - 同步更新 `mc-panel-plugin-map` 至 `v1.1.1`，重新压缩打包 `mc-panel-plugin-map.zip`；
+  - 同步更新 `docs/plugins_shop/plugins.json` 索引信息并同步至 `runner/` 与 `dist/temp/` 目录。
+
 ---
 ## [2.4.2] - 2026-09-11
 
@@ -42,6 +86,12 @@
     - 插件版本号正式递增为 `1.1.0`，同步更新 `docs/plugins_shop/plugins.json` 索引并重新构建打包发行包（`mc-panel-plugin-frp.zip`），便于用户一键检测更新。
 
 ### 🛠️ 优化与修复
+
+- **在线玩家全生命周期多组件数据同步与显示修复**：
+  - **全周期主动拉取与实时同步**：修复前端在页面加载、实例切换或刷新后未拉取在线玩家名单，导致实例详情主界面显示有在线人数（如 1 人），但在「玩家列表」和「服务器地图」中却显示 0 人的缺陷；
+  - **新增 `/list` 控制台响应实时解析**：在后端控制台日志监听中增加对 `/list` 响应（支持 `There are X of a max of Y players online: ...` 及中文服格式）的精准捕获与在线玩家集合自动校准，并实时广播更新；
+  - **扩充进出服与掉线特征兼容**：兼容 `[Not Secure]` 消息签名、中文语言包（`加入了游戏` / `离开了游戏`）、超时/断开掉线（`lost connection: Disconnected`）以及基岩版/特殊符号玩家名；
+  - **服务器地图插件 (mc-panel-plugin-map) 修复**：修复地图前端组件错误引用 `store.activeInstanceId` 导致向后端请求错误实例 ID 的问题，并在 `store` 中增加代理兼容；同步更新官方商店地图发布包。
 
 - **FRP 运行日志展示与持久化修复**：
   - 修复原点击“运行日志”按钮无响应或在页面底部错误渲染嵌入卡片的问题；

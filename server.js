@@ -1254,6 +1254,16 @@ if (cluster.isPrimary) {
             const state = getOrCreateInstanceState(id);
             const channel = (typeof instanceId === 'string' && instanceId) ? `console_history:${instanceId}` : 'console_history';
             socket.emit(channel, state.logHistory);
+            // 同步当前在线玩家列表
+            const playersChannel = (typeof instanceId === 'string' && instanceId) ? `players_update:${instanceId}` : 'players_update';
+            socket.emit(playersChannel, Array.from(state.onlinePlayers));
+        });
+
+        socket.on('req_players', (instanceId) => {
+            const id = (typeof instanceId === 'string' && instanceId) ? instanceId : instanceConfig.activeInstanceId;
+            const state = getOrCreateInstanceState(id);
+            const channel = (typeof instanceId === 'string' && instanceId) ? `players_update:${instanceId}` : 'players_update';
+            socket.emit(channel, Array.from(state.onlinePlayers));
         });
     });
 
@@ -1313,7 +1323,7 @@ if (cluster.isPrimary) {
                                 } catch (e) { }
                             }
 
-                            // Mods
+                            // Mods & Plugins detection
                             const modsDir = path.join(instDir, 'mods');
                             if (fs.existsSync(modsDir)) {
                                 try {
@@ -1322,6 +1332,28 @@ if (cluster.isPrimary) {
                                     hasEasyAuth = modFiles.some(f => f.includes('easyauth') || f.includes('easy-auth') || f.includes('easy_auth'));
                                     hasVoicechat = modFiles.some(f => f.includes('voicechat') || f.includes('voice-chat') || f.includes('voice_chat'));
                                 } catch (e) { }
+                            }
+                            const serverPluginsDir = path.join(instDir, 'plugins');
+                            if (fs.existsSync(serverPluginsDir)) {
+                                try {
+                                    const pluginFiles = fs.readdirSync(serverPluginsDir).map(f => f.toLowerCase());
+                                    if (!hasBackupMod) hasBackupMod = pluginFiles.some(f => f.includes('backup'));
+                                    if (!hasEasyAuth) hasEasyAuth = pluginFiles.some(f => f.includes('easyauth') || f.includes('easy-auth') || f.includes('authme'));
+                                    if (!hasVoicechat) hasVoicechat = pluginFiles.some(f => f.includes('voicechat') || f.includes('voice-chat') || f.includes('voice_chat'));
+                                } catch (e) { }
+                            }
+                            // Fallback detection from existing config directories
+                            if (!hasVoicechat) {
+                                hasVoicechat = fs.existsSync(path.join(instDir, 'config', 'voicechat')) ||
+                                               fs.existsSync(path.join(instDir, 'plugins', 'voicechat')) ||
+                                               fs.existsSync(path.join(instDir, 'config', 'voicechat.properties')) ||
+                                               fs.existsSync(path.join(instDir, 'config', 'voicechat-server.properties'));
+                            }
+                            if (!hasEasyAuth) {
+                                hasEasyAuth = fs.existsSync(path.join(instDir, 'EasyAuth')) ||
+                                              fs.existsSync(path.join(instDir, 'easyauth')) ||
+                                              fs.existsSync(path.join(instDir, 'config', 'EasyAuth')) ||
+                                              fs.existsSync(path.join(instDir, 'config', 'easyauth'));
                             }
                             // Check for icon
                             const iconFile = path.join(instDir, 'server-icon.png');
@@ -1354,6 +1386,7 @@ if (cluster.isPrimary) {
                         status: state.status || (state.process ? 'running' : 'stopped'),
                         isRunning: !!state.process,
                         onlinePlayers: state.onlinePlayers.size,
+                        onlinePlayerList: Array.from(state.onlinePlayers),
                         maxPlayers: serverInfo.maxPlayers,
                         port: serverInfo.port,
                         motd: serverInfo.motd,
@@ -1398,7 +1431,14 @@ if (cluster.isPrimary) {
 
                 io.emit('system_stats', {
                     ...systemStats,
-                    mc: { port: activeStatus.port, maxPlayers: activeStatus.maxPlayers, motd: activeStatus.motd, online: activeStatus.onlinePlayers },
+                    activeInstanceId: activeId,
+                    mc: {
+                        port: activeStatus.port,
+                        maxPlayers: activeStatus.maxPlayers,
+                        motd: activeStatus.motd,
+                        online: activeStatus.onlinePlayers,
+                        onlinePlayerList: Array.from(activeInstState.onlinePlayers)
+                    },
                     version: activeStatus.version,
                     loaderType: activeInst ? (activeInst.loaderType || 'fabric') : 'fabric',
                     hasBackupMod: activeStatus.hasBackupMod,
@@ -2401,28 +2441,89 @@ if (cluster.isPrimary) {
 
 
 
-    // 5. Voicechat Config API
-    app.get('/api/voicechat/config', requireAuth, withInstance, async (req, res) => {
-        const VOICECHAT_DIR = path.join(req.instDir, 'config', 'voicechat');
-        const vcPropFile = path.join(VOICECHAT_DIR, 'voicechat-server.properties');
-        try {
-            if (!fs.existsSync(vcPropFile)) {
-                if (fs.existsSync(VOICECHAT_DIR)) return res.json({ content: '' });
-                return res.status(404).json({ error: '配置文件不存在' });
+    // 5. Voicechat Config API (智能多路径嗅探与默认模板适配)
+    const findVoicechatConfig = (instDir) => {
+        const candidates = [
+            path.join(instDir, 'config', 'voicechat', 'voicechat-server.properties'),
+            path.join(instDir, 'config', 'voicechat', 'voicechat.properties'),
+            path.join(instDir, 'config', 'voicechat.properties'),
+            path.join(instDir, 'plugins', 'voicechat', 'voicechat-server.properties'),
+            path.join(instDir, 'plugins', 'voicechat', 'voicechat.properties'),
+            path.join(instDir, 'plugins', 'SimpleVoiceChat', 'voicechat-server.properties'),
+            path.join(instDir, 'config', 'voicechat-server.properties')
+        ];
+        for (const p of candidates) {
+            if (fs.existsSync(p)) {
+                return { fullPath: p, relativePath: path.relative(instDir, p), exists: true };
             }
-            const content = await fs.readFile(vcPropFile, 'utf8');
-            res.json({ content });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        }
+        const defaultPath = path.join(instDir, 'config', 'voicechat', 'voicechat-server.properties');
+        return { fullPath: defaultPath, relativePath: 'config/voicechat/voicechat-server.properties', exists: false };
+    };
+
+    const DEFAULT_VOICECHAT_PROPERTIES = `# Simple Voice Chat server config
+port=24454
+bind_address=
+max_voice_distance=48.0
+whisper_distance=24.0
+codec=VOIP
+mtu_size=1024
+tcp_rate_limit=16
+keep_alive=1000
+enable_groups=true
+voice_host=
+allow_recording=true
+spectator_interaction=false
+spectator_player_possession=false
+force_voice_chat=false
+login_timeout=10000
+broadcast_range=-1.0
+allow_pings=true
+use_natives=true
+threaded_server_support=false
+`;
+
+    app.get('/api/voicechat/config', requireAuth, withInstance, async (req, res) => {
+        try {
+            const fileInfo = findVoicechatConfig(req.instDir);
+            let content = '';
+            if (fileInfo.exists) {
+                content = await fs.readFile(fileInfo.fullPath, 'utf8');
+            } else {
+                content = DEFAULT_VOICECHAT_PROPERTIES;
+            }
+            res.json({
+                content,
+                filePath: fileInfo.relativePath,
+                exists: fileInfo.exists,
+                hasVoicechat: true
+            });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     });
 
     app.post('/api/voicechat/save', requireAuth, withInstance, async (req, res) => {
-        const VOICECHAT_DIR = path.join(req.instDir, 'config', 'voicechat');
-        const vcPropFile = path.join(VOICECHAT_DIR, 'voicechat-server.properties');
         try {
-            if (!fs.existsSync(VOICECHAT_DIR)) fs.ensureDirSync(VOICECHAT_DIR);
-            await fs.writeFile(vcPropFile, req.body.content);
-            res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+            const { content, filePath } = req.body;
+            let targetFile;
+            if (filePath && typeof filePath === 'string' && !filePath.includes('..')) {
+                targetFile = path.resolve(req.instDir, filePath);
+                if (!targetFile.startsWith(req.instDir)) {
+                    return res.status(403).json({ error: '非法文件路径' });
+                }
+            } else {
+                targetFile = findVoicechatConfig(req.instDir).fullPath;
+            }
+            await fs.ensureDir(path.dirname(targetFile));
+            await fs.writeFile(targetFile, content !== undefined ? content : '', 'utf8');
+            res.json({
+                success: true,
+                filePath: path.relative(req.instDir, targetFile)
+            });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     });
 
     // --- 面板设置 API (新增) ---
@@ -4303,28 +4404,61 @@ if (cluster.isPrimary) {
                     io.emit(`status:${instanceId}`, { isRunning: true, status: 'stopping' });
                 }
 
-                const join = line.match(/:\s(\w+)\sjoined the game/);
-                if (join) {
-                    instState.onlinePlayers.add(join[1]);
-                    io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
-                    triggerWebhook('player_change', { instanceId, type: 'join', player: join[1], onlinePlayers: Array.from(instState.onlinePlayers) });
-                    if (pluginLoader && pluginLoader.emitLifecycleEvent) {
-                        pluginLoader.emitLifecycleEvent('playerJoin', { instanceId, player: join[1], onlinePlayers: Array.from(instState.onlinePlayers) });
+                const rawLines = line.split('\n');
+                for (const rawLine of rawLines) {
+                    if (!rawLine.trim()) continue;
+
+                    // Strip log prefix (e.g. "[13:27:31] [Server thread/INFO]: ") and optional "[Not Secure] "
+                    const cleanMsg = rawLine
+                        .replace(/^(?:\[\d{2}:\d{2}:\d{2}\]\s*)?(?:\[(?:Server thread|Async Chat Thread|INFO|minecraft\/MinecraftServer|[^\]]+)\]\s*)*:\s*/i, '')
+                        .replace(/^\[Not Secure\]\s*/i, '')
+                        .trim();
+
+                    // 1. /list 指令响应解析（校准在线玩家）
+                    // 兼容: "There are 1 of a max of 20 players online: Henvei", "There are 1/20 players online: Henvei", "共有 1 个在线玩家: Henvei"
+                    const listMatch = cleanMsg.match(/(?:There are|共有)\s*(\d+)[^:：]*[:：]\s*(.*)$/i);
+                    if (listMatch) {
+                        const count = parseInt(listMatch[1], 10);
+                        const rawNames = listMatch[2].trim();
+                        const names = rawNames ? rawNames.split(',').map(n => n.trim().replace(/^\[.*?\]\s*/, '')).filter(Boolean) : [];
+                        instState.onlinePlayers.clear();
+                        for (const name of names) {
+                            instState.onlinePlayers.add(name);
+                        }
+                        io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
+                        continue;
                     }
-                    if (scrollEngine) {
-                        scrollEngine.handlePlayerJoin(instanceId, join[1]);
+
+                    // 2. 玩家加入游戏（支持英文、中文、Not Secure、带前缀/特殊符号用户名）
+                    const join = cleanMsg.match(/^([a-zA-Z0-9_.* -]+?)\s+(?:joined the game|加入了游戏)/i);
+                    if (join) {
+                        const playerName = join[1].trim();
+                        instState.onlinePlayers.add(playerName);
+                        io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
+                        triggerWebhook('player_change', { instanceId, type: 'join', player: playerName, onlinePlayers: Array.from(instState.onlinePlayers) });
+                        if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                            pluginLoader.emitLifecycleEvent('playerJoin', { instanceId, player: playerName, onlinePlayers: Array.from(instState.onlinePlayers) });
+                        }
+                        if (scrollEngine) {
+                            scrollEngine.handlePlayerJoin(instanceId, playerName);
+                        }
+                        continue;
                     }
-                }
-                const leave = line.match(/:\s(\w+)\sleft the game/);
-                if (leave) {
-                    instState.onlinePlayers.delete(leave[1]);
-                    io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
-                    triggerWebhook('player_change', { instanceId, type: 'leave', player: leave[1], onlinePlayers: Array.from(instState.onlinePlayers) });
-                    if (pluginLoader && pluginLoader.emitLifecycleEvent) {
-                        pluginLoader.emitLifecycleEvent('playerQuit', { instanceId, player: leave[1], onlinePlayers: Array.from(instState.onlinePlayers) });
-                    }
-                    if (scrollEngine) {
-                        scrollEngine.handlePlayerQuit(instanceId, leave[1]);
+
+                    // 3. 玩家离开游戏或掉线（支持 left the game, 离开了游戏, lost connection: Disconnected）
+                    const leave = cleanMsg.match(/^([a-zA-Z0-9_.* -]+?)\s+(?:left the game|离开了游戏|lost connection)/i);
+                    if (leave) {
+                        const playerName = leave[1].trim();
+                        instState.onlinePlayers.delete(playerName);
+                        io.emit(`players_update:${instanceId}`, Array.from(instState.onlinePlayers));
+                        triggerWebhook('player_change', { instanceId, type: 'leave', player: playerName, onlinePlayers: Array.from(instState.onlinePlayers) });
+                        if (pluginLoader && pluginLoader.emitLifecycleEvent) {
+                            pluginLoader.emitLifecycleEvent('playerQuit', { instanceId, player: playerName, onlinePlayers: Array.from(instState.onlinePlayers) });
+                        }
+                        if (scrollEngine) {
+                            scrollEngine.handlePlayerQuit(instanceId, playerName);
+                        }
+                        continue;
                     }
                 }
 
