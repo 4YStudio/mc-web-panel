@@ -73,7 +73,7 @@
         "name": "FRP 内网穿透",
         "version": "1.1.0",
         "author": "4YStudio",
-        "description": "FRP 内网穿透管理插件，支持 TOML/INI 双格式配置、文件与剪切板导入、进程监控与 GitHub 代理加速下载",
+        "description": "FRP 内网穿透管理插件，支持 TOML/INI 双格式配置、文件与剪贴板导入、进程监控与 GitHub 代理加速下载",
         "category": "network",
         "permissions": [
             "http",
