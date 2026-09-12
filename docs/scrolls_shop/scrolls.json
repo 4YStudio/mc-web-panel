@@ -1,5 +1,68 @@
 [
     {
+        "id": "auto-announcer",
+        "name": {
+            "zh": "定时智能公告姬",
+            "en": "Auto Announcer"
+        },
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": {
+            "zh": "定时循环播报服务器规则、QQ交流群、赞助或温馨提示。支持聊天栏轮播、ActionBar 跑马灯、提示音效，以及玩家进服欢迎展示与聊天栏输入 !rules 快速查阅。",
+            "en": "Periodically broadcasts server rules, group links, and tips. Supports chat rotation, ActionBar ticker, sound effects, join-display, and !rules chat command."
+        },
+        "category": "interactive",
+        "icon": "fa-bullhorn",
+        "color": "#f59e0b",
+        "configSchema": {
+            "intervalMinutes": {
+                "type": "number",
+                "title": "广播间隔 (分钟)",
+                "default": 5,
+                "min": 1,
+                "max": 120,
+                "description": "循环发送下一条公告的等待时间"
+            },
+            "messages": {
+                "type": "string",
+                "title": "公告列表 (每行一条)",
+                "default": "§6[公告] §f欢迎来到服务器，请文明游戏，遵守服务器规则！\n§a[提示] §f在聊天栏输入 §e!rules §f可随时查看本服所有公告与指引！\n§b[社区] §f加入官方玩家交流群，获取最新周目动态与活动福利！\n§e[安全] §f请妥善保管贵重物资，切勿向任何人透露账号密码！",
+                "description": "多条公告按行分割，将按顺序循环轮播展示"
+            },
+            "broadcastMode": {
+                "type": "select",
+                "title": "展示形式",
+                "default": "both",
+                "options": [
+                    "both",
+                    "chat",
+                    "actionbar"
+                ],
+                "description": "both (聊天栏+底部ActionBar), chat (仅聊天栏), actionbar (仅底部快捷栏)"
+            },
+            "enableSound": {
+                "type": "boolean",
+                "title": "伴随清脆提示音",
+                "default": true,
+                "description": "播报时播放提示音（经验球拾取音效）以吸引玩家注意"
+            },
+            "showOnJoin": {
+                "type": "boolean",
+                "title": "玩家进服欢迎展示",
+                "default": true,
+                "description": "玩家进入服务器后延迟 3 秒私信展示当前公告"
+            },
+            "enableChatCommand": {
+                "type": "boolean",
+                "title": "启用玩家快捷查阅指令",
+                "default": true,
+                "description": "玩家输入 !rules、!help、!公告 时向其私信完整公告指引"
+            }
+        },
+        "fileSize": 2531,
+        "downloadUrl": "./scrolls_shop/auto-announcer.zip"
+    },
+    {
         "id": "auto-cleaner",
         "name": "智能扫地姬",
         "version": "1.0.0",
@@ -40,6 +103,75 @@
         ],
         "fileSize": 1499,
         "downloadUrl": "./scrolls_shop/auto-cleaner.zip"
+    },
+    {
+        "id": "auto-saver",
+        "name": {
+            "zh": "自动安全存档守护",
+            "en": "Auto Saver & World Guard"
+        },
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": {
+            "zh": "定时强制保存世界与玩家数据并刷盘到磁盘 (save-all flush)，有效防止突发崩溃、停电或掉线导致的回档。支持全员离线时触发人走落锁存档，及聊天栏 !save 手动触发。",
+            "en": "Periodically forces world and player data flushing to disk (save-all flush), preventing rollback upon crash. Supports empty-server auto-save and !save chat command."
+        },
+        "category": "tools",
+        "icon": "fa-floppy-disk",
+        "color": "#06b6d4",
+        "configSchema": {
+            "intervalMinutes": {
+                "type": "number",
+                "title": "自动存档周期 (分钟)",
+                "default": 15,
+                "min": 1,
+                "max": 240,
+                "description": "执行自动世界刷盘的间隔时间"
+            },
+            "flushDisk": {
+                "type": "boolean",
+                "title": "强制刷盘写入磁盘 (flush)",
+                "default": true,
+                "description": "开启后使用 save-all flush（立即同步写入物理磁盘），关闭使用普通 save-all"
+            },
+            "notifyMode": {
+                "type": "select",
+                "title": "存档提示方式",
+                "default": "actionbar",
+                "options": [
+                    "actionbar",
+                    "silent",
+                    "chat"
+                ],
+                "description": "actionbar (底部快捷栏微提示，不打扰玩家), silent (静默仅控制台记录), chat (聊天栏广播)"
+            },
+            "notifyMessage": {
+                "type": "string",
+                "title": "存档提示内容",
+                "default": "§a[安全守护] §f服务器世界数据已安全保存并刷盘。",
+                "description": "向玩家展示的安全存档提示"
+            },
+            "saveOnEmpty": {
+                "type": "boolean",
+                "title": "全员离线时自动存档",
+                "default": true,
+                "description": "当最后一名在线玩家退出服务器时，自动执行一次安全存档，人走档安"
+            },
+            "saveOnStart": {
+                "type": "boolean",
+                "title": "服务器就绪后初始化存档",
+                "default": true,
+                "description": "服务端启动成功 15 秒后自动执行一次安全检查与存档"
+            },
+            "enableChatCommand": {
+                "type": "boolean",
+                "title": "启用聊天栏快捷指令",
+                "default": true,
+                "description": "输入 !save 或 保存 可查询存档状态或触发即时保存"
+            }
+        },
+        "fileSize": 2782,
+        "downloadUrl": "./scrolls_shop/auto-saver.zip"
     },
     {
         "id": "death-coords",
@@ -170,6 +302,56 @@
         },
         "fileSize": 3037,
         "downloadUrl": "./scrolls_shop/health-guardian.zip"
+    },
+    {
+        "id": "safe-world",
+        "name": {
+            "zh": "世界安全与防爆守护",
+            "en": "Safe World & Anti-Grief"
+        },
+        "version": "1.0.0",
+        "author": "4YStudio",
+        "description": {
+            "zh": "纯净与轻量服务器的世界防护守护者。自动下发与维护生物防爆规则 (禁止苦力怕/末影人破坏方块与地形)，防止火灾蔓延，并实时监控 TNT 爆炸与凋灵破坏日志，守护建筑心血。",
+            "en": "Lightweight world protection for vanilla/modded servers. Enforces anti-explosion rules (Creeper/Enderman mobGriefing false), fire spread prevention, and monitors TNT/wither griefing."
+        },
+        "category": "utility",
+        "icon": "fa-shield-halved",
+        "color": "#10b981",
+        "configSchema": {
+            "disableMobGriefing": {
+                "type": "boolean",
+                "title": "禁止生物破坏方块 (mobGriefing false)",
+                "default": true,
+                "description": "苦力怕爆炸不破坏地形方块，末影人无法偷搬方块，恶魂/凋灵不炸毁方块"
+            },
+            "disableFireSpread": {
+                "type": "boolean",
+                "title": "禁止火焰蔓延 (doFireTick false)",
+                "default": true,
+                "description": "防止雷击或点火导致森林大火与木质建筑被烧毁"
+            },
+            "logExplosions": {
+                "type": "boolean",
+                "title": "监控并告警爆炸事件",
+                "default": true,
+                "description": "监控控制台 TNT、爆炸与实体破坏日志并记录安全告警"
+            },
+            "announceProtection": {
+                "type": "boolean",
+                "title": "玩家进服安全提示",
+                "default": true,
+                "description": "玩家进入服务器后提示当前世界受防爆与防火保护，安心建造"
+            },
+            "enableChatCommand": {
+                "type": "boolean",
+                "title": "启用 !safe 状态查询指令",
+                "default": true,
+                "description": "在聊天栏输入 !safe、!防爆 可查看当前世界安全规则状态"
+            }
+        },
+        "fileSize": 2304,
+        "downloadUrl": "./scrolls_shop/safe-world.zip"
     },
     {
         "id": "welcome-scroll",

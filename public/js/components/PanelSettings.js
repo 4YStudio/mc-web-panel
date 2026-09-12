@@ -133,10 +133,11 @@ export default {
                                     <ul class="dropdown-menu shadow-sm border-0">
                                         <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = ''"><i class="fa-solid fa-ban me-2 opacity-50"></i>{{ $t('common.disabled') }} (不使用代理)</a></li>
                                         <li><hr class="dropdown-divider opacity-50"></li>
-                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://gh-proxy.org'">gh-proxy.org</a></li>
-                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://hk.gh-proxy.org'">hk.gh-proxy.org</a></li>
-                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://cdn.gh-proxy.org'">cdn.gh-proxy.org</a></li>
-                                        <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = 'https://edgeone.gh-proxy.org'">edgeone.gh-proxy.org</a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium d-flex justify-content-between align-items-center" href="#" @click.prevent="config.githubProxy = 'https://ghfast.top'"><span>ghfast.top</span><span class="badge bg-success-subtle text-success ms-2">推荐</span></a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium d-flex justify-content-between align-items-center" href="#" @click.prevent="config.githubProxy = 'https://ghproxy.net'"><span>ghproxy.net</span><span class="badge bg-primary-subtle text-primary ms-2">高速</span></a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium d-flex justify-content-between align-items-center" href="#" @click.prevent="config.githubProxy = 'https://gh.ddlc.top'"><span>gh.ddlc.top</span><span class="badge bg-info-subtle text-info ms-2">边缘</span></a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium d-flex justify-content-between align-items-center" href="#" @click.prevent="config.githubProxy = 'https://hub.gitmirror.com'"><span>hub.gitmirror.com</span><span class="badge bg-secondary-subtle text-secondary ms-2">加速</span></a></li>
+                                        <li><a class="dropdown-item small py-2 px-3 fw-medium d-flex justify-content-between align-items-center" href="#" @click.prevent="config.githubProxy = 'https://mirror.ghproxy.com'"><span>mirror.ghproxy.com</span><span class="badge bg-secondary-subtle text-secondary ms-2">经典</span></a></li>
                                     </ul>
                                     <input type="text" class="form-control" v-model="config.githubProxy" :placeholder="$t('panel_settings.github_proxy_desc')">
                                 </div>

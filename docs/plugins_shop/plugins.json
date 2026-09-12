@@ -59,13 +59,13 @@
         "name": "认证管理",
         "version": "1.2.0",
         "author": "4YStudio",
-        "description": "基于 EasyAuth 模组的玩家登录认证管理插件，支持玩家信息查看、密码修改与注销，兼容多路径与存储配置。",
+        "description": "基于 EasyAuth 模组的玩家登录认证管理插件。",
         "category": "security",
         "permissions": [
             "http"
         ],
         "icon": "fa-user-shield",
-        "fileSize": 6323550,
+        "fileSize": 6342387,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-easyauth.zip"
     },
     {
@@ -80,7 +80,7 @@
             "process"
         ],
         "icon": "fa-network-wired",
-        "fileSize": 26283,
+        "fileSize": 26687,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-frp.zip"
     },
     {
@@ -96,7 +96,7 @@
             "command"
         ],
         "icon": "fa-map-location-dot",
-        "fileSize": 72801,
+        "fileSize": 1146002,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-map.zip"
     },
     {
@@ -132,11 +132,11 @@
         "name": "语音设置",
         "version": "1.1.0",
         "author": "4YStudio",
-        "description": "基于 Simple Voice Chat 模组的语音通信管理插件，支持图形化与文本双模式编辑、多路径探测与全属性配置。",
+        "description": "基于 Simple Voice Chat 模组的语音通信管理插件。",
         "category": "tools",
         "permissions": [],
         "icon": "fa-microphone",
-        "fileSize": 4694,
+        "fileSize": 4813,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-voicechat.zip"
     }
 ]
