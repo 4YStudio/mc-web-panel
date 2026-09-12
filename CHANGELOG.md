@@ -5,6 +5,22 @@
 
 ### 🛠️ 优化与修复
 
+- **面板全局备份与系统还原全链路重构与加固 (彻底解决丢配置、丢文件、还原损坏)**：
+  - **原生流式解压与权限软链无损还原**：重构 `extractBackupArchive`，优先调用系统原生 `unzip -qo`（自动重置 `UNZIP=''` 环境变量），原生保留所有 POSIX 0755/0644 权限与符号链接，避免将大文件读入 V8 堆内存造成 OOM；第二级智能降级至原生 `tar -xf`；第三级降级至 AdmZip 并从 entry.attr 恢复文件权限与符号链接，并在 Linux 环境下自动校验并修复 `data/java/**/bin/java` 的可执行权限；
+  - **关键配置子目录全量打包**：彻底解决原备份仅打包 `data/*.json` 顶层文件导致 `appearance/`（外观主题）、`frp/`（内网穿透）、`scroll_storage/`（卷轴持久化存储）丢失的缺陷，全面打包所有子目录并排除临时缓存；
+  - **世界安全刷盘与嵌套备份递归排除**：备份前向运行中的服务端发送 `save-off` 与 `save-all flush` 确保世界区块完整落盘；打包实例时严格过滤 `backups/` 目录与 `panel.log`，防止压缩包无限递归膨胀；
+  - **Stream Pipeline 分片装配**：分片合并改写为基于 Node.js 流式管道 (`stream/promises pipeline`) 拼接，彻底解决大文件背压截断与末尾损坏；
+  - **登录界面灾难恢复模式与多重别名路由**：
+    - 修复登录界面因调用 `/api/backups/global/...` 导致 404 错误的问题，注册全套别名路由；
+    - 改造 `requireBackupAccess` 鉴权中间件，支持携带 `x-admin-password` 在未登录状态下验证管理员密码执行灾难恢复；
+    - 登录界面新增「灾难恢复 / 从备份还原」模式，支持查看待回档文件名与文件大小、动态上传进度展示与一键回档。
+
+- **卷轴工坊：单人快速跳过夜晚 (`fast-sleep` v1.1.0) 与健康防沉迷守护 (`health-guardian` v1.1.0) 重构**：
+  - **`fast-sleep` v1.1.0**：启动自动下发 Minecraft 1.17+ 原生规则 `/gamerule playersSleepingPercentage 1`（卸载自动恢复 100）；支持聊天输入 `!sleep`、`!day`、`睡觉`、`晚安` 快捷跳夜；支持原版 `[Sweet Dreams]` / `[甜蜜的梦]` 进度与中英文入睡日志；支持全屏大标题与破晓音效；
+  - **`health-guardian` v1.1.0**：启动即刻通过 `scroll.getOnlinePlayers()` 同步当前所有在服玩家；使用 `scroll.storage` 持久化 `sessions`，离线重连连续累计时长；ActionBar + tellraw 私聊 + 拾取音效三重提醒；支持聊天栏输入 `!health`、`!防沉迷` 随时查询在线时长与下次提醒倒计时；
+  - **卷轴引擎与生命周期增强**：`scroll-engine.js` 扩展 `sendMessage` 与 `playSound` 快捷接口；日志分发统一提供 `line` 与 `raw` 字段；在服务端状态切为 `running` 时触发 `onServerStart`，在 `stopping` 和进程退出时触发 `onServerStop`；
+  - 重新打包发布 `docs/scrolls_shop/fast-sleep.zip` 与 `health-guardian.zip`，更新 `docs/scrolls_shop/scrolls.json`。
+
 - **语音聊天插件 (Simple Voice Chat) 全方位配置适配与升级 (v1.1.0)**：
   - **状态判定与加载时序修复**：修复前端检查 `store.stats.hasVoicechat` 导致始终误判为“未安装模组”且拦截配置加载的严重问题，实现 `store.hasVoicechat` 与 `store.stats.hasVoicechat` 双向无缝同步；支持即使模组尚未启动也可一键强制打开配置；
   - **智能多路径嗅探与零 404 兜底**：

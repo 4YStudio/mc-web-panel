@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.4.2';
+const APP_VERSION = '2.4.3';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -3338,10 +3338,87 @@ threaded_server_support=false
         return isPathInside(fullPath, GLOBAL_BACKUP_DIR);
     };
 
+    /**
+     * 高可用、无损系统备份解压管道
+     * 1. 优先调用系统原生 unzip，重置 UNZIP/ZIPINFO 环境变量，100% 还原 0755 权限与符号链接，且流式解压无需将数 GB 读入 V8 堆内存；
+     * 2. 备用尝试系统原生 tar (Windows 10/11 和 Linux 原生支持 tar -xf)；
+     * 3. 终极降级方案：使用 AdmZip 解压，并逐项恢复 entry.attr 记录的 POSIX 文件权限与软链接。
+     */
+    const extractBackupArchive = async (zipPath, targetDir) => {
+        await fs.ensureDir(targetDir);
+
+        // 方案 1: 系统原生 unzip
+        try {
+            const { execFileSync } = require('child_process');
+            const cleanEnv = { ...process.env, UNZIP: '', ZIPINFO: '' };
+            execFileSync('unzip', ['-qo', zipPath, '-d', targetDir], { env: cleanEnv, stdio: 'pipe' });
+            return true;
+        } catch (unzipErr) {
+            console.warn('[ExtractArchive] 系统 unzip 执行失败，尝试降级方案:', unzipErr.message);
+        }
+
+        // 方案 2: 系统原生 tar
+        try {
+            const { execFileSync } = require('child_process');
+            execFileSync('tar', ['-xf', zipPath, '-C', targetDir], { stdio: 'pipe' });
+            return true;
+        } catch (tarErr) {
+            console.warn('[ExtractArchive] 系统 tar 执行失败，尝试 AdmZip 智能降级方案:', tarErr.message);
+        }
+
+        // 方案 3: AdmZip 智能降级（显式恢复文件模式与符号链接）
+        const zip = new AdmZip(zipPath);
+        const entries = zip.getEntries();
+        for (const entry of entries) {
+            const outPath = path.join(targetDir, entry.entryName);
+            if (entry.isDirectory) {
+                fs.ensureDirSync(outPath);
+                continue;
+            }
+
+            fs.ensureDirSync(path.dirname(outPath));
+            const mode = (entry.attr >>> 16) & 0o777;
+            const isSymlink = ((entry.attr >>> 16) & 0o120000) === 0o120000;
+
+            if (isSymlink) {
+                const linkTarget = entry.getData().toString('utf8').trim();
+                try {
+                    if (fs.existsSync(outPath) || fs.lstatSync(outPath).isSymbolicLink()) {
+                        fs.unlinkSync(outPath);
+                    }
+                } catch (_) {}
+                try {
+                    fs.symlinkSync(linkTarget, outPath);
+                } catch (err) {
+                    fs.writeFileSync(outPath, entry.getData());
+                }
+            } else {
+                fs.writeFileSync(outPath, entry.getData());
+                if (mode && process.platform !== 'win32') {
+                    try {
+                        fs.chmodSync(outPath, mode);
+                    } catch (_) {}
+                }
+            }
+        }
+        return true;
+    };
+
     const requireBackupAccess = (req, res, next) => {
         if (appConfig && appConfig.isSetup) {
             if (!req.session || !req.session.authenticated) {
-                return res.status(401).json({ error: '未授权' });
+                // 支持登录界面/灾难恢复场景通过管理员密码验证授权
+                const candidatePass = req.headers['x-admin-password'] || req.body?.adminPassword || req.query?.adminPassword;
+                if (candidatePass && appConfig.passwordHash) {
+                    const salt = appConfig.passwordSalt || '';
+                    const hashed = hashPassword(candidatePass, salt).hash;
+                    if (hashed === appConfig.passwordHash) {
+                        return next();
+                    } else {
+                        return res.status(401).json({ error: '管理员密码错误，无法执行灾难恢复' });
+                    }
+                }
+                return res.status(401).json({ error: '未授权：请先登录或提供管理员密码' });
             }
             if (req.session.isSubAccount) {
                 const perms = req.session.permissions || [];
@@ -3362,11 +3439,39 @@ threaded_server_support=false
         const instConf = await fs.readJson(path.join(DATA_DIR, 'instances.json')).catch(() => ({ instances: [] }));
         instConf.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份开始: ${filename}...\n`));
 
+        // 1. 安全刷盘：检查并通知运行中的 Minecraft 服务端保存世界数据
+        const runningInstances = [];
+        for (const [id, state] of instancesState) {
+            if (state.process && state.process.stdin && !state.process.stdin.destroyed) {
+                runningInstances.push(state);
+                try {
+                    state.process.stdin.write('save-off\n');
+                    state.process.stdin.write('save-all flush\n');
+                    appendLog(id, '[系统] 全局备份前安全刷盘 (save-all flush)...\n');
+                } catch (_) {}
+            }
+        }
+        if (runningInstances.length > 0) {
+            // 等待 1.5 秒确保世界缓存数据完全落盘
+            await new Promise(r => setTimeout(r, 1500));
+        }
+
+        const restoreRunningSaves = () => {
+            for (const state of runningInstances) {
+                try {
+                    if (state.process && state.process.stdin && !state.process.stdin.destroyed) {
+                        state.process.stdin.write('save-on\n');
+                    }
+                } catch (_) {}
+            }
+        };
+
         return new Promise((resolve, reject) => {
             const output = fs.createWriteStream(zipPath);
             const archive = archiver('zip', { zlib: { level: 5 } });
 
             output.on('close', async () => {
+                restoreRunningSaves();
                 const metaPath = zipPath + '.meta.json';
                 await fs.writeJson(metaPath, { note, options, createdAt: new Date() }, { spaces: 2 });
                 instConf.instances.forEach(inst => appendLog(inst.id, `[系统] 全局备份完成！大小: ${(archive.pointer() / 1024 / 1024).toFixed(1)} MB\n`));
@@ -3374,24 +3479,30 @@ threaded_server_support=false
             });
 
             archive.on('error', (err) => {
+                restoreRunningSaves();
                 instConf.instances.forEach(inst => appendLog(inst.id, `[错误] 全局备份失败: ${err.message}\n`));
                 reject(err);
             });
 
             archive.pipe(output);
 
-            if (options.configs) {
-                if (fs.existsSync(DATA_DIR)) {
-                    const files = fs.readdirSync(DATA_DIR);
-                    for (const file of files) {
-                        const fullPath = path.join(DATA_DIR, file);
-                        if (fs.statSync(fullPath).isFile() && (file.endsWith('.json') || file === 'executable_path.txt')) {
-                            archive.file(fullPath, { name: `data/${file}` });
-                        }
+            // 2. 备份面板配置与子目录数据（包含 appearance, frp, scroll_storage，排除临时缓存）
+            if (options.configs && fs.existsSync(DATA_DIR)) {
+                const excludeDataItems = new Set(['java', 'backup_chunks', 'tmp_uploads', 'avatar_cache', 'map_cache', 'panel.pid', 'panel.log', 'global_backups']);
+                const entries = fs.readdirSync(DATA_DIR);
+                for (const entry of entries) {
+                    if (excludeDataItems.has(entry)) continue;
+                    const fullPath = path.join(DATA_DIR, entry);
+                    const stat = fs.statSync(fullPath);
+                    if (stat.isFile()) {
+                        archive.file(fullPath, { name: `data/${entry}` });
+                    } else if (stat.isDirectory()) {
+                        archive.directory(fullPath, `data/${entry}`);
                     }
                 }
             }
 
+            // 3. 备份 Java 环境
             if (Array.isArray(options.java)) {
                 for (const javaId of options.java) {
                     const javaPath = path.join(DATA_DIR, 'java', javaId);
@@ -3404,15 +3515,34 @@ threaded_server_support=false
                 if (fs.existsSync(javaDir)) archive.directory(javaDir, 'data/java');
             }
 
-            if (Array.isArray(options.instances)) {
-                for (const instId of options.instances) {
-                    const instPath = path.join(INSTANCES_DIR, instId);
-                    if (fs.existsSync(instPath)) {
-                        archive.directory(instPath, `instances/${instId}`);
+            // 4. 备份 Minecraft 实例数据（排除内部嵌套 backups/ 与临时日志）
+            const archiveInstance = (instId) => {
+                const instPath = path.join(INSTANCES_DIR, instId);
+                if (!fs.existsSync(instPath)) return;
+                const entries = fs.readdirSync(instPath);
+                for (const entry of entries) {
+                    if (entry === 'backups' || entry === 'panel.log') continue;
+                    const fullPath = path.join(instPath, entry);
+                    const stat = fs.statSync(fullPath);
+                    if (stat.isFile()) {
+                        archive.file(fullPath, { name: `instances/${instId}/${entry}` });
+                    } else if (stat.isDirectory()) {
+                        archive.directory(fullPath, `instances/${instId}/${entry}`);
                     }
                 }
+            };
+
+            if (Array.isArray(options.instances)) {
+                for (const instId of options.instances) {
+                    archiveInstance(instId);
+                }
             } else if (options.instances === true) {
-                archive.directory(INSTANCES_DIR, 'instances');
+                if (fs.existsSync(INSTANCES_DIR)) {
+                    const allInsts = fs.readdirSync(INSTANCES_DIR);
+                    for (const id of allInsts) {
+                        archiveInstance(id);
+                    }
+                }
             }
 
             archive.finalize();
@@ -3484,7 +3614,7 @@ threaded_server_support=false
         res.download(zipPath);
     });
 
-    app.post('/api/panel/backups/import', requireBackupAccess, upload.single('backup'), async (req, res) => {
+    const handleBackupImport = async (req, res) => {
         if (!req.file) return res.status(400).json({ error: '未上传文件' });
         const safeName = path.basename(req.file.originalname).replace(/[\\/:*?"<>|]/g, '_');
         if (!isSafeBackupFile(safeName)) return res.status(400).json({ error: '非法的备份压缩包文件' });
@@ -3496,11 +3626,11 @@ threaded_server_support=false
             await fs.writeJson(metaPath, { note: '导入的备份', createdAt: new Date() }, { spaces: 2 });
             res.json({ success: true, filename: path.basename(targetPath) });
         } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+    };
 
-    app.post('/api/panel/backups/import-chunk/init', requireBackupAccess, async (req, res) => {
+    const handleChunkInit = async (req, res) => {
         const { fileName, fileSize, totalChunks } = req.body;
-        const safeName = path.basename(fileName).replace(/[\\/:*?"<>|]/g, '_');
+        const safeName = path.basename(fileName || '').replace(/[\\/:*?"<>|]/g, '_');
         if (!isSafeBackupFile(safeName)) return res.status(400).json({ error: '非法的备份压缩包文件名' });
         const uploadId = crypto.randomBytes(16).toString('hex');
         const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
@@ -3512,9 +3642,9 @@ threaded_server_support=false
             createdAt: Date.now()
         });
         res.json({ uploadId });
-    });
+    };
 
-    app.post('/api/panel/backups/import-chunk/upload', requireBackupAccess, upload.single('chunk'), async (req, res) => {
+    const handleChunkUpload = async (req, res) => {
         const { uploadId, chunkIndex } = req.body;
         if (!uploadId || chunkIndex === undefined) return res.status(400).json({ error: '缺少分片参数' });
         const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
@@ -3526,9 +3656,9 @@ threaded_server_support=false
             await fs.move(req.file.path, chunkFile, { overwrite: true });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+    };
 
-    app.post('/api/panel/backups/import-chunk/complete', requireBackupAccess, async (req, res) => {
+    const handleChunkComplete = async (req, res) => {
         const { uploadId } = req.body;
         if (!uploadId) return res.status(400).json({ error: '缺少 uploadId' });
         const chunkDir = path.join(BACKUP_CHUNK_TEMP_DIR, uploadId);
@@ -3543,21 +3673,28 @@ threaded_server_support=false
             if (!isPathInside(finalPath, GLOBAL_BACKUP_DIR)) return res.status(403).json({ error: 'Access Denied' });
             await fs.ensureDir(GLOBAL_BACKUP_DIR);
 
+            // 使用 Node.js Stream Pipeline 流式拼接分片，杜绝内存堆积与背压截断
             const writeStream = fs.createWriteStream(finalPath);
-            for (let i = 0; i < totalChunks; i++) {
-                const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
-                if (!fs.existsSync(chunkFile)) {
-                    writeStream.close();
-                    await fs.remove(finalPath).catch(() => { });
-                    return res.status(400).json({ error: `缺少分片 ${i}` });
+            try {
+                for (let i = 0; i < totalChunks; i++) {
+                    const chunkFile = path.join(chunkDir, String(i).padStart(6, '0'));
+                    if (!fs.existsSync(chunkFile)) {
+                        writeStream.destroy();
+                        await fs.remove(finalPath).catch(() => { });
+                        return res.status(400).json({ error: `缺少分片 ${i}` });
+                    }
+                    const readStream = fs.createReadStream(chunkFile);
+                    await pipeline(readStream, writeStream, { end: false });
                 }
-                const data = fs.readFileSync(chunkFile);
-                writeStream.write(data);
+                await new Promise((resolve, reject) => {
+                    writeStream.end(resolve);
+                    writeStream.on('error', reject);
+                });
+            } catch (streamErr) {
+                writeStream.destroy();
+                await fs.remove(finalPath).catch(() => { });
+                throw streamErr;
             }
-            await new Promise((resolve, reject) => {
-                writeStream.end(resolve);
-                writeStream.on('error', reject);
-            });
 
             const metaJsonPath = finalPath + '.meta.json';
             await fs.writeJson(metaJsonPath, { note: '导入的备份', createdAt: new Date() }, { spaces: 2 });
@@ -3567,9 +3704,9 @@ threaded_server_support=false
             res.status(500).json({ error: e.message });
             try { await fs.remove(path.join(BACKUP_CHUNK_TEMP_DIR, uploadId)); } catch (_) { }
         }
-    });
+    };
 
-    app.post('/api/panel/backups/import-chunk/cancel', requireBackupAccess, async (req, res) => {
+    const handleChunkCancel = async (req, res) => {
         const { uploadId } = req.body;
         if (!uploadId) return res.status(400).json({ error: '缺少 uploadId' });
         try {
@@ -3577,9 +3714,9 @@ threaded_server_support=false
             if (fs.existsSync(chunkDir)) await fs.remove(chunkDir);
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+    };
 
-    app.post('/api/panel/backups/restore', requireBackupAccess, async (req, res) => {
+    const handleBackupRestore = async (req, res) => {
         const { filename } = req.body;
         if (!isSafeBackupFile(filename)) return res.status(400).json({ error: '非法的备份压缩包' });
         const zipPath = path.join(GLOBAL_BACKUP_DIR, filename);
@@ -3613,9 +3750,9 @@ threaded_server_support=false
                         } catch (e) { }
                     }
 
-                    // 等待所有实例退出，最多等待 15 秒
+                    // 等待所有实例退出，最多等待 30 秒（为大型 Mod 整合包预留充足刷盘落盘时间）
                     const waitStartTime = Date.now();
-                    while (Date.now() - waitStartTime < 15000) {
+                    while (Date.now() - waitStartTime < 30000) {
                         const stillRunning = runningServers.some(({ state }) => state.process !== null);
                         if (!stillRunning) break;
                         await new Promise(r => setTimeout(r, 500));
@@ -3632,20 +3769,15 @@ threaded_server_support=false
                     }
                 }
 
-                // 2. 解压备份到临时目录
+                // 2. 解压备份到临时目录（使用 extractBackupArchive 原生无损解压，完整保留 0755 权限与符号链接）
                 io.emit('restore_progress', { percent: 35, message: '正在解压备份文件...' });
-                await fs.ensureDir(tempExtractDir);
-                const zip = new AdmZip(zipPath);
-                zip.extractAllTo(tempExtractDir, true);
+                await extractBackupArchive(zipPath, tempExtractDir);
 
-                // 3. 还原系统配置与数据
+                // 3. 还原系统配置与运行时数据（整目录覆盖，保留 appearance, frp, scroll_storage 等）
                 io.emit('restore_progress', { percent: 65, message: '正在还原面板配置与运行时数据...' });
                 const dataRestoreDir = path.join(tempExtractDir, 'data');
                 if (fs.existsSync(dataRestoreDir)) {
-                    const files = fs.readdirSync(dataRestoreDir);
-                    for (const file of files) {
-                        await fs.copy(path.join(dataRestoreDir, file), path.join(DATA_DIR, file), { overwrite: true });
-                    }
+                    await fs.copy(dataRestoreDir, DATA_DIR, { overwrite: true });
                 }
 
                 // 4. 还原实例数据
@@ -3655,7 +3787,18 @@ threaded_server_support=false
                     await fs.copy(instancesRestoreDir, INSTANCES_DIR, { overwrite: true });
                 }
 
-                // 5. 完成并准备重启
+                // 5. Linux 环境下校验并修复 Java 与可执行脚本权限（额外安全兜底）
+                if (process.platform !== 'win32') {
+                    try {
+                        const { execSync } = require('child_process');
+                        const javaDir = path.join(DATA_DIR, 'java');
+                        if (fs.existsSync(javaDir)) {
+                            execSync(`find "${javaDir}" -type f -name "java" -exec chmod 755 {} +`, { stdio: 'ignore' });
+                        }
+                    } catch (_) {}
+                }
+
+                // 6. 完成并准备重启
                 await fs.remove(tempExtractDir).catch(() => { });
                 io.emit('restore_progress', { percent: 100, message: '还原完成，面板即将重启...' });
                 io.emit('restore_completed');
@@ -3670,7 +3813,26 @@ threaded_server_support=false
                 io.emit('restore_error', err.message || '回档执行失败');
             }
         })();
-    });
+    };
+
+    // 面板内部主路由
+    app.post('/api/panel/backups/import', requireBackupAccess, upload.single('backup'), handleBackupImport);
+    app.post('/api/panel/backups/import-chunk/init', requireBackupAccess, handleChunkInit);
+    app.post('/api/panel/backups/import-chunk/upload', requireBackupAccess, upload.single('chunk'), handleChunkUpload);
+    app.post('/api/panel/backups/import-chunk/complete', requireBackupAccess, handleChunkComplete);
+    app.post('/api/panel/backups/import-chunk/cancel', requireBackupAccess, handleChunkCancel);
+    app.post('/api/panel/backups/restore', requireBackupAccess, handleBackupRestore);
+
+    // 兼容历史与登录界面的 /api/backups/global/* 以及 /api/panel/backups/global/* 别名路由
+    const backupGlobalAliases = ['/api/backups/global', '/api/panel/backups/global'];
+    for (const prefix of backupGlobalAliases) {
+        app.post(`${prefix}/import`, requireBackupAccess, upload.single('backup'), handleBackupImport);
+        app.post(`${prefix}/import-chunk/init`, requireBackupAccess, handleChunkInit);
+        app.post(`${prefix}/import-chunk/upload`, requireBackupAccess, upload.single('chunk'), handleChunkUpload);
+        app.post(`${prefix}/import-chunk/complete`, requireBackupAccess, handleChunkComplete);
+        app.post(`${prefix}/import-chunk/cancel`, requireBackupAccess, handleChunkCancel);
+        app.post(`${prefix}/restore`, requireBackupAccess, handleBackupRestore);
+    }
 
     app.get('/api/auth/check', (req, res) => {
         let isSetup = false;
@@ -4399,9 +4561,15 @@ threaded_server_support=false
                 if (instState.status === 'starting' && /(?:Done \([0-9.]+s\)!|Done in [0-9.]+|Done! For help|Timings Reset)/i.test(line)) {
                     instState.status = 'running';
                     io.emit(`status:${instanceId}`, { isRunning: true, status: 'running' });
+                    if (scrollEngine) {
+                        scrollEngine.handleServerStart(instanceId);
+                    }
                 } else if (instState.status !== 'stopped' && /(?:Stopping (?:the )?server|Saving worlds|Saving players|Closing Server)/i.test(line)) {
                     instState.status = 'stopping';
                     io.emit(`status:${instanceId}`, { isRunning: true, status: 'stopping' });
+                    if (scrollEngine) {
+                        scrollEngine.handleServerStop(instanceId);
+                    }
                 }
 
                 const rawLines = line.split('\n');
@@ -4596,6 +4764,9 @@ threaded_server_support=false
                     triggerWebhook('server_state_change', { instanceId, isRunning: false, state: 'stop', code });
                     if (pluginLoader && pluginLoader.emitLifecycleEvent) {
                         pluginLoader.emitLifecycleEvent('serverStop', { instanceId, code });
+                    }
+                    if (scrollEngine) {
+                        scrollEngine.handleServerStop(instanceId);
                     }
                 }
 

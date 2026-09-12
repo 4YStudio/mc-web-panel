@@ -79,58 +79,96 @@
             "zh": "单人快速跳过夜晚",
             "en": "Fast Sleep"
         },
-        "version": "1.0.0",
+        "version": "1.1.0",
         "author": "4YStudio",
         "description": {
-            "zh": "多人联机时，只要有一名玩家上床睡觉，即可触发全服倒计时并自动切换至白昼，解决多人服无法跳过黑夜的痛点。",
-            "en": "Allows a single player sleeping in bed to skip the night after a short countdown."
+            "zh": "多人联机时，只要有一名玩家上床睡觉（或输入聊天指令），即可触发全服通知并平滑迎来白昼。原生支持 1.17+ 官方游戏规则与全版本聊天快捷跳夜。",
+            "en": "Allows a single player sleeping in bed (or typing chat command) to skip the night. Supports Minecraft 1.17+ native rule and chat commands."
         },
         "category": "interactive",
         "icon": "fa-bed",
         "color": "#3b82f6",
         "configSchema": {
+            "enableNativeGamerule": {
+                "type": "boolean",
+                "title": "启用 1.17+ 原生规则自动下发",
+                "default": true,
+                "description": "自动将 gamerule playersSleepingPercentage 设为 1，1人入睡原生自动跳夜"
+            },
             "countdownSec": {
                 "type": "number",
                 "title": "倒计时时长 (秒)",
                 "default": 3,
-                "description": "检测到玩家入睡后等待多少秒跳过黑夜"
+                "min": 0,
+                "max": 10,
+                "description": "触发跳夜后等待多少秒执行昼夜切换"
+            },
+            "enableChatCommand": {
+                "type": "boolean",
+                "title": "启用聊天栏快捷跳夜指令",
+                "default": true,
+                "description": "允许玩家在聊天栏发送 !sleep、!day、睡觉、晚安 快捷跳过黑夜"
             },
             "announceTitle": {
                 "type": "boolean",
-                "title": "全屏大标题提示",
+                "title": "全屏大标题与破晓音效",
                 "default": true,
-                "description": "跳过夜晚时是否向全服玩家屏幕展示醒目的大标题"
+                "description": "跳过夜晚时是否向全服玩家屏幕展示醒目的大标题并播放音效"
             }
         },
-        "fileSize": 1621,
+        "fileSize": 2974,
         "downloadUrl": "./scrolls_shop/fast-sleep.zip"
     },
     {
         "id": "health-guardian",
-        "name": "健康防沉迷守护",
-        "version": "1.0.0",
+        "name": {
+            "zh": "健康防沉迷守护",
+            "en": "Health Guardian"
+        },
+        "version": "1.1.0",
         "author": "4YStudio",
-        "description": "统计玩家连续在线时长，到达设定时间后通过快捷栏操作区 (ActionBar) 发送温和的护眼与休息提示。",
+        "description": {
+            "zh": "精准统计玩家连续在线时长，到达设定时间后通过快捷栏 (ActionBar)、私信与音效发送温和的休息提示。支持玩家聊天框输入 !health 随时查询。",
+            "en": "Tracks player session time and sends friendly rest reminders via ActionBar, private message, and sound. Supports !health chat command."
+        },
         "category": "utility",
         "icon": "fa-heart-pulse",
-        "color": "#8b5cf6",
-        "configSchema": [
-            {
-                "key": "remindIntervalMinutes",
-                "label": "提醒间隔 (分钟)",
+        "color": "#10b981",
+        "configSchema": {
+            "remindIntervalMinutes": {
                 "type": "number",
-                "min": 15,
-                "max": 240,
-                "default": 60
+                "title": "提醒间隔 (分钟)",
+                "default": 60,
+                "min": 1,
+                "max": 720,
+                "description": "每连续游戏多少分钟提醒一次（测试可设为 1 分钟）"
             },
-            {
-                "key": "remindMessage",
-                "label": "提醒文字 ({hours} 代表已在线小时数)",
+            "remindMessage": {
                 "type": "string",
-                "default": "您已连续开荒 {hours} 小时啦，站起来活动一下，保护视力哦！"
+                "title": "提醒文字模板",
+                "default": "您已连续开荒 {minutes} 分钟啦，站起来活动一下，保护视力哦！",
+                "description": "{minutes} 代表连续在线分钟数，{hours} 代表在线小时数"
+            },
+            "enableActionBar": {
+                "type": "boolean",
+                "title": "快捷栏 (ActionBar) 提示",
+                "default": true,
+                "description": "是否在屏幕底部的快捷栏显示提醒"
+            },
+            "enableChatMessage": {
+                "type": "boolean",
+                "title": "聊天栏私信提示",
+                "default": true,
+                "description": "是否在聊天栏向玩家发送私信提醒，确保不遗漏"
+            },
+            "enableSound": {
+                "type": "boolean",
+                "title": "播放经验球拾取音效",
+                "default": true,
+                "description": "提醒时是否播放清脆的拾取经验球提示音"
             }
-        ],
-        "fileSize": 1499,
+        },
+        "fileSize": 3037,
         "downloadUrl": "./scrolls_shop/health-guardian.zip"
     },
     {

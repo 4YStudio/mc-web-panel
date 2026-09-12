@@ -429,6 +429,20 @@ class ScrollEngine {
                 self.sendCommand(iid, `tellraw @a ${json}`);
             },
 
+            // 便捷私聊信息
+            sendMessage: async (player, message, targetInstanceId) => {
+                const iid = targetInstanceId || instanceId;
+                const json = JSON.stringify({ text: message });
+                self.sendCommand(iid, `tellraw ${player} ${json}`);
+            },
+
+            // 便捷音效播放
+            playSound: async (player, sound = 'entity.experience_orb.pickup', targetInstanceId) => {
+                const iid = targetInstanceId || instanceId;
+                const target = player || '@a';
+                self.sendCommand(iid, `playsound ${sound} master ${target}`);
+            },
+
             // 持久化存储 API（实例隔离）
             storage: {
                 get: (key, defaultValue) => {
@@ -474,13 +488,13 @@ class ScrollEngine {
         const holder = this.instanceHolders.get(instanceId);
         if (!holder) return;
 
-        // 1. 触发该实例的通用 onLog
+        // 1. 触发该实例的通用 onLog（同时提供 line 和 raw 字段以最大化兼容第三方脚本）
         for (const handler of holder.eventListeners.log) {
-            try { handler({ instanceId, line: logLine }); } catch (e) {}
+            try { handler({ instanceId, line: logLine, raw: logLine }); } catch (e) {}
         }
 
-        // 2. 匹配玩家聊天消息: <Player> message
-        const chatMatch = logLine.match(/<(\w+)>\s+(.*)/);
+        // 2. 匹配玩家聊天消息: <Player> message 或 [Chat] <Player> message
+        const chatMatch = logLine.match(/(?:<|\[Chat\]\s*<)\s*([a-zA-Z0-9_.-]+)\s*>\s*(.*)/);
         if (chatMatch) {
             const player = chatMatch[1];
             const message = chatMatch[2].trim();
@@ -489,15 +503,16 @@ class ScrollEngine {
             }
         }
 
-        // 3. 匹配死亡消息
+        // 3. 匹配死亡消息（包含原版英文字符串及主流核心汉化日志）
         const deathPatterns = [
-            /:\s+(\w+)\swas\sslain\sby\s(.*)/,
-            /:\s+(\w+)\sfell\sfrom\sa\shigh\splace/,
-            /:\s+(\w+)\sdrowned/,
-            /:\s+(\w+)\sburned\sto\sdeath/,
-            /:\s+(\w+)\swas\sshot\sby\s(.*)/,
-            /:\s+(\w+)\swas\sblown\sup\sby\s(.*)/,
-            /:\s+(\w+)\ssuffocated\sin\sa\swall/
+            /:\s+([a-zA-Z0-9_.-]+)\swas\sslain\sby\s(.*)/i,
+            /:\s+([a-zA-Z0-9_.-]+)\sfell\sfrom\sa\shigh\splace/i,
+            /:\s+([a-zA-Z0-9_.-]+)\sdrowned/i,
+            /:\s+([a-zA-Z0-9_.-]+)\sburned\sto\sdeath/i,
+            /:\s+([a-zA-Z0-9_.-]+)\swas\sshot\sby\s(.*)/i,
+            /:\s+([a-zA-Z0-9_.-]+)\swas\sblown\sup\sby\s(.*)/i,
+            /:\s+([a-zA-Z0-9_.-]+)\ssuffocated\sin\sa\swall/i,
+            /:\s+([a-zA-Z0-9_.-]+)\s+(?:被|摔死|溺死|烧死|被射杀|被炸死|在墙里窒息)/
         ];
         for (const pat of deathPatterns) {
             const m = logLine.match(pat);
@@ -507,6 +522,34 @@ class ScrollEngine {
                     try { handler({ instanceId, player, reason: logLine.trim() }); } catch (e) {}
                 }
                 break;
+            }
+        }
+    }
+
+    /**
+     * 服务端启动成功事件分发（按 instanceId 隔离）
+     */
+    handleServerStart(instanceId) {
+        const holder = this.instanceHolders.get(instanceId);
+        if (!holder) return;
+
+        for (const handler of holder.eventListeners.serverStart) {
+            try { handler({ instanceId }); } catch (e) {
+                console.error(`[ScrollEngine:${instanceId}] 执行 serverStart 钩子失败:`, e);
+            }
+        }
+    }
+
+    /**
+     * 服务端停止/关闭事件分发（按 instanceId 隔离）
+     */
+    handleServerStop(instanceId) {
+        const holder = this.instanceHolders.get(instanceId);
+        if (!holder) return;
+
+        for (const handler of holder.eventListeners.serverStop) {
+            try { handler({ instanceId }); } catch (e) {
+                console.error(`[ScrollEngine:${instanceId}] 执行 serverStop 钩子失败:`, e);
             }
         }
     }

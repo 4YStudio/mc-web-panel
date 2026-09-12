@@ -1,12 +1,12 @@
 import { ref, watch, onMounted } from '/js/vue.esm-browser.js';
 import { store } from '../store.js';
 import { api } from '../api.js';
-import { showToast, waitForPanel, uploadFileWithChunk, isLargeFile } from '../utils.js';
+import { showToast, waitForPanel, uploadFileWithChunk, isLargeFile, t } from '../utils.js';
 
 export default {
     template: `
     <div class="login-page d-flex justify-content-center w-100 h-100 overflow-y-auto py-4 py-md-5">
-        <div class="glass-card login-card p-4 p-md-5 text-center animate-in my-auto" style="width: 100%; max-width: 420px;">
+        <div class="glass-card login-card p-4 p-md-5 text-center animate-in my-auto" style="width: 100%; max-width: 440px;">
             <div class="mb-4">
                  <img v-if="store.customLogoUrl" :src="store.customLogoUrl" alt="Logo" class="login-logo">
                  <img v-else-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="login-logo rounded-circle">
@@ -52,23 +52,25 @@ export default {
                     <div class="modern-progress" style="height: 6px;">
                         <div class="modern-progress-bar" :style="{width: uploadPercent + '%'}"></div>
                     </div>
-                    <div class="text-muted small mt-1" style="font-size: 0.7rem;">{{ uploadPercent }}% - {{ $t('setup.restoring_uploading') }}</div>
+                    <div class="text-muted small mt-1 d-flex justify-content-between" style="font-size: 0.75rem;">
+                        <span>{{ restoreStatusText }}</span>
+                        <span>{{ uploadPercent }}%</span>
+                    </div>
                 </div>
 
                 <div class="d-grid gap-2 mb-3">
                     <button class="btn btn-outline-warning btn-sm py-2 border-dashed fw-bold" @click="triggerRestore" :disabled="restoring">
                         <i class="fa-solid fa-file-import me-1"></i>{{ $t('setup.restore_from_backup') }}
                     </button>
-                    <input type="file" ref="restoreInput" class="d-none" accept=".zip" @change="handleRestore">
+                    <input type="file" ref="restoreInput" class="d-none" accept=".zip" @change="handleSetupRestore">
                 </div>
             </div>
 
-            <!-- 2. 标准登录 -->
-            <div v-else class="animate-in text-start mb-3">
-                <h4 class="mb-4 fw-bold text-center tracking-tight">{{ $t('login.title') }}</h4>
-
+            <!-- 2. 标准登录与灾难恢复 -->
+            <div v-else class="animate-in mb-3">
                 <!-- 模式一: 账号密码登录 -->
-                <div v-if="loginMode === 'password'">
+                <div v-if="loginMode === 'password'" class="text-start">
+                    <h4 class="mb-4 fw-bold text-center tracking-tight">{{ $t('login.title') }}</h4>
                     <div class="mb-3">
                         <input type="text" v-model="loginUser" class="form-control" :placeholder="$t('login.placeholder_user')" @keyup.enter="loginPassword" autofocus>
                     </div>
@@ -91,10 +93,17 @@ export default {
                             <i class="fa-solid fa-shield-halved me-1"></i> {{ $t('login.switch_to_2fa') }}
                         </button>
                     </div>
+
+                    <div class="mt-4 pt-3 border-top border-secondary-subtle text-center">
+                        <button class="btn btn-link text-warning-emphasis text-decoration-none small py-0 fw-semibold" @click="switchMode('recovery')">
+                            <i class="fa-solid fa-life-ring me-1"></i> {{ $t('login.disaster_recovery') }}
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 模式二: 2FA 令牌直登 -->
-                <div v-else class="animate-in text-center">
+                <div v-else-if="loginMode === '2fa'" class="animate-in text-center">
+                    <h4 class="mb-4 fw-bold text-center tracking-tight">{{ $t('login.title') }}</h4>
                     <div class="alert alert-info small py-2 mb-3">{{ $t('login.placeholder_code') }}</div>
                     <div class="mb-4">
                         <input type="text" v-model="login2FAToken" class="form-control form-control-lg login-input-2fa text-center font-monospace" :placeholder="$t('login.placeholder_code')" maxlength="6" @keyup.enter="login2FA" autofocus>
@@ -106,6 +115,63 @@ export default {
                     <div class="text-center mt-2">
                         <button class="btn btn-link text-primary small text-decoration-none fw-semibold" @click="switchMode('password')">
                             <i class="fa-solid fa-key me-1"></i> {{ $t('login.switch_to_password') }}
+                        </button>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top border-secondary-subtle text-center">
+                        <button class="btn btn-link text-warning-emphasis text-decoration-none small py-0 fw-semibold" @click="switchMode('recovery')">
+                            <i class="fa-solid fa-life-ring me-1"></i> {{ $t('login.disaster_recovery') }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 模式三: 灾难恢复 / 从备份还原 -->
+                <div v-else-if="loginMode === 'recovery'" class="animate-in text-start">
+                    <div class="text-center mb-3">
+                        <div class="d-inline-flex align-items-center justify-content-center bg-warning-subtle text-warning rounded-circle mb-2" style="width: 46px; height: 46px;">
+                            <i class="fa-solid fa-life-ring fa-xl"></i>
+                        </div>
+                        <h5 class="fw-bold tracking-tight mb-1 text-warning-emphasis">{{ $t('login.recovery_title') }}</h5>
+                        <div class="text-muted small" style="font-size: 0.8rem;">{{ $t('login.recovery_desc') }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">{{ $t('login.recovery_pass_label') }}</label>
+                        <input type="password" v-model="recoveryPass" class="form-control" :placeholder="$t('login.recovery_pass_placeholder')" :disabled="restoring">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold mb-1">{{ $t('login.recovery_file_label') }}</label>
+                        <div class="d-grid">
+                            <button type="button" class="btn btn-outline-secondary text-start d-flex align-items-center justify-content-between py-2" @click="triggerRecoveryFile" :disabled="restoring">
+                                <span class="text-truncate me-2">
+                                    <i class="fa-solid fa-file-zipper me-2 text-warning"></i>
+                                    <span v-if="recoveryFile" class="fw-semibold">{{ recoveryFile.name }} ({{ formatFileSize(recoveryFile.size) }})</span>
+                                    <span v-else class="text-muted">{{ $t('login.recovery_select_file') }}</span>
+                                </span>
+                                <i class="fa-solid fa-folder-open text-muted"></i>
+                            </button>
+                            <input type="file" ref="recoveryFileInput" class="d-none" accept=".zip" @change="handleRecoveryFileSelect">
+                        </div>
+                    </div>
+
+                    <div v-if="restoring" class="mb-3 animate-in">
+                        <div class="modern-progress" style="height: 6px;">
+                            <div class="modern-progress-bar" :style="{width: uploadPercent + '%'}"></div>
+                        </div>
+                        <div class="text-muted small mt-1 d-flex justify-content-between" style="font-size: 0.75rem;">
+                            <span>{{ restoreStatusText }}</span>
+                            <span>{{ uploadPercent }}%</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-warning w-100 mb-2 py-2 fw-bold text-dark" @click="startDisasterRecovery" :disabled="restoring || !recoveryFile || !recoveryPass">
+                        <i class="fa-solid fa-rotate-left me-1"></i> {{ $t('login.recovery_btn_start') }}
+                    </button>
+
+                    <div class="text-center mt-3">
+                        <button class="btn btn-link text-secondary small text-decoration-none" @click="switchMode('password')" :disabled="restoring">
+                            <i class="fa-solid fa-arrow-left me-1"></i> {{ $t('login.recovery_btn_cancel') }}
                         </button>
                     </div>
                 </div>
@@ -126,7 +192,9 @@ export default {
         const hasIcon = ref(false);
         const restoring = ref(false);
         const uploadPercent = ref(0);
+        const restoreStatusText = ref('');
         const restoreInput = ref(null);
+        const recoveryFileInput = ref(null);
 
         // Setup States
         const initUser = ref('admin');
@@ -142,8 +210,24 @@ export default {
         const login2FAToken = ref('');
         const captchaSvg = ref('');
         
-        // Mode switchable state: 'password' or '2fa'
+        // Mode switchable state: 'password', '2fa', or 'recovery'
         const loginMode = ref('password');
+
+        // Disaster Recovery States
+        const recoveryPass = ref('');
+        const recoveryFile = ref(null);
+
+        const formatFileSize = (bytes) => {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIdx = 0;
+            while (size >= 1024 && unitIdx < units.length - 1) {
+                size /= 1024;
+                unitIdx++;
+            }
+            return `${size.toFixed(1)} ${units[unitIdx]}`;
+        };
 
         const checkIcon = async () => {
             const img = new Image();
@@ -182,11 +266,13 @@ export default {
 
         const switchMode = (mode) => {
             loginMode.value = mode;
-            localStorage.setItem('preferred_login_mode', mode);
+            if (mode !== 'recovery') {
+                localStorage.setItem('preferred_login_mode', mode);
+            }
             if (mode === 'password') {
                 refreshCaptcha();
                 loginCaptcha.value = '';
-            } else {
+            } else if (mode === '2fa') {
                 login2FAToken.value = '';
             }
         };
@@ -286,21 +372,35 @@ export default {
             localStorage.setItem('lang', store.lang);
         };
 
-        const triggerRestore = () => restoreInput.value.click();
+        const triggerRestore = () => restoreInput.value && restoreInput.value.click();
+        const triggerRecoveryFile = () => recoveryFileInput.value && recoveryFileInput.value.click();
 
-        const handleRestore = async (e) => {
+        const handleRecoveryFileSelect = (e) => {
             const file = e.target.files[0];
+            if (file) {
+                recoveryFile.value = file;
+            }
+            e.target.value = '';
+        };
+
+        const executeRestore = async (file, adminPassword = '') => {
             if (!file) return;
 
             restoring.value = true;
             uploadPercent.value = 0;
+            restoreStatusText.value = t('setup.restoring_uploading');
+
+            const reqHeaders = adminPassword ? { 'x-admin-password': adminPassword } : {};
 
             try {
                 let filename;
                 if (isLargeFile(file)) {
                     const chunkResult = await uploadFileWithChunk(file, {
-                        initUrl: '/api/backups/global/import-chunk/init',
-                        completeUrl: '/api/backups/global/import-chunk/complete',
+                        initUrl: '/api/panel/backups/import-chunk/init',
+                        uploadUrl: '/api/panel/backups/import-chunk/upload',
+                        completeUrl: '/api/panel/backups/import-chunk/complete',
+                        cancelUrl: '/api/panel/backups/import-chunk/cancel',
+                        headers: reqHeaders,
                         onProgress: (bytesDone, bytesTotal) => {
                             uploadPercent.value = Math.round((bytesDone * 100) / bytesTotal);
                         }
@@ -310,17 +410,20 @@ export default {
                     const formData = new FormData();
                     formData.append('backup', file);
                     showToast('setup.restoring_uploading', 'info');
-                    const uploadRes = await api.post('/api/backups/global/import', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' },
+                    const uploadRes = await api.post('/api/panel/backups/import', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data', ...reqHeaders },
                         onUploadProgress: (p) => {
-                            uploadPercent.value = Math.round((p.loaded * 100) / p.total);
+                            if (p.total) {
+                                uploadPercent.value = Math.round((p.loaded * 100) / p.total);
+                            }
                         }
                     });
                     filename = uploadRes.data.filename;
                 }
                 
+                restoreStatusText.value = t('setup.restoring_applying');
                 showToast('setup.restoring_applying', 'info');
-                await api.post('/api/backups/global/restore', { filename });
+                await api.post('/api/panel/backups/restore', { filename, adminPassword }, { headers: reqHeaders });
                 
                 await waitForPanel();
                 window.location.reload();
@@ -328,16 +431,36 @@ export default {
                 restoring.value = false;
                 showToast(e.response?.data?.error || e.message, 'danger');
             }
+        };
+
+        const handleSetupRestore = async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                await executeRestore(file, '');
+            }
             e.target.value = '';
         };
 
+        const startDisasterRecovery = async () => {
+            if (!recoveryPass.value) {
+                showToast('login.recovery_no_pass', 'warning');
+                return;
+            }
+            if (!recoveryFile.value) {
+                showToast('login.recovery_no_file', 'warning');
+                return;
+            }
+            await executeRestore(recoveryFile.value, recoveryPass.value);
+        };
+
         return {
-            store, hasIcon, restoring, uploadPercent, restoreInput,
+            store, hasIcon, restoring, uploadPercent, restoreStatusText, restoreInput, recoveryFileInput,
             initUser, initPass, initConfirmPass, enable2FA, init2FAToken,
             loginUser, loginPass, loginCaptcha, login2FAToken, captchaSvg, loginMode,
+            recoveryPass, recoveryFile, formatFileSize,
             refreshCaptcha, switchMode, setupAdmin, loginPassword, login2FA,
-            toggleTheme, toggleLang, triggerRestore, handleRestore
+            toggleTheme, toggleLang, triggerRestore, triggerRecoveryFile,
+            handleRecoveryFileSelect, handleSetupRestore, startDisasterRecovery
         };
     }
 };
-import { messages } from '../i18n.js';

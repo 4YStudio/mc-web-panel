@@ -88,7 +88,18 @@ export const messages = {
             locked_suffix: ' 秒后再试',
             mismatch_pass: '两次输入的密码不一致',
             switch_to_2fa: '使用 2FA 令牌直登',
-            switch_to_password: '使用账号密码登录'
+            switch_to_password: '使用账号密码登录',
+            disaster_recovery: '灾难恢复 / 从备份还原',
+            recovery_title: '系统灾难恢复',
+            recovery_desc: '若面板配置损坏或无法正常登录，可输入管理员密码并上传系统全局备份压缩包直接覆盖还原。',
+            recovery_pass_label: '管理员登录密码',
+            recovery_pass_placeholder: '请输入管理员登录密码',
+            recovery_file_label: '备份压缩包文件 (.zip)',
+            recovery_select_file: '点击选择备份压缩包 (.zip)',
+            recovery_btn_start: '验证密码并开始回档',
+            recovery_btn_cancel: '返回登录',
+            recovery_no_pass: '请输入管理员密码以授权回档',
+            recovery_no_file: '请先选择要还原的备份压缩包'
         },
         sidebar: {
             title: 'MC 面板',
@@ -1218,7 +1229,18 @@ export const messages = {
             locked_suffix: ' seconds',
             mismatch_pass: 'Passwords do not match',
             switch_to_2fa: 'Login with 2FA Token',
-            switch_to_password: 'Login with Username/Password'
+            switch_to_password: 'Login with Username/Password',
+            disaster_recovery: 'Disaster Recovery / Restore Backup',
+            recovery_title: 'Disaster Recovery',
+            recovery_desc: 'If the panel is corrupted or inaccessible, you can restore directly from a global backup zip by providing the admin password.',
+            recovery_pass_label: 'Admin Password',
+            recovery_pass_placeholder: 'Enter admin password to authorize restore',
+            recovery_file_label: 'Backup Archive (.zip)',
+            recovery_select_file: 'Select Backup Archive (.zip)',
+            recovery_btn_start: 'Verify & Start Restore',
+            recovery_btn_cancel: 'Back to Login',
+            recovery_no_pass: 'Please enter the admin password',
+            recovery_no_file: 'Please select a backup archive to restore'
         },
         sidebar: {
             title: 'MC Panel',

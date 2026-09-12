@@ -185,6 +185,7 @@ export const uploadFileWithChunk = async (file, options = {}) => {
         extraInitData = {},
         onProgress = () => {},
         signal = null,
+        headers = {},
     } = options;
 
     const isLargeFile = file.size >= LARGE_FILE_THRESHOLD;
@@ -202,7 +203,7 @@ export const uploadFileWithChunk = async (file, options = {}) => {
             fileSize: file.size,
             totalChunks,
             ...extraInitData,
-        }, { signal });
+        }, { headers, signal });
         uploadId = initRes.data.uploadId;
 
         let uploadedBytes = 0;
@@ -216,17 +217,17 @@ export const uploadFileWithChunk = async (file, options = {}) => {
             fd.append('uploadId', uploadId);
             fd.append('chunkIndex', i);
 
-            await axios.post(uploadUrl, fd, { signal });
+            await axios.post(uploadUrl, fd, { headers, signal });
 
             uploadedBytes += (end - start);
             onProgress(uploadedBytes, file.size, i + 1, totalChunks);
         }
 
-        const completeRes = await axios.post(completeUrl, { uploadId }, { signal });
+        const completeRes = await axios.post(completeUrl, { uploadId }, { headers, signal });
         return completeRes.data;
     } catch (e) {
         if (uploadId) {
-            try { await axios.post(cancelUrl, { uploadId }); } catch (_) {}
+            try { await axios.post(cancelUrl, { uploadId }, { headers }); } catch (_) {}
         }
         throw e;
     }
