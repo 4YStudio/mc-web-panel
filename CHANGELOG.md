@@ -1,6 +1,57 @@
 # MC Web Panel 更新日志
 
-所有重要的项目变更都会记录在此文件中。
+## [2.4.4] - 2026-09-13
+
+### 🛠️ 优化与修复
+
+- **单人快速跳过夜晚卷轴 (`fast-sleep` v1.3.0) 核心机制重构与全链路客户端静默**：
+  - **调试日志管道接入与实时呈现**：修复 `scroll-engine.js`，将卷轴的 `logger.info/warn/error` 实时推送到面板控制台 `appendLog` 管道及日志文件中，彻底解决卷轴在面板控制台静默、无调试输出的问题；
+  - **单次就绪生效机制（彻底消除无意义轮询与进服重复下发）**：
+    - 因 Minecraft `/gamerule` 会直接写入世界持久化数据（`level.dat`）永久生效，彻底移除了原每 30 秒重复执行的 `schedule(30000)` 轮询定时器与玩家进服重设规则逻辑；
+    - 新增 `ruleApplied` 状态守卫：仅在服务器已在运行中（`scroll.isServerRunning()`）或开服就绪完成（`scroll.onServerStart`）时执行一次；
+  - **全链路自动静默客户端指令回显**：
+    - 彻底根治 Minecraft 原版 `sendCommandFeedback true` 导致的客户端聊天栏频繁弹出 `[Server: 已将游戏规则playersSleepingPercentage设为1]`、`[Server: 已将xxx传送至...]` 等系统回显刷屏问题；
+    - 服务端就绪进入 `running` 状态时，`server.js` 自动向进程写入 `gamerule sendCommandFeedback false\n`；
+    - 卷轴引擎在 `handleServerStart` 中自动下发静默指令，并在上下文沙盒注入 `scroll.isServerRunning()` 与 `scroll.silenceCommandFeedback()` 辅助函数；
+    - `fast-sleep` 与 `safe-world` 在执行原生规则或切换白昼天气（`time set day` / `weather clear`）前自动确保客户端回显关闭；
+    - 玩家在游戏内的聊天栏恢复整洁清爽，面板网页控制台和日志文件不受任何影响，完整记录所有操作；
+  - **全版本交互与成就监听**：健全玩家聊天快捷指令（`!sleep`、`!day`、`/sleep`、`睡觉`、`晚安`、`跳过夜晚` 等）与原版 `[Sweet Dreams]` / `[甜蜜的梦]` 进度及入睡日志捕获；卷轴卸载时自动恢复 `/gamerule playersSleepingPercentage 100`。
+
+- **第三方皮肤账号（LittleSkin / Ely.by 等离线/外置登录）头像全链路兼容与智能优先级降级**：
+  - **根因修复**：解决 `mc-heads.net` 接收到第三方账号时返回 HTTP 200 默认 Steve 头像导致后续 LittleSkin、Ely.by 等国内/国际主流第三方皮肤源被提前短路截断的问题；
+  - **后端 `/api/avatar` 优先级链路重构**：
+    - 重构最优请求顺序：`crafthead.net`（官方正版极速，不存在返回 404） → `littleskin.cn`（国内最大第三方皮肤站） → `skinsystem.ely.by`（国际主流第三方皮肤站） → `minotar.net`（正版备用源） → `mc-heads.net`（兜底源）；
+    - 支持 `?refresh=1` / `?force=1` 强制绕过本地磁盘缓存重新拉取最新皮肤；
+    - 自动清理 `data/avatar_cache/` 中被旧逻辑污染的默认 Steve 缓存图片；
+  - **前端与地图联动降级**：前端 `Avatar.js` 及地图图钉 Marker 的 `onerror` 降级链路同步按该最优顺序排列，确保第三方账号玩家的个性化头像能 100% 正确呈现。
+
+- **服务器地图插件 (mc-panel-plugin-map) 多维度支持、下界 Y 轴切片高度透视与跨维度传送修复 (v1.3.0)**：
+  - **多维度地图获取与玩家维度显示**：
+    - 修复后台玩家实体维度查询缺失问题，在定时器中补充 `data get entity <player> Dimension` 查询；
+    - 修复维度 NBT 正则匹配：支持带双引号及命名空间（如 `"minecraft:the_nether"`、`"minecraft:the_end"`、模组自定义维度等）；
+    - 增强 `getRegionPath`：兼容各类服务端核心（Vanilla/Fabric 的 `DIM-1`/`DIM1` 与 Paper/Spigot 的 `world_nether`/`world_the_end` 等）；
+    - 彻底修复前端切换维度时 `resetView()` 误用 `panToPlayer` 将维度反向重置为主世界的恶性 Bug；
+    - 新增当前维度暂无已生成区块的友好提示；
+  - **下界地形透视：自定义 Y 轴切片高度选择器**：
+    - 针对下界 Y=100~127 全为致密实心下界岩与基岩顶盖导致俯视图呈现一片红色岩壁的问题，在 `renderRegionToPNG` 中引入 `maxY` 切片高度；
+    - 下界默认切片高度设定为 **`Y=76`**（直接穿透顶盖致密层，切入下界要塞、猪灵堡垒、主要活动层与岩浆海）；
+    - `/render` 路由将瓦片缓存与并发锁按 `${instanceId}_${dim}_y${maxY}_${region}.png` 严格隔离，切换高度秒级换图且互不干扰；
+    - `/safe-surface-y` 接口同步适配 `maxY`，在指定切片高度下方寻找可站立的实体表面；
+    - 前端顶部维度工具栏新增 Y 轴切片高度下拉选择器，提供下界、主世界与末地的丰富预设（如岩浆海平面、深层板岩层等）；
+  - **跨维度传送指令彻底修复**：
+    - 修复因控制台默认上下文为主世界导致在下界/末地点击传送玩家误落回主世界的 Bug；
+    - 传送执行函数全量改用标准跨维度语法 `/execute in <dimension> run tp <player> <X> <Y> <Z>`（随机传送同步改用 `/execute in <dimension> run spreadplayers ...`）；
+    - 传送弹窗与确认框明确标识目标维度与安全坐标。
+
+- **世界安全与防爆守护卷轴 (`safe-world` v1.1.0)**：
+  - 增加 `ruleApplied` 守卫与单次就绪生效机制，避免重复执行；
+  - 下发规则前执行 `gamerule sendCommandFeedback false`，保持客户端完全静默；
+  - 重新打包发布至商店并更新索引。
+
+- **官方插件与卷轴商店索引发布包同步构建**：
+  - 重新打包发布 `docs/plugins_shop/mc-panel-plugin-map.zip` (v1.3.0) 并更新 `plugins.json`；
+  - 重新打包发布 `docs/scrolls_shop/fast-sleep.zip` (v1.3.0)、`safe-world.zip` (v1.1.0) 并更新 `scrolls.json`。
+
 ## [2.4.3] - 2026-09-12
 
 ### 🛠️ 优化与修复

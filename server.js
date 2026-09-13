@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.4.3';
+const APP_VERSION = '2.4.4';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -4250,8 +4250,9 @@ threaded_server_support=false
             const safeKey = player.toLowerCase();
             const cacheFile = path.join(cacheDir, `${safeKey}_${size}.png`);
 
-            // 本地缓存 24 小时有效
-            if (fs.existsSync(cacheFile)) {
+            // 本地缓存 24 小时有效 (支持 ?refresh=1 强制刷新)
+            const forceRefresh = req.query.refresh === '1' || req.query.force === '1';
+            if (!forceRefresh && fs.existsSync(cacheFile)) {
                 const stat = fs.statSync(cacheFile);
                 if (Date.now() - stat.mtimeMs < 24 * 3600 * 1000) {
                     res.set('Content-Type', 'image/png');
@@ -4263,9 +4264,11 @@ threaded_server_support=false
             const axios = require('axios');
             const candidateUrls = [
                 `https://crafthead.net/avatar/${encodeURIComponent(player)}/${size}`,
-                `https://mc-heads.net/avatar/${encodeURIComponent(player)}/${size}`,
                 `https://littleskin.cn/avatar/player/${encodeURIComponent(player)}?size=${size}`,
+                `https://skinsystem.ely.by/avatars/${encodeURIComponent(player)}.png`,
+                `https://skinsystem.ely.by/avatars/${encodeURIComponent(player)}`,
                 `https://minotar.net/helm/${encodeURIComponent(player)}/${size}`,
+                `https://mc-heads.net/avatar/${encodeURIComponent(player)}/${size}`,
                 `https://crafatar.com/avatars/${encodeURIComponent(player)}?size=${size}&overlay`
             ];
 
@@ -4561,6 +4564,9 @@ threaded_server_support=false
                 if (instState.status === 'starting' && /(?:Done \([0-9.]+s\)!|Done in [0-9.]+|Done! For help|Timings Reset)/i.test(line)) {
                     instState.status = 'running';
                     io.emit(`status:${instanceId}`, { isRunning: true, status: 'running' });
+                    try {
+                        instState.process.stdin.write('gamerule sendCommandFeedback false\n');
+                    } catch (e) {}
                     if (scrollEngine) {
                         scrollEngine.handleServerStart(instanceId);
                     }

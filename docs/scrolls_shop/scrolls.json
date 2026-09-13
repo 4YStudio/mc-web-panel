@@ -211,7 +211,7 @@
             "zh": "单人快速跳过夜晚",
             "en": "Fast Sleep"
         },
-        "version": "1.1.0",
+        "version": "1.3.0",
         "author": "4YStudio",
         "description": {
             "zh": "多人联机时，只要有一名玩家上床睡觉（或输入聊天指令），即可触发全服通知并平滑迎来白昼。原生支持 1.17+ 官方游戏规则与全版本聊天快捷跳夜。",
@@ -248,7 +248,7 @@
                 "description": "跳过夜晚时是否向全服玩家屏幕展示醒目的大标题并播放音效"
             }
         },
-        "fileSize": 2974,
+        "fileSize": 3542,
         "downloadUrl": "./scrolls_shop/fast-sleep.zip"
     },
     {
@@ -309,7 +309,7 @@
             "zh": "世界安全与防爆守护",
             "en": "Safe World & Anti-Grief"
         },
-        "version": "1.0.0",
+        "version": "1.1.0",
         "author": "4YStudio",
         "description": {
             "zh": "纯净与轻量服务器的世界防护守护者。自动下发与维护生物防爆规则 (禁止苦力怕/末影人破坏方块与地形)，防止火灾蔓延，并实时监控 TNT 爆炸与凋灵破坏日志，守护建筑心血。",

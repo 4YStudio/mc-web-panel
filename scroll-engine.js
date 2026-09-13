@@ -356,9 +356,30 @@ class ScrollEngine {
             config: manifest.config || {},
 
             logger: {
-                info: (...args) => console.log(`[Scroll:${instanceId}:${scrollId}]`, ...args),
-                warn: (...args) => console.warn(`[Scroll:${instanceId}:${scrollId}]`, ...args),
-                error: (...args) => console.error(`[Scroll:${instanceId}:${scrollId}]`, ...args)
+                info: (...args) => {
+                    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+                    console.log(`[Scroll:${instanceId}:${scrollId}]`, msg);
+                    if (self.appendLog) {
+                        const name = (manifest && (manifest.name?.zh || manifest.name)) || scrollId;
+                        self.appendLog(instanceId, `[卷轴:${name}] ${msg}\n`);
+                    }
+                },
+                warn: (...args) => {
+                    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+                    console.warn(`[Scroll:${instanceId}:${scrollId}]`, msg);
+                    if (self.appendLog) {
+                        const name = (manifest && (manifest.name?.zh || manifest.name)) || scrollId;
+                        self.appendLog(instanceId, `[卷轴:${name}] [警告] ${msg}\n`);
+                    }
+                },
+                error: (...args) => {
+                    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+                    console.error(`[Scroll:${instanceId}:${scrollId}]`, msg);
+                    if (self.appendLog) {
+                        const name = (manifest && (manifest.name?.zh || manifest.name)) || scrollId;
+                        self.appendLog(instanceId, `[卷轴:${name}] [错误] ${msg}\n`);
+                    }
+                }
             },
 
             sleep: (ms) => new Promise(resolve => {
@@ -394,6 +415,19 @@ class ScrollEngine {
             sendCommand: (command, targetInstanceId) => {
                 const iid = targetInstanceId || instanceId;
                 return self.sendCommand(iid, command);
+            },
+
+            // 查询服务器是否处于运行就绪状态
+            isServerRunning: (targetInstanceId) => {
+                const iid = targetInstanceId || instanceId;
+                const state = self.instancesState ? (self.instancesState.get ? self.instancesState.get(iid) : self.instancesState[iid]) : null;
+                return !!(state && state.status === 'running' && state.process);
+            },
+
+            // 静默控制台指令回显，避免卷轴与后台任务向游戏客户端聊天栏广播 [Server: ...]
+            silenceCommandFeedback: (targetInstanceId) => {
+                const iid = targetInstanceId || instanceId;
+                return self.sendCommand(iid, 'gamerule sendCommandFeedback false');
             },
 
             // 便捷全屏大标题
@@ -532,6 +566,11 @@ class ScrollEngine {
     handleServerStart(instanceId) {
         const holder = this.instanceHolders.get(instanceId);
         if (!holder) return;
+
+        // 默认静默后台指令回显，避免卷轴与控制台后台指令向客户端聊天栏广播 [Server: ...]
+        try {
+            this.sendCommand(instanceId, 'gamerule sendCommandFeedback false');
+        } catch (e) {}
 
         for (const handler of holder.eventListeners.serverStart) {
             try { handler({ instanceId }); } catch (e) {

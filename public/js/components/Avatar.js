@@ -98,27 +98,31 @@ export default {
             const sz = size.value || 64;
             const list = [];
 
-            // 1. 面板本地代理与缓存 (0ms 磁盘极速，已配置为纯 2D 正面头像)
+            // 1. 面板本地代理与缓存 (0ms 磁盘极速，全源聚合支持官方/LittleSkin/Ely.by)
             list.push(`/api/avatar?player=${cleanName}&size=${sz}`);
 
-            // 2. Crafthead 2D 正面头像 (Cloudflare 边缘极速，含帽子层 Overlay)
+            // 2. Crafthead 2D 正面头像 (官方高速边缘，404 不拦截)
             list.push(`https://crafthead.net/avatar/${targetId}/${sz}`);
 
-            // 3. MC-Heads 2D 正面头像 (老牌超稳定，含帽子层)
-            list.push(`https://mc-heads.net/avatar/${targetId}/${sz}`);
-
-            // 4. LittleSkin 玩家 2D 正面头像 (国内最大第三方皮肤站)
+            // 3. LittleSkin 玩家 2D 正面头像 (国内主流第三方皮肤站，404 不拦截)
             list.push(`https://littleskin.cn/avatar/player/${cleanName}?size=${sz}`);
+
+            // 4. Ely.by 国际第三方皮肤站 (404 不拦截)
+            list.push(`https://skinsystem.ely.by/avatars/${cleanName}.png`);
+            list.push(`https://skinsystem.ely.by/avatars/${cleanName}`);
 
             // 5. Minotar 2D 正面头像 (带 Helm 帽子层)
             list.push(`https://minotar.net/helm/${cleanName}/${sz}`);
 
-            // 6. Crafatar 2D 正面头像 (备用候选源)
+            // 6. MC-Heads 2D 正面头像 (兜底源，未找到时可能返回默认 Steve)
+            list.push(`https://mc-heads.net/avatar/${targetId}/${sz}`);
+
+            // 7. Crafatar 2D 正面头像 (备用候选源)
             if (uuid) {
                 list.push(`https://crafatar.com/avatars/${encodeURIComponent(uuid)}?size=${sz}&overlay`);
             }
 
-            // 7. 终极兜底：本地 Steve / Alex 经典 2D 像素面孔 SVG
+            // 8. 终极兜底：本地 Steve / Alex 经典 2D 像素面孔 SVG
             list.push(defaultSvg.value);
 
             // 如果该玩家此前已有成功记录的源类型，优先尝试该源
