@@ -248,7 +248,7 @@
                 "description": "跳过夜晚时是否向全服玩家屏幕展示醒目的大标题并播放音效"
             }
         },
-        "fileSize": 3542,
+        "fileSize": 3682,
         "downloadUrl": "./scrolls_shop/fast-sleep.zip"
     },
     {
@@ -350,7 +350,7 @@
                 "description": "在聊天栏输入 !safe、!防爆 可查看当前世界安全规则状态"
             }
         },
-        "fileSize": 2304,
+        "fileSize": 2432,
         "downloadUrl": "./scrolls_shop/safe-world.zip"
     },
     {
