@@ -42,7 +42,7 @@
             "fs.write",
             "*"
         ],
-        "icon": "fa-clock-rotate-left",
+        "icon": "fa-shield-halved",
         "fileSize": 16084,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-backup-mod.zip"
     },
