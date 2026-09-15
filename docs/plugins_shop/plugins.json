@@ -31,13 +31,19 @@
     {
         "id": "mc-panel-plugin-backup-mod",
         "name": "高级备份",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "author": "4YStudio",
-        "description": "基于 Advanced Backups 模组的专业备份管理插件。",
+        "description": "基于 Advanced Backups 模组的专业备份管理插件，支持全量/差量/增量备份多维扫描、链式安全还原与完整模组配置同步。",
         "category": "backups",
-        "permissions": [],
+        "permissions": [
+            "http",
+            "command",
+            "fs.read",
+            "fs.write",
+            "*"
+        ],
         "icon": "fa-clock-rotate-left",
-        "fileSize": 6625,
+        "fileSize": 16084,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-backup-mod.zip"
     },
     {

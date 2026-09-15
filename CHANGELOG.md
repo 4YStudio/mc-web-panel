@@ -1,5 +1,32 @@
 # MC Web Panel 更新日志
 
+## [2.4.5] - 2026-09-15
+
+### 🛠️ 优化与修复
+
+- **高级备份插件 (`mc-panel-plugin-backup-mod` v1.1.0) 架构重构与 Advanced Backups 模组全链路深度兼容**：
+  - **独立完整专属后端架构**：为高级备份插件实现独立的后端控制路由与 Express 路由器，彻底剥离原先对“地图备份 (`backup-instance`)”的不合理耦合与路径混淆，提供 `/list`、`/status`、`/config`、`/save-config`、`/create`、`/reset-chain`、`/restore`、`/delete`、`/download` 全套标准化 RESTful API；
+  - **模组多层级与多模式备份目录全量兼容**：
+    - 针对 `AdvancedBackups` 模组将备份归档于 `<backup_path>/<world_name>/{differential,incremental,zips,snapshots}/*.zip` 的结构，实现智能动态探测；
+    - 动态解析 `AdvancedBackups.properties` 中的自定义存储路径 `config.advancedbackups.path`（支持绝对路径与相对路径），并从 `server.properties` 提取主世界名 `level-name`；
+    - 全面兼容扫描与识别四大备份模式：差量备份 (`differential` 全量基准 / 增量链部分)、增量备份 (`incremental` 全量基准 / 按序部分)、完整压缩包 (`zip`) 以及模组快照 (`snapshot`)，彻底解决旧版本备份列表恒为空的问题；
+  - **智能链式安全回档 (Chain Deduction Restoration)**：
+    - 严格遵循模组恢复规范：针对差量部分备份（`differential partial`），自动回溯推导并先提取最近的 `full` 全量基准，再叠加解压目标部分；
+    - 针对增量部分备份（`incremental partial`），先提取基准 `full`，再按时间正序依次提取其间所有 partial 备份链，完美恢复世界状态；
+    - **跨平台路径与安全性加固**：解压时自动将 ZIP 内的 Windows 反斜杠规范化为 POSIX 正斜杠，彻底根除 Linux 下解压成扁平反斜杠乱码文件的严重缺陷；增加严格的 Zip Slip 路径穿越防御，保障宿主机文件系统绝对安全；
+    - **安全停机与自动当前存档保护**：回档时自动检测并安全关闭运行中的服务器，并将现有存档重命名备份为 `world_bak_<timestamp>`，回档全程通过 Socket.IO 实时推送解压步进与百分比；
+  - **模组配置项 100% 完整支持与无缝热重载**：
+    - 前端 GUI 扩展为六大标准配置组（基础设置、计划与频率、备份链管理、清理策略、日志与通知、存储与高级），全面支持 `chains.length`, `chains.compress`, `chains.smart`, `chains.maxpercent`, `purge.incrementals`, `frequency.shutdown`, `frequency.startup`, `logging.*` 等全量模组参数；
+    - 支持 GUI 模式与原始文本代码模式无损双向切换，保留所有注释与排版；
+    - 保存配置时若服务器正在运行，自动通过控制台发送 `backup reload-config`，无需重启即可立即生效；
+  - **状态判定与快捷指令增强**：
+    - `server.js` 补充检测 `config/AdvancedBackups.properties` 与 `backups/world/`，确保模组安装状态准时识别；
+    - 前端提供“重置备份链 (`backup reset-chain`)”、“创建快照 (`backup snapshot`)”、“手动备份 (`backup start`)”等全套快捷操作；
+  - **地图备份插件 (`mc-panel-plugin-backup-instance`) 路由规范化**：
+    - 补齐直接路由与 `/panel/...` 别名映射，彻底理清“面板内置地图备份”与“模组高级备份”的职责边界，互不干扰；
+  - **发布包构建与商店清单更新**：
+    - 重新打包构建 `docs/plugins_shop/mc-panel-plugin-backup-mod.zip` (v1.1.0)，更新 `plugins.json`。
+
 ## [2.4.4] - 2026-09-13
 
 ### 🛠️ 优化与修复

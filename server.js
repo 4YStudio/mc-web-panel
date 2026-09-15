@@ -1343,6 +1343,12 @@ if (cluster.isPrimary) {
                                 } catch (e) { }
                             }
                             // Fallback detection from existing config directories
+                            if (!hasBackupMod) {
+                                hasBackupMod = fs.existsSync(path.join(instDir, 'config', 'AdvancedBackups.properties')) ||
+                                               fs.existsSync(path.join(instDir, 'config', 'advancedbackups.properties')) ||
+                                               fs.existsSync(path.join(instDir, 'backups', 'world', 'manifest.json')) ||
+                                               fs.existsSync(path.join(instDir, 'backups', 'world', 'differential'));
+                            }
                             if (!hasVoicechat) {
                                 hasVoicechat = fs.existsSync(path.join(instDir, 'config', 'voicechat')) ||
                                                fs.existsSync(path.join(instDir, 'plugins', 'voicechat')) ||
