@@ -7,7 +7,7 @@ export default {
     template: `
     <div class="h-100 d-flex flex-column animate-in overflow-hidden">
         <!-- Header -->
-        <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0">
+        <div class="page-header d-flex justify-content-between align-items-center flex-shrink-0 flex-wrap gap-2 mb-3">
             <div class="d-flex align-items-center overflow-hidden">
                 <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-3">
                     <i class="fa-solid fa-chevron-left"></i>
@@ -17,17 +17,16 @@ export default {
                     <span>{{ $t('instance_manager.manage_java') }}</span>
                 </h3>
             </div>
-        </div>
-
-        <div class="d-flex justify-content-end align-items-center mb-3 flex-shrink-0 gap-2 px-1">
-            <button @click="detectSystemJava" class="btn btn-sm btn-outline-secondary border shadow-sm px-2 px-md-3 rounded-pill fw-bold" :disabled="detecting" style="border-radius: 10px !important;">
-                <span v-if="detecting" class="spinner-border spinner-border-sm"></span>
-                <i v-else class="fa-solid fa-magnifying-glass d-md-none"></i>
-                <span class="d-none d-md-inline"><i class="fa-solid fa-magnifying-glass me-1"></i>{{ $t('java.detect_system') }}</span>
-            </button>
-             <button class="btn btn-primary btn-sm fw-bold px-2 px-md-3 shadow-sm" @click="showAddLocal = !showAddLocal" style="border-radius: 10px;">
-                <i class="fa-solid fa-folder-plus"></i><span class="d-none d-md-inline ms-1">{{ $t('java.add_local') }}</span>
-            </button>
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <button @click="detectSystemJava" class="btn btn-sm btn-outline-secondary border shadow-sm px-2 px-md-3 rounded-pill fw-bold" :disabled="detecting" style="border-radius: 10px !important;">
+                    <span v-if="detecting" class="spinner-border spinner-border-sm"></span>
+                    <i v-else class="fa-solid fa-magnifying-glass d-md-none"></i>
+                    <span class="d-none d-md-inline"><i class="fa-solid fa-magnifying-glass me-1"></i>{{ $t('java.detect_system') }}</span>
+                </button>
+                <button class="btn btn-primary btn-sm fw-bold px-2 px-md-3 shadow-sm" @click="showAddLocal = !showAddLocal" style="border-radius: 10px;">
+                    <i class="fa-solid fa-folder-plus"></i><span class="d-none d-md-inline ms-1">{{ $t('java.add_local') }}</span>
+                </button>
+            </div>
         </div>
 
         <!-- 添加本地 Java 面板 -->
@@ -96,10 +95,10 @@ export default {
 
         <!-- 在线安装 -->
         <div class="card shadow-sm d-flex flex-column border-0 overflow-hidden" style="flex: 1; min-height: 0; border-radius: 16px;">
-            <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 border-0">
-                <span class="fw-bold small text-uppercase text-muted"><i class="fa-solid fa-cloud-arrow-down me-2 text-primary"></i>{{ $t('java.online_install') }}</span>
-                <div class="d-flex align-items-center gap-2">
-                    <CustomSelect v-model="selectedSource" :options="sources.map(s => ({value: s.id, label: s.name}))" size="sm" width="auto" @change="fetchAvailable" />
+            <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 border-0 flex-wrap gap-2">
+                <span class="fw-bold small text-uppercase text-muted text-nowrap flex-shrink-0"><i class="fa-solid fa-cloud-arrow-down me-2 text-primary"></i>{{ $t('java.online_install') }}</span>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <CustomSelect v-model="selectedSource" :options="sources.map(s => ({value: s.id, label: s.name}))" size="sm" width="auto" style="max-width: 190px;" @change="fetchAvailable" />
                     <button class="btn btn-sm btn-link text-warning p-0" @click="runDiagnose" :disabled="diagnosing" :title="'诊断下载源'">
                         <i class="fa-solid fa-stethoscope" :class="{'fa-spin': diagnosing}"></i>
                     </button>

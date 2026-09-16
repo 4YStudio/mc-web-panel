@@ -52,6 +52,15 @@ export const formatLog = (log) => {
 export const modalData = ref({ title: '', message: '', mode: 'confirm', inputValue: '', suffix: '', options: [], placeholder: '', callback: null });
 let modalInstance = null;
 
+// Prevent 'Blocked aria-hidden on an element because its descendant retained focus'
+if (typeof document !== 'undefined') {
+    document.addEventListener('hide.bs.modal', (e) => {
+        if (document.activeElement && e.target && e.target.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    });
+}
+
 export const initModal = () => {
     const el = document.getElementById('confirmModal');
     if (el) {

@@ -18,11 +18,11 @@ export default {
         </div>
 
         <div class="flex-grow-1 overflow-auto custom-scrollbar">
-            <div class="container-fluid">
+            <div class="container-fluid px-2 px-md-3">
                 <div class="row justify-content-center">
-                    <div class="col-lg-8 mx-auto">
+                    <div class="col-12 col-lg-8 mx-auto px-1 px-md-3">
                         <div class="card shadow rounded-3 border-0">
-                            <div class="card-body text-center p-5">
+                            <div class="card-body text-center p-3 p-md-5">
                                 <img src="logo.png" class="mb-4" width="80" height="80" alt="Logo">
                                 
                                 <h2 class="fw-bold mb-3">{{ $t('about.title') }}</h2>

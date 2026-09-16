@@ -20,11 +20,11 @@ export default {
                     <div class="col-12 col-md-auto flex-grow-1 overflow-hidden">
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb mb-0 p-2 border-secondary rounded flex-nowrap overflow-auto no-scrollbar" style="font-size: 0.9rem; background-color: var(--c-surface) !important; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: row; align-items: center;">
-                                <li class="breadcrumb-item text-primary cursor-pointer" @click="changeDir('')">
+                                <li class="breadcrumb-item text-primary cursor-pointer breadcrumb-nav-item" @click="changeDir('')">
                                     <i class="fa-solid fa-house"></i>
                                 </li>
                                 <li v-for="(p, idx) in pathParts" :key="idx" 
-                                    class="breadcrumb-item text-truncate cursor-pointer" 
+                                    class="breadcrumb-item text-truncate cursor-pointer breadcrumb-nav-item" 
                                     style="max-width: 120px;"
                                     @click="changeDir(pathParts.slice(0, idx+1).join('/'))">
                                     {{ p }}
@@ -44,22 +44,22 @@ export default {
                 <div class="card mb-3 bg-body-tertiary border-secondary flex-shrink-0">
                     <div class="card-body p-2 d-flex flex-wrap gap-2 align-items-center">
                         <div class="btn-group">
-                            <button v-if="currentPath !== ''" class="btn btn-sm btn-outline-secondary" @click="goUp()" :title="$t('files.go_up')"><i class="fa-solid fa-turn-up"></i></button>
-                            <button class="btn btn-sm btn-outline-secondary" @click="refreshFiles" :title="$t('common.refresh')"><i class="fa-solid fa-rotate"></i></button>
-                            <button class="btn btn-sm btn-outline-secondary" @click="askCompress" :disabled="!selectedFiles.length" :title="$t('files.compress')"><i class="fa-solid fa-file-zipper"></i></button>
-                            <button class="btn btn-sm btn-outline-secondary" @click="extractSelected" :disabled="!selectedArchiveFiles.length" :title="$t('files.extract')"><i class="fa-solid fa-box-open"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" @click="askDelete(selectedFiles)" :disabled="!selectedFiles.length" :title="$t('common.delete')"><i class="fa-solid fa-trash"></i></button>
+                            <button v-if="currentPath !== ''" class="btn btn-sm btn-outline-secondary file-action-btn" @click="goUp()" :title="$t('files.go_up')"><i class="fa-solid fa-turn-up"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary file-action-btn" @click="refreshFiles" :title="$t('common.refresh')"><i class="fa-solid fa-rotate" :class="{'fa-spin': isLoadingFiles}"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary file-action-btn" @click="askCompress" :disabled="!selectedFiles.length" :title="$t('files.compress')"><i class="fa-solid fa-file-zipper"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary file-action-btn" @click="extractSelected" :disabled="!selectedArchiveFiles.length" :title="$t('files.extract')"><i class="fa-solid fa-box-open"></i></button>
+                            <button class="btn btn-sm btn-outline-danger file-action-btn" @click="askDelete(selectedFiles)" :disabled="!selectedFiles.length" :title="$t('common.delete')"><i class="fa-solid fa-trash"></i></button>
                         </div>
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" @click="copyToClipboard('copy')" :disabled="!selectedFiles.length" :title="$t('files.copy')"><i class="fa-solid fa-copy"></i></button>
-                            <button class="btn btn-sm btn-outline-primary" @click="copyToClipboard('move')" :disabled="!selectedFiles.length" :title="$t('files.move')"><i class="fa-solid fa-scissors"></i></button>
-                            <button v-if="clipboard.files.length" class="btn btn-sm btn-warning" @click="pasteFiles"><i class="fa-solid fa-paste"></i> ({{ clipboard.files.length }})</button>
+                            <button class="btn btn-sm btn-outline-primary file-action-btn" @click="copyToClipboard('copy')" :disabled="!selectedFiles.length" :title="$t('files.copy')"><i class="fa-solid fa-copy"></i></button>
+                            <button class="btn btn-sm btn-outline-primary file-action-btn" @click="copyToClipboard('move')" :disabled="!selectedFiles.length" :title="$t('files.move')"><i class="fa-solid fa-scissors"></i></button>
+                            <button v-if="clipboard.files.length" class="btn btn-sm btn-warning file-action-btn" @click="pasteFiles"><i class="fa-solid fa-paste"></i> ({{ clipboard.files.length }})</button>
                         </div>
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" @click="$refs.fileUp.click()" :title="$t('files.upload_file')"><i class="fa-solid fa-file-upload"></i></button>
-                            <button class="btn btn-sm btn-outline-primary" @click="$refs.folderUp.click()" :title="$t('files.upload_folder')"><i class="fa-solid fa-upload"></i></button>
-                            <button class="btn btn-sm btn-outline-success" @click="askNewFile" :title="$t('files.new_file')"><i class="fa-solid fa-file-circle-plus"></i></button>
-                            <button class="btn btn-sm btn-outline-success" @click="askNewFolder" :title="$t('files.new_folder')"><i class="fa-solid fa-folder-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary file-action-btn" @click="$refs.fileUp.click()" :title="$t('files.upload_file')"><i class="fa-solid fa-file-upload"></i></button>
+                            <button class="btn btn-sm btn-outline-primary file-action-btn" @click="$refs.folderUp.click()" :title="$t('files.upload_folder')"><i class="fa-solid fa-upload"></i></button>
+                            <button class="btn btn-sm btn-outline-success file-action-btn" @click="askNewFile" :title="$t('files.new_file')"><i class="fa-solid fa-file-circle-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-success file-action-btn" @click="askNewFolder" :title="$t('files.new_folder')"><i class="fa-solid fa-folder-plus"></i></button>
                         </div>
                         <input type="file" ref="fileUp" multiple class="d-none" @change="(e)=>uploadFiles(e)">
                         <input type="file" ref="folderUp" webkitdirectory multiple class="d-none" @change="(e)=>uploadFiles(e)">
@@ -70,42 +70,53 @@ export default {
 
                 <!-- 文件列表表格 -->
                 <div class="card flex-grow-1 overflow-hidden position-relative" style="border-radius: 12px;">
+                    <!-- 拖拽上传遮罩 -->
                     <div v-if="isDragging" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="z-index: 10; background: rgba(var(--bs-primary-rgb), 0.15); backdrop-filter: blur(2px); border-radius: 12px; border: 3px dashed var(--bs-primary);">
                         <div class="text-center text-primary">
                             <i class="fa-solid fa-cloud-arrow-up fa-3x mb-2"></i>
                             <h5 class="fw-bold">{{ $t('files.drop_to_upload') }}</h5>
                         </div>
                     </div>
+                    
+                    <!-- 文件夹跳转与文件加载动画遮罩 -->
+                    <Transition name="fade">
+                        <div v-if="isLoadingFiles" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center file-nav-loading-overlay" style="z-index: 8; background: rgba(var(--c-surface-rgb), 0.35); backdrop-filter: blur(2px); pointer-events: none;">
+                            <div class="file-loading-capsule d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-sm">
+                                <div class="spinner-border text-primary spinner-border-sm" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></div>
+                                <span class="small fw-semibold" style="color: var(--c-text-primary);">{{ $t('common.loading') }}...</span>
+                            </div>
+                        </div>
+                    </Transition>
+                    
                     <div class="table-responsive h-100 custom-scrollbar">
-                        <table class="table table-hover table-sm mb-0 align-middle">
+                        <table class="table table-hover table-sm mb-0 align-middle" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr class="small text-uppercase text-muted">
-                                    <th style="width: 35px;" class="px-3"><input type="checkbox" v-model="selectAll" class="form-check-input"></th>
+                                    <th style="width: 38px;" class="px-2 px-md-3"><input type="checkbox" v-model="selectAll" class="form-check-input"></th>
                                     <th>{{ $t('common.name') }}</th>
                                     <th style="width: 80px;" class="d-none d-sm-table-cell">{{ $t('common.size') }}</th>
                                     <th style="width: 140px;" class="d-none d-md-table-cell">{{ $t('common.time') }}</th>
-                                    <th style="width: 50px; min-width: 50px;" class="text-end px-3">
+                                    <th style="width: 44px;" class="text-end px-2 px-md-3">
                                         <span class="d-none d-md-inline">{{ $t('common.actions') }}</span>
                                     </th>
                                 </tr>
                             </thead>
-                            <TransitionGroup tag="tbody" name="list">
+                            <TransitionGroup tag="tbody" name="list" class="file-table-body" :class="{ 'file-nav-navigating': isNavigating }">
                                 <tr v-for="f in filteredFiles" :key="f.name" class="file-row" :class="{selected: selectedFiles.includes(f.name)}">
-                                    <td @click.stop class="px-3"><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
+                                    <td @click.stop class="px-2 px-md-3"><input type="checkbox" :value="f.name" v-model="selectedFiles" class="form-check-input"></td>
                                     
                                     <!-- 点击名称：文件夹进入，图片预览，压缩包预览，其他文件编辑 -->
-                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : isImageFile(f.name) ? previewImage(f.name) : isArchive(f.name) ? previewArchive(f.name) : editFile(f.name)" class="py-2 pe-0 cursor-pointer">
-                                        <div class="d-flex align-items-center">
-                                            <i class="fa-solid me-2 flex-shrink-0" :class="getIcon(f)" style="width: 1.2rem; text-align: center;"></i>
-                                            <span class="text-truncate flex-grow-1" style="max-width: calc(100vw - 180px);">{{ f.name }}</span>
-                                            <div class="d-sm-none small text-muted opacity-75 ms-auto me-2 flex-shrink-0 text-end" style="min-width: 60px;">{{ f.isDir ? '-' : formatSize(f.size) }}</div>
+                                    <td @click="f.isDir ? changeDir(joinPath(currentPath, f.name)) : isImageFile(f.name) ? previewImage(f.name) : isArchive(f.name) ? previewArchive(f.name) : editFile(f.name)" class="py-2 pe-1 cursor-pointer overflow-hidden text-truncate file-name-cell">
+                                        <div class="d-flex align-items-center min-w-0">
+                                            <i class="fa-solid me-2 flex-shrink-0 file-icon" :class="getIcon(f)" style="width: 1.2rem; text-align: center;"></i>
+                                            <span class="text-truncate flex-grow-1" style="min-width: 0;">{{ f.name }}</span>
                                         </div>
                                     </td>
                                     
                                     <td class="d-none d-sm-table-cell small">{{ f.isDir ? '-' : formatSize(f.size) }}</td>
                                     <td class="small text-muted d-none d-md-table-cell">{{ new Date(f.mtime).toLocaleString() }}</td>
                                     
-                                    <td class="text-end px-3 py-2">
+                                    <td class="text-end px-2 px-md-3 py-2">
                                         <!-- Desktop actions -->
                                         <div class="d-none d-md-flex justify-content-end gap-1">
                                             <button v-if="isArchive(f.name)" class="btn btn-xs btn-link text-warning p-1" @click.stop="extractFile(f.name)" :title="$t('files.extract')">
@@ -114,7 +125,7 @@ export default {
                                             <button v-if="!f.isDir" class="btn btn-xs btn-link text-info p-1" @click.stop="editFile(f.name)" :title="$t('common.edit')">
                                                 <i class="fa-solid fa-file-pen"></i>
                                             </button>
-                                            <button class="btn btn-xs btn-link text-primary p-1" @click.stop="askRename(f)" :title="$t('common.edit')">
+                                            <button class="btn btn-xs btn-link text-primary p-1" @click.stop="askRename(f)" :title="$t('common.rename')">
                                                 <i class="fa-solid fa-pen"></i>
                                             </button>
                                             <button v-if="!f.isDir" class="btn btn-xs btn-link text-secondary p-1" @click.stop="downloadFile(f.name)" :title="$t('common.download')">
@@ -133,7 +144,7 @@ export default {
                                                 <ul v-if="activeActionMenu === f.name" class="dropdown-menu dropdown-menu-end shadow border-0 p-1 d-block" style="border-radius: 12px; z-index: 1060; min-width: 120px; position: absolute; right: 0;">
                                                     <li v-if="isArchive(f.name)"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="extractFile(f.name); activeActionMenu=null"><i class="fa-solid fa-file-zipper me-2 text-warning"></i>{{ $t('files.extract') }}</button></li>
                                                     <li v-if="!f.isDir"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="editFile(f.name); activeActionMenu=null"><i class="fa-solid fa-file-pen me-2 text-info"></i>{{ $t('common.edit') }}</button></li>
-                                                    <li><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="askRename(f); activeActionMenu=null"><i class="fa-solid fa-pen me-2 text-primary"></i>{{ $t('common.edit') }}</button></li>
+                                                    <li><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="askRename(f); activeActionMenu=null"><i class="fa-solid fa-pen me-2 text-primary"></i>{{ $t('common.rename') }}</button></li>
                                                     <li v-if="!f.isDir"><button class="dropdown-item rounded-3 py-1 fw-bold small" @click.stop="downloadFile(f.name); activeActionMenu=null"><i class="fa-solid fa-download me-2 text-secondary"></i>{{ $t('common.download') }}</button></li>
                                                     <li><hr class="dropdown-divider opacity-10 my-1"></li>
                                                     <li><button class="dropdown-item rounded-3 py-1 text-danger fw-bold small" @click.stop="askDelete([f.name]); activeActionMenu=null"><i class="fa-solid fa-trash me-2"></i>{{ $t('common.delete') }}</button></li>
@@ -314,6 +325,8 @@ export default {
         const previewingFile = ref(null);
         const previewType = ref('');
         const previewData = ref(null);
+        const isNavigating = ref(false);
+        const isLoadingFiles = ref(false);
         // Upload Confirmation Modal state
         const uploadConfirmModal = reactive({
             visible: false,
@@ -344,8 +357,69 @@ export default {
         const pathParts = computed(() => currentPath.value ? currentPath.value.split('/') : []);
         const joinPath = (base, name) => base ? `${base}/${name}` : name;
         const goUp = () => { if (!currentPath.value) return; const parts = currentPath.value.split('/'); parts.pop(); changeDir(parts.join('/')); };
-        const changeDir = (path) => { currentPath.value = path; loadFiles(); };
-        const loadFiles = async () => { try { const res = await api.get(`/api/files/list?path=${currentPath.value}`); fileList.value = res.data.sort((a, b) => { if (a.isDir !== b.isDir) return b.isDir - a.isDir; return a.name.localeCompare(b.name); }); selectedFiles.value = []; selectAll.value = false; } catch (e) { showToast($t('common.error'), 'danger'); } };
+        
+        const loadFiles = async (showLoading = true) => {
+            if (showLoading) isLoadingFiles.value = true;
+            try {
+                const res = await api.get(`/api/files/list?path=${encodeURIComponent(currentPath.value)}`);
+                fileList.value = res.data.sort((a, b) => {
+                    if (a.isDir !== b.isDir) return b.isDir - a.isDir;
+                    return a.name.localeCompare(b.name);
+                });
+                selectedFiles.value = [];
+                selectAll.value = false;
+            } catch (e) {
+                showToast($t('common.error'), 'danger');
+            } finally {
+                if (showLoading && !isNavigating.value) {
+                    isLoadingFiles.value = false;
+                }
+            }
+        };
+
+        const changeDir = async (path) => {
+            if (isNavigating.value) return;
+            isNavigating.value = true;
+            isLoadingFiles.value = true;
+
+            const targetPath = path;
+            const fadeOutDuration = 160;
+            const fadeOutTimer = new Promise(resolve => setTimeout(resolve, fadeOutDuration));
+            let nextData = null;
+            let fetchError = false;
+
+            const fetchTask = api.get(`/api/files/list?path=${encodeURIComponent(targetPath)}`)
+                .then(res => {
+                    nextData = res.data;
+                })
+                .catch(e => {
+                    fetchError = true;
+                });
+
+            try {
+                // 等待列表平滑淡出至透明，同时异步拉取新文件夹内容
+                await Promise.all([fetchTask, fadeOutTimer]);
+
+                if (fetchError) {
+                    showToast($t('common.error'), 'danger');
+                } else if (nextData) {
+                    currentPath.value = targetPath;
+                    // 在内容完全透明期间无感更新列表项
+                    fileList.value = nextData.sort((a, b) => {
+                        if (a.isDir !== b.isDir) return b.isDir - a.isDir;
+                        return a.name.localeCompare(b.name);
+                    });
+                    selectedFiles.value = [];
+                    selectAll.value = false;
+                }
+            } finally {
+                // 确保新 DOM 节点渲染后平滑淡入呈现
+                setTimeout(() => {
+                    isNavigating.value = false;
+                    isLoadingFiles.value = false;
+                }, 30);
+            }
+        };
         const filteredFiles = computed(() => fileList.value.filter(f => f.name.toLowerCase().includes(searchQuery.value.toLowerCase())));
         const selectedArchiveFiles = computed(() => selectedFiles.value.filter(f => isArchive(f)));
         watch(selectAll, (v) => selectedFiles.value = v ? filteredFiles.value.map(f => f.name) : []);
@@ -715,7 +789,7 @@ export default {
         });
 
         const askRename = (file) => openModal({
-            title: $t('common.edit'), message: $t('files.modal_new_file'), mode: 'input', inputValue: file.name,
+            title: $t('common.rename'), message: $t('files.modal_rename'), mode: 'input', inputValue: file.name,
             callback: async (newName) => {
                 if (!newName || newName === file.name) return;
                 try {
@@ -731,7 +805,15 @@ export default {
             window.open(`/api/files/download?${params.toString()}`, '_blank');
         };
 
-        const refreshFiles = () => loadFiles();
+        const refreshFiles = async () => {
+            if (isLoadingFiles.value) return;
+            isLoadingFiles.value = true;
+            try {
+                await loadFiles(false);
+            } finally {
+                isLoadingFiles.value = false;
+            }
+        };
         const toggleActionMenu = (name) => {
             activeActionMenu.value = activeActionMenu.value === name ? null : name;
         };
@@ -742,6 +824,7 @@ export default {
             currentPath, pathParts, fileList, filteredFiles, selectedFiles, selectAll, searchQuery,
             editingFile, fileContent, hasUnsavedChanges, editorArea, clipboard, fileUp, folderUp, isDragging, dragCounter,
             previewingFile, previewType, previewData,
+            isNavigating, isLoadingFiles,
             changeDir, goUp, joinPath, getIcon, formatSize, isArchive, isImageFile, extractFile, extractSelected, selectedArchiveFiles, handleDrop,
             uploadFiles, copyToClipboard, pasteFiles, askCompress, askDelete, downloadFile,
             editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder,

@@ -37,7 +37,7 @@ export default {
             <!-- 优雅固定侧边栏 (Fixed Harmonious Sidebar) -->
             <div class="settings-sidebar d-flex flex-column p-3 h-100">
                 <div class="settings-nav-section-title">设置导航</div>
-                <div class="d-flex flex-column gap-1 mt-1">
+                <div class="settings-sidebar-nav d-flex flex-column gap-1 mt-1">
                     <button v-for="tab in settingsTabs" :key="tab.id" 
                         class="btn w-100 settings-tab-btn d-flex align-items-center gap-2.5"
                         :class="{ active: activeSettingsTab === tab.id }"
@@ -426,9 +426,9 @@ export default {
                         </div>
 
                         <!-- 选项卡导航 -->
-                        <div class="d-flex border-bottom mb-4 gap-2 overflow-auto" style="flex-shrink: 0;">
-                            <button v-for="tab in appearanceTabs" :key="tab.id" class="btn btn-sm px-3 py-2 fw-semibold rounded-3 border-0 d-flex align-items-center gap-1.5" 
-                                :class="activeAppearanceTab === tab.id ? 'btn-primary shadow-sm' : 'text-muted'" 
+                        <div class="d-flex flex-nowrap border-bottom mb-4 gap-2 overflow-x-auto no-scrollbar pb-2" style="flex-shrink: 0; -webkit-overflow-scrolling: touch;">
+                            <button v-for="tab in appearanceTabs" :key="tab.id" class="btn btn-sm px-3 py-2 fw-semibold rounded-3 border-0 d-flex align-items-center gap-2 flex-shrink-0 text-nowrap" 
+                                :class="activeAppearanceTab === tab.id ? 'btn-primary shadow-sm' : 'text-muted bg-body-tertiary'" 
                                 @click="activeAppearanceTab = tab.id">
                                 <i class="fa-solid" :class="tab.icon"></i>
                                 <span>{{ $t(tab.labelKey) }}</span>
@@ -642,7 +642,7 @@ export default {
 
                     <!-- 6. 子账号管理 Panel -->
                     <div v-show="activeSettingsTab === 'subaccounts'" class="animate-in">
-                        <div class="settings-panel-header d-flex align-items-center justify-content-between">
+                        <div class="settings-panel-header d-flex align-items-center justify-content-between flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="settings-header-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
                                     <i class="fa-solid fa-users-gear"></i>
@@ -665,7 +665,7 @@ export default {
                     </div>
                     <div v-else class="row g-3 mb-4">
                         <div v-for="user in users" :key="user.username" class="col-md-6">
-                            <div class="card instance-card h-100 p-4 border rounded-4 bg-surface flex-column" style="border-radius: 16px;">
+                            <div class="card instance-card h-100 p-3 p-md-4 border rounded-4 bg-surface flex-column" style="border-radius: 16px;">
                                 <div class="d-flex align-items-center gap-3 mb-4">
                                     <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                                         <i class="fa-solid fa-user" style="font-size: 1.25rem;"></i>
@@ -692,7 +692,7 @@ export default {
                                 <!-- Hover Swap Container -->
                                 <div class="card-hover-swap-container mt-auto position-relative" style="height: 38px;">
                                     <!-- Info View -->
-                                    <div class="card-info-view w-100 h-100 d-flex align-items-center">
+                                    <div class="card-info-view w-100 h-100 d-none d-md-flex align-items-center">
                                         <span class="small text-muted"><i class="fa-solid fa-ellipsis me-1.5"></i>悬停以显示操作</span>
                                     </div>
                                     <!-- Action View -->

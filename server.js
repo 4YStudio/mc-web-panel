@@ -25,8 +25,9 @@ const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
+const sharp = require('sharp');
 
-const APP_VERSION = '2.4.6';
+const APP_VERSION = '2.4.7';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -379,36 +380,277 @@ function resetFailedAttempts(ip) {
     failedAttempts.delete(ip);
 }
 
-// 图形验证码生成器 (SVG)
-function generateCaptcha() {
-    const chars = '23456789abcdefghkmnpqrstuvwxyzABCDEFGHKMNPQRSTUVWXYZ';
-    let text = '';
-    for (let i = 0; i < 4; i++) {
-        text += chars[Math.floor(Math.random() * chars.length)];
+// ==================== 滑动拼图验证码 (Slide Captcha) ====================
+const captchaAnswers = new Map(); // captchaId -> { targetX, createdAt }
+const verifiedCaptchaTokens = new Map(); // token -> { createdAt }
+
+// 定期清理过期验证码与令牌 (5分钟验证码过期，2分钟令牌过期)
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, val] of captchaAnswers.entries()) {
+        if (now - val.createdAt > 5 * 60 * 1000) captchaAnswers.delete(id);
     }
-    const width = 120;
-    const height = 40;
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
-    svg += `<rect width="100%" height="100%" fill="#f3f4f6"/>`;
-    for (let i = 0; i < 4; i++) {
-        const x1 = Math.random() * width;
-        const y1 = Math.random() * height;
-        const x2 = Math.random() * width;
-        const y2 = Math.random() * height;
-        const color = `rgba(${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},0.3)`;
-        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2"/>`;
+    for (const [tk, val] of verifiedCaptchaTokens.entries()) {
+        if (now - val.createdAt > 2 * 60 * 1000) verifiedCaptchaTokens.delete(tk);
     }
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const fontSize = Math.floor(Math.random() * 8) + 22;
-        const angle = (Math.random() - 0.5) * 30;
-        const x = 15 + i * 25 + Math.random() * 5;
-        const y = 28 + (Math.random() - 0.5) * 6;
-        const color = `rgb(${Math.floor(Math.random()*150)},${Math.floor(Math.random()*100)},${Math.floor(Math.random()*200)})`;
-        svg += `<text x="${x}" y="${y}" font-size="${fontSize}" font-family="monospace" font-weight="bold" fill="${color}" transform="rotate(${angle} ${x} ${y})">${char}</text>`;
+}, 60 * 1000);
+
+async function generateSlideCaptcha() {
+    let originBgBuffer = null;
+
+    // 1. 尝试从网络地址拉取高清壁纸
+    try {
+        const response = await axios.get('https://t.alcy.cc/pc', {
+            responseType: 'arraybuffer',
+            timeout: 3500,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        if (response.data && response.data.length > 0) {
+            originBgBuffer = Buffer.from(response.data);
+        }
+    } catch (apiErr) {
+        // 网络超时或无外网连接时静默转入本地兜底
     }
-    svg += `</svg>`;
-    return { text: text.toLowerCase(), svg };
+
+    // 2. 本地图片降级 (优先检查 public/img/captcha_bg，次选 data/captcha_bg)
+    if (!originBgBuffer) {
+        const candidateDirs = [
+            path.join(__dirname, 'public', 'img', 'captcha_bg'),
+            path.join(__dirname, 'data', 'captcha_bg')
+        ];
+        for (const dir of candidateDirs) {
+            if (fs.existsSync(dir)) {
+                const files = fs.readdirSync(dir).filter(f => /\.(png|jpe?g|webp)$/i.test(f));
+                if (files.length > 0) {
+                    const chosen = files[Math.floor(Math.random() * files.length)];
+                    try {
+                        originBgBuffer = fs.readFileSync(path.join(dir, chosen));
+                        break;
+                    } catch (e) {}
+                }
+            }
+        }
+    }
+
+    // 3. 极速 SVG 渐变背景保底（避免任何极端情况下无图）
+    if (!originBgBuffer) {
+        const fallbackSvg = `
+            <svg width="380" height="240" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#1e293b"/>
+                        <stop offset="50%" stop-color="#334155"/>
+                        <stop offset="100%" stop-color="#0f172a"/>
+                    </linearGradient>
+                </defs>
+                <rect width="380" height="240" fill="url(#g)"/>
+                <circle cx="80" cy="80" r="50" fill="#3b82f6" opacity="0.3"/>
+                <circle cx="290" cy="150" r="60" fill="#8b5cf6" opacity="0.25"/>
+                <rect x="150" y="100" width="80" height="80" rx="12" fill="#10b981" opacity="0.2"/>
+            </svg>
+        `;
+        originBgBuffer = Buffer.from(fallbackSvg);
+    }
+
+    const bgWidth = 380;
+    const bgHeight = 240;
+    const pieceSize = 56;
+
+    const maxTargetX = bgWidth - pieceSize - 12;
+    const minTargetX = 80;
+    const maxTargetY = bgHeight - pieceSize - 20;
+    const minTargetY = 20;
+
+    const targetX = Math.floor(Math.random() * (maxTargetX - minTargetX + 1)) + minTargetX;
+    const targetY = Math.floor(Math.random() * (maxTargetY - minTargetY + 1)) + minTargetY;
+
+    // 拼图凸凹遮罩 (56x56)
+    const maskSvg = `
+        <svg width="${pieceSize}" height="${pieceSize}" viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 10 10 
+                   H 25 
+                   C 25 5, 33 5, 33 10 
+                   H 40 
+                   V 25 
+                   C 45 25, 45 33, 40 33 
+                   V 40 
+                   H 25 
+                   C 25 35, 17 35, 17 40 
+                   H 10 
+                   V 25 
+                   C 15 25, 15 17, 10 17 
+                   Z" 
+                fill="white" />
+        </svg>
+    `;
+
+    // 真实缺口阴影 (深色阴影+白色描边边缘)
+    const shadowSvg = `
+        <svg width="${pieceSize}" height="${pieceSize}" viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 10 10 
+                   H 25 
+                   C 25 5, 33 5, 33 10 
+                   H 40 
+                   V 25 
+                   C 45 25, 45 33, 40 33 
+                   V 40 
+                   H 25 
+                   C 25 35, 17 35, 17 40 
+                   H 10 
+                   V 25 
+                   C 15 25, 15 17, 10 17 
+                   Z" 
+                fill="black" 
+                fill-opacity="0.65"
+                stroke="rgba(255,255,255,0.7)"
+                stroke-width="1.5" />
+        </svg>
+    `;
+
+    // 干扰缺口阴影 (浅色阴影，迷惑机器人视觉边缘检测)
+    const decoyShadowSvg = `
+        <svg width="${pieceSize}" height="${pieceSize}" viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 10 10 
+                   H 25 
+                   C 25 5, 33 5, 33 10 
+                   H 40 
+                   V 25 
+                   C 45 25, 45 33, 40 33 
+                   V 40 
+                   H 25 
+                   C 25 35, 17 35, 17 40 
+                   H 10 
+                   V 25 
+                   C 15 25, 15 17, 10 17 
+                   Z" 
+                fill="black" 
+                fill-opacity="0.45"
+                stroke="rgba(255,255,255,0.4)"
+                stroke-width="1.2" />
+        </svg>
+    `;
+
+    // 干扰缺口生成
+    const minDecoySpacing = pieceSize + 16;
+    const maxDecoyX = bgWidth - pieceSize - 16;
+    const notchXs = [targetX];
+    let attempts = 0;
+    while (notchXs.length < 2 && attempts < 100) {
+        attempts++;
+        const px = Math.floor(Math.random() * (maxDecoyX - 60 + 1)) + 60;
+        if (notchXs.every(p => Math.abs(p - px) >= minDecoySpacing)) {
+            notchXs.push(px);
+        }
+    }
+
+    // 1. 生成滑块小图
+    const slideBuffer = await sharp(originBgBuffer)
+        .resize(bgWidth, bgHeight)
+        .extract({ left: targetX, top: targetY, width: pieceSize, height: pieceSize })
+        .composite([{ input: Buffer.from(maskSvg), blend: 'dest-in' }])
+        .png()
+        .toBuffer();
+
+    // 2. 生成背景图 (真实缺口 + 干扰缺口)
+    const bgComposites = [{ input: Buffer.from(shadowSvg), left: targetX, top: targetY }];
+    notchXs.slice(1).forEach(px => {
+        bgComposites.push({ input: Buffer.from(decoyShadowSvg), left: px, top: targetY });
+    });
+    const bgBuffer = await sharp(originBgBuffer)
+        .resize(bgWidth, bgHeight)
+        .composite(bgComposites)
+        .png()
+        .toBuffer();
+
+    const captchaId = 'captcha_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex');
+    captchaAnswers.set(captchaId, { targetX, createdAt: Date.now() });
+
+    return {
+        captchaId,
+        y: targetY,
+        bgWidth,
+        bgHeight,
+        pieceSize,
+        bgImage: `data:image/png;base64,${bgBuffer.toString('base64')}`,
+        slideImage: `data:image/png;base64,${slideBuffer.toString('base64')}`
+    };
+}
+
+function verifySlideCaptcha(captchaId, dragX, track) {
+    if (!captchaId || dragX === undefined) {
+        return { success: false, error: '参数不完整' };
+    }
+
+    const item = captchaAnswers.get(captchaId);
+    if (!item) {
+        return { success: false, error: '验证码已失效，请刷新重试' };
+    }
+    // 立即销毁，确保一次性验证防重放
+    captchaAnswers.delete(captchaId);
+
+    if (Date.now() - item.createdAt > 5 * 60 * 1000) {
+        return { success: false, error: '验证码已超时，请刷新' };
+    }
+
+    const targetX = item.targetX;
+    const parsedDragX = parseFloat(dragX);
+    const offsetDiff = Math.abs(parsedDragX - targetX);
+
+    // 位置偏差容差：最大允许 6 像素误差
+    if (offsetDiff > 6) {
+        return { success: false, error: '拼图未对齐，请重新滑动' };
+    }
+
+    // 人机轨迹行为审计
+    if (!track || !Array.isArray(track) || track.length < 4) {
+        return { success: false, error: '检测到异常操作行为' };
+    }
+
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let isConstantSpeed = true;
+    let prevSpeed = null;
+
+    for (let i = 0; i < track.length; i++) {
+        const pt = track[i];
+        if (!Array.isArray(pt) || pt.length < 3) continue;
+        const [x, y, time] = pt;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+
+        if (i > 0) {
+            const prevPt = track[i - 1];
+            const dist = Math.sqrt(Math.pow(x - prevPt[0], 2) + Math.pow(y - prevPt[1], 2));
+            const timeDiff = time - prevPt[2];
+            if (timeDiff > 0) {
+                const speed = dist / timeDiff;
+                if (prevSpeed !== null && Math.abs(speed - prevSpeed) > 0.001) {
+                    isConstantSpeed = false;
+                }
+                prevSpeed = speed;
+            }
+        }
+    }
+
+    // 耗时审计
+    const startTime = track[0][2] || 0;
+    const endTime = track[track.length - 1][2] || 0;
+    const duration = endTime - startTime;
+    if (duration < 120 || duration > 15000) {
+        return { success: false, error: '滑动超时或过快，请重试' };
+    }
+
+    // 恒速检测（超过8个轨迹点且速度完全一致）
+    if (isConstantSpeed && track.length > 8) {
+        return { success: false, error: '检测到非人类操作行为' };
+    }
+
+    // 颁发临时凭证，有效期2分钟
+    const token = 'token_' + crypto.randomUUID().replace(/-/g, '');
+    verifiedCaptchaTokens.set(token, { createdAt: Date.now() });
+    return { success: true, token };
 }
 
 let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : { ...DEFAULT_CONFIG };
@@ -3986,10 +4228,28 @@ threaded_server_support=false
         });
     });
 
-    app.get('/api/auth/captcha', (req, res) => {
-        const { text, svg } = generateCaptcha();
-        req.session.captcha = text;
-        res.json({ svg });
+    app.get('/api/auth/captcha', async (req, res) => {
+        try {
+            const data = await generateSlideCaptcha();
+            res.json({ success: true, ...data });
+        } catch (e) {
+            console.error('[Captcha] 生成滑块验证码失败:', e);
+            res.status(500).json({ success: false, error: '生成滑块验证码失败' });
+        }
+    });
+
+    app.post('/api/auth/captcha/verify', (req, res) => {
+        try {
+            const { captchaId, dragX, track } = req.body;
+            const result = verifySlideCaptcha(captchaId, dragX, track);
+            if (result.success) {
+                req.session.captchaToken = result.token;
+            }
+            res.json(result);
+        } catch (e) {
+            console.error('[Captcha] 校验滑块验证码失败:', e);
+            res.status(500).json({ success: false, error: '校验滑块验证码失败' });
+        }
     });
 
     app.get('/api/auth/qr', (req, res) => {
@@ -4070,13 +4330,18 @@ threaded_server_support=false
         }
 
         // 情况 B: 账号密码登录
-        // 2. 验证码校验
-        if (!req.session.captcha || !captcha || req.session.captcha !== captcha.toLowerCase()) {
+        // 2. 滑块验证码凭证校验
+        const verifyToken = captcha || req.body.captchaToken;
+        const isTokenValid = (verifyToken && verifiedCaptchaTokens.has(verifyToken)) || (req.session.captchaToken && req.session.captchaToken === verifyToken);
+        if (!isTokenValid) {
             recordFailedAttempt(req.ip);
-            delete req.session.captcha;
-            return res.status(400).json({ error: '验证码错误' });
+            if (verifyToken) verifiedCaptchaTokens.delete(verifyToken);
+            delete req.session.captchaToken;
+            return res.status(400).json({ error: '安全验证未通过或已过期，请重新完成滑动验证' });
         }
-        delete req.session.captcha;
+        // 单次消费立即销毁凭证
+        if (verifyToken) verifiedCaptchaTokens.delete(verifyToken);
+        delete req.session.captchaToken;
 
         // 3. 账号密码校验
         if (!appConfig.username || !appConfig.passwordHash) {

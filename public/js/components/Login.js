@@ -2,11 +2,15 @@ import { ref, watch, onMounted } from '/js/vue.esm-browser.js';
 import { store } from '../store.js';
 import { api } from '../api.js';
 import { showToast, waitForPanel, uploadFileWithChunk, isLargeFile, t } from '../utils.js';
+import SlideCaptchaModal from './SlideCaptchaModal.js';
 
 export default {
+    components: {
+        SlideCaptchaModal
+    },
     template: `
-    <div class="login-page d-flex justify-content-center w-100 h-100 overflow-y-auto py-4 py-md-5">
-        <div class="glass-card login-card p-4 p-md-5 text-center animate-in my-auto" style="width: 100%; max-width: 440px;">
+    <div class="login-page d-flex justify-content-center w-100 h-100 overflow-y-auto py-4 py-md-5 px-3">
+        <div class="glass-card login-card p-3.5 p-sm-4 p-md-5 text-center animate-in my-auto" style="width: 100%; max-width: 440px;">
             <div class="mb-4">
                  <img v-if="store.customLogoUrl" :src="store.customLogoUrl" alt="Logo" class="login-logo">
                  <img v-else-if="hasIcon" :src="'/api/server/icon?t=' + store.serverIconVersion" class="login-logo rounded-circle">
@@ -74,14 +78,8 @@ export default {
                     <div class="mb-3">
                         <input type="text" v-model="loginUser" class="form-control" :placeholder="$t('login.placeholder_user')" @keyup.enter="loginPassword" autofocus>
                     </div>
-                    <div class="mb-3">
-                        <input type="password" v-model="loginPass" class="form-control" :placeholder="$t('login.placeholder_pass')" @keyup.enter="loginPassword">
-                    </div>
                     <div class="mb-4">
-                        <div class="input-group">
-                            <input type="text" v-model="loginCaptcha" class="form-control captcha-input-field" :placeholder="$t('login.placeholder_captcha')" maxlength="4" @keyup.enter="loginPassword">
-                            <div class="captcha-img-container cursor-pointer border overflow-hidden" @click="refreshCaptcha" v-html="captchaSvg" title="点击刷新验证码"></div>
-                        </div>
+                        <input type="password" v-model="loginPass" class="form-control" :placeholder="$t('login.placeholder_pass')" @keyup.enter="loginPassword">
                     </div>
                     
                     <button class="btn btn-primary w-100 login-btn mb-3 py-2 fw-bold" @click="loginPassword">
@@ -186,6 +184,7 @@ export default {
                 </button>
             </div>
         </div>
+        <slide-captcha-modal v-model="showCaptchaModal" @success="onCaptchaSuccess"></slide-captcha-modal>
     </div>
     `,
     setup() {
@@ -206,9 +205,8 @@ export default {
         // Login States
         const loginUser = ref('');
         const loginPass = ref('');
-        const loginCaptcha = ref('');
         const login2FAToken = ref('');
-        const captchaSvg = ref('');
+        const showCaptchaModal = ref(false);
         
         // Mode switchable state: 'password', '2fa', or 'recovery'
         const loginMode = ref('password');
@@ -236,15 +234,6 @@ export default {
             img.src = '/api/server/icon?t=' + Date.now();
         };
 
-        const refreshCaptcha = async () => {
-            try {
-                const res = await api.get('/api/auth/captcha');
-                captchaSvg.value = res.data.svg;
-            } catch (e) {
-                console.error('Failed to load captcha', e);
-            }
-        };
-
         watch(() => store.serverIconVersion, checkIcon);
 
         onMounted(() => {
@@ -253,14 +242,6 @@ export default {
                 if (store.auth.isSetup && localStorage.getItem('preferred_login_mode') === '2fa') {
                     loginMode.value = '2fa';
                 }
-                refreshCaptcha();
-            }
-        });
-
-        // Watch for store.auth.initialized transitions
-        watch(() => store.auth.initialized, (val) => {
-            if (val) {
-                refreshCaptcha();
             }
         });
 
@@ -270,8 +251,7 @@ export default {
                 localStorage.setItem('preferred_login_mode', mode);
             }
             if (mode === 'password') {
-                refreshCaptcha();
-                loginCaptcha.value = '';
+                loginPass.value = '';
             } else if (mode === '2fa') {
                 login2FAToken.value = '';
             }
@@ -313,7 +293,7 @@ export default {
             }
         };
 
-        const loginPassword = async () => {
+        const loginPassword = () => {
             if (!loginUser.value) {
                 showToast('login.placeholder_user', 'warning');
                 return;
@@ -322,24 +302,22 @@ export default {
                 showToast('login.placeholder_pass', 'warning');
                 return;
             }
-            if (!loginCaptcha.value) {
-                showToast('login.placeholder_captcha', 'warning');
-                return;
-            }
+            showCaptchaModal.value = true;
+        };
 
+        const onCaptchaSuccess = async (data) => {
+            showCaptchaModal.value = false;
             try {
                 const res = await api.post('/api/auth/login', {
                     username: loginUser.value,
                     password: loginPass.value,
-                    captcha: loginCaptcha.value
+                    captcha: data.token
                 });
                 if (res.data.success) {
                     store.auth.loggedIn = true;
                 }
             } catch (err) {
                 showToast(err.response?.data?.error || 'login.toast_login_fail', 'danger');
-                refreshCaptcha();
-                loginCaptcha.value = '';
             }
         };
 
@@ -456,9 +434,10 @@ export default {
         return {
             store, hasIcon, restoring, uploadPercent, restoreStatusText, restoreInput, recoveryFileInput,
             initUser, initPass, initConfirmPass, enable2FA, init2FAToken,
-            loginUser, loginPass, loginCaptcha, login2FAToken, captchaSvg, loginMode,
+            loginUser, loginPass, login2FAToken, loginMode,
+            showCaptchaModal, onCaptchaSuccess,
             recoveryPass, recoveryFile, formatFileSize,
-            refreshCaptcha, switchMode, setupAdmin, loginPassword, login2FA,
+            switchMode, setupAdmin, loginPassword, login2FA,
             toggleTheme, toggleLang, triggerRestore, triggerRecoveryFile,
             handleRecoveryFileSelect, handleSetupRestore, startDisasterRecovery
         };

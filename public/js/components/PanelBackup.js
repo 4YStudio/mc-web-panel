@@ -6,56 +6,57 @@ import { showToast, openModal, isLargeFile, uploadFileWithChunk, waitForPanel } 
 export default {
     template: `
     <div class="animate-in">
-        <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
             <div class="d-flex align-items-center">
-                <button @click="store.view = store.prevView || 'instance-manager'" class="btn btn-outline-secondary btn-sm rounded-circle me-3" style="width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;" title="返回">
+                <button @click="store.view = store.prevView || 'instance-manager'" class="btn btn-outline-secondary btn-sm rounded-circle me-3 flex-shrink-0" style="width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;" title="返回">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
                 <div>
-                    <h3 class="m-0 fw-bold d-flex align-items-center">
-                        <i class="fa-solid fa-box-archive me-3 text-warning"></i>
+                    <h3 class="m-0 fw-bold d-flex align-items-center text-nowrap">
+                        <i class="fa-solid fa-box-archive me-2 me-md-3 text-warning"></i>
                         <span>{{ $t('panel_backup.title') || '面板全局备份' }}</span>
                     </h3>
-                    <p class="text-muted mb-0 mt-1 small">{{ $t('panel_backup.description') || '管理整个面板的数据备份、系统配置、Java环境及实例归档' }}</p>
+                    <p class="text-muted mb-0 mt-1 small d-none d-sm-block">{{ $t('panel_backup.description') || '管理整个面板的数据备份、系统配置、Java环境及实例归档' }}</p>
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary btn-sm rounded-pill fw-bold" @click="loadGlobalBackups" :disabled="loading">
-                    <i class="fa-solid fa-rotate-right me-1" :class="{'fa-spin': loading}"></i>{{ $t('common.refresh') || '刷新' }}
+                <button class="btn btn-outline-secondary btn-sm rounded-pill fw-bold" @click="loadGlobalBackups" :disabled="loading" :title="$t('common.refresh') || '刷新'">
+                    <i class="fa-solid fa-rotate-right" :class="{'fa-spin': loading, 'me-sm-1': true}"></i><span class="d-none d-sm-inline">{{ $t('common.refresh') || '刷新' }}</span>
                 </button>
-                <button class="btn btn-outline-warning btn-sm rounded-pill fw-bold" @click="triggerRestoreImport" :disabled="saving">
-                    <i class="fa-solid fa-file-import me-1"></i>{{ $t('panel_backup.import_btn') || '导入备份' }}
+                <button class="btn btn-outline-warning btn-sm rounded-pill fw-bold" @click="triggerRestoreImport" :disabled="saving" :title="$t('panel_backup.import_btn') || '导入备份'">
+                    <i class="fa-solid fa-file-import me-0 me-sm-1"></i><span class="d-none d-sm-inline">{{ $t('panel_backup.import_btn') || '导入备份' }}</span>
                 </button>
-                <button class="btn btn-warning btn-sm rounded-pill fw-bold text-dark" @click="askCreateGlobalBackup" :disabled="saving">
-                    <i class="fa-solid fa-plus me-1"></i>{{ $t('panel_backup.create_btn') || '创建全局备份' }}
+                <button class="btn btn-warning btn-sm rounded-pill fw-bold text-dark" @click="askCreateGlobalBackup" :disabled="saving" :title="$t('panel_backup.create_btn') || '创建全局备份'">
+                    <i class="fa-solid fa-plus me-0 me-sm-1"></i><span class="d-none d-sm-inline">{{ $t('panel_backup.create_btn') || '创建全局备份' }}</span>
                 </button>
                 <input type="file" ref="restoreInput" class="d-none" accept=".zip" @change="handleRestoreImport">
             </div>
         </div>
 
         <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 16px;">
-            <div class="table-responsive">
+            <!-- Desktop Table View -->
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-body-tertiary">
                         <tr class="small text-uppercase text-muted fw-bold">
-                            <th class="px-4 py-3">{{ $t('common.name') }}</th>
+                            <th class="px-3 px-md-4 py-3">{{ $t('common.name') }}</th>
                             <th>{{ $t('common.size') }}</th>
                             <th>{{ $t('common.time') }}</th>
                             <th>{{ $t('panel_backup.backup_content') || '包含内容' }}</th>
-                            <th class="text-end px-4">{{ $t('common.actions') }}</th>
+                            <th class="text-end px-3 px-md-4">{{ $t('common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="b in globalBackups" :key="b.name">
-                            <td class="px-4 py-3">
+                            <td class="px-3 px-md-4 py-3">
                                 <div class="fw-bold small text-body d-flex align-items-center gap-2">
-                                    <i class="fa-solid fa-file-zipper text-warning"></i>
-                                    <span>{{ b.name }}</span>
+                                    <i class="fa-solid fa-file-zipper text-warning flex-shrink-0"></i>
+                                    <span class="text-truncate" style="max-width: 220px;" :title="b.name">{{ b.name }}</span>
                                 </div>
                                 <div class="text-muted mt-1" style="font-size: 0.75rem;">{{ b.note || '-' }}</div>
                             </td>
-                            <td class="small fw-semibold">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
-                            <td class="small text-muted">{{ new Date(b.mtime).toLocaleString() }}</td>
+                            <td class="small fw-semibold text-nowrap">{{ (b.size/1024/1024).toFixed(1) }} MB</td>
+                            <td class="small text-muted text-nowrap">{{ new Date(b.mtime).toLocaleString() }}</td>
                             <td>
                                 <div class="d-flex flex-wrap gap-1">
                                     <span v-if="b.options?.configs !== false" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style="font-size: 0.7rem;">
@@ -69,7 +70,7 @@ export default {
                                     </span>
                                 </div>
                             </td>
-                            <td class="text-end px-4">
+                            <td class="text-end px-3 px-md-4">
                                 <div class="d-flex justify-content-end gap-1">
                                     <button class="btn btn-sm btn-outline-success border-0 rounded-circle" style="width: 32px; height: 32px; padding: 0;" @click="downloadGlobalBackup(b)" :title="$t('common.download')">
                                         <i class="fa-solid fa-download"></i>
@@ -97,6 +98,59 @@ export default {
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Mobile Card View -->
+            <div class="d-md-none p-2.5 d-flex flex-column gap-2.5">
+                <div v-if="loading" class="text-center py-5">
+                    <div class="spinner-border spinner-border-sm text-warning me-2"></div>
+                    <span class="small text-muted">{{ $t('common.loading') || '正在加载备份列表...' }}</span>
+                </div>
+                <div v-else-if="!globalBackups.length" class="text-center text-muted py-5 small">
+                    <i class="fa-solid fa-box-open d-block mb-2 opacity-25" style="font-size: 2.5rem;"></i>
+                    {{ $t('common.no_data') || '暂无全局备份记录' }}
+                </div>
+                <div v-else v-for="b in globalBackups" :key="b.name" class="card border rounded-3 p-3 shadow-sm bg-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2 min-w-0">
+                            <i class="fa-solid fa-file-zipper text-warning flex-shrink-0 fa-lg"></i>
+                            <span class="fw-bold small text-truncate" :title="b.name">{{ b.name }}</span>
+                        </div>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 flex-shrink-0" style="font-size: 0.72rem;">
+                            {{ (b.size/1024/1024).toFixed(1) }} MB
+                        </span>
+                    </div>
+                    <div v-if="b.note" class="text-muted small mb-2" style="font-size: 0.75rem;">
+                        {{ b.note }}
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        <span v-if="b.options?.configs !== false" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style="font-size: 0.65rem;">
+                            <i class="fa-solid fa-gear me-1"></i>{{ $t('panel_backup.opt_config') || '配置' }}
+                        </span>
+                        <span v-if="b.options?.java && (b.options.java === true || b.options.java.length)" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="font-size: 0.65rem;">
+                            <i class="fa-brands fa-java me-1"></i>Java ({{ Array.isArray(b.options.java) ? b.options.java.length : '全部' }})
+                        </span>
+                        <span v-if="b.options?.instances && (b.options.instances === true || b.options.instances.length)" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.65rem;">
+                            <i class="fa-solid fa-server me-1"></i>实例 ({{ Array.isArray(b.options.instances) ? b.options.instances.length : '全部' }})
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                        <div class="text-muted" style="font-size: 0.72rem;">
+                            <i class="fa-regular fa-clock me-1"></i>{{ new Date(b.mtime).toLocaleDateString() }}
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-success border-0 rounded-circle" style="width: 32px; height: 32px; padding: 0;" @click="downloadGlobalBackup(b)" :title="$t('common.download')">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning border-0 rounded-circle" style="width: 32px; height: 32px; padding: 0;" @click="askRestoreGlobalBackup(b)" :title="$t('panel_backup.restore_btn') || '回档此备份'">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger border-0 rounded-circle" style="width: 32px; height: 32px; padding: 0;" @click="deleteGlobalBackup(b)" :title="$t('common.delete')">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

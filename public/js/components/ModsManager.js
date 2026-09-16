@@ -94,8 +94,94 @@ const LazyModRow = {
     }
 };
 
+const LazyModCard = {
+    props: ['file', 'selectedFiles'],
+    emits: ['update:selectedFiles', 'click-mod'],
+    template: `
+        <div :class="{'opacity-75': file.isDisabled}" ref="cardEl" class="card border rounded-3 p-3 shadow-sm bg-body cursor-pointer" @click="$emit('click-mod', file)">
+            <div class="d-flex align-items-center gap-3">
+                <div @click.stop class="d-flex align-items-center flex-shrink-0">
+                    <input class="form-check-input m-0 cursor-pointer" type="checkbox" :value="file.name" 
+                        :checked="selectedFiles.includes(file.name)"
+                        @change="$emit('update:selectedFiles', $event.target.checked ? [...selectedFiles, file.name] : selectedFiles.filter(n => n !== file.name))">
+                </div>
+                <div class="position-relative flex-shrink-0">
+                    <img :src="iconUrl" @error="handleImgError" class="rounded-3 border shadow-sm" width="42" height="42" style="object-fit:cover;">
+                    <div v-if="loading && !metadata" class="position-absolute top-50 start-50 translate-middle">
+                        <span class="spinner-border spinner-border-sm text-primary opacity-50" style="width: 12px; height: 12px;"></span>
+                    </div>
+                </div>
+                <div class="min-width-0 flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                        <div class="fw-bold text-truncate small" style="color: var(--c-text-primary); font-size: 0.85rem;">{{ metadata?.title || file.name }}</div>
+                        <span v-if="file.isDisabled" class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle py-1 px-2 flex-shrink-0" style="font-size: 0.65rem;">{{ $t('common.disabled') }}</span>
+                        <span v-else class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle py-1 px-2 flex-shrink-0" style="font-size: 0.65rem;">{{ $t('common.enabled') }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1 flex-wrap gap-2">
+                        <span v-if="metadata?.version" class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">{{ metadata.version }}</span>
+                        <span v-else class="small text-muted font-monospace" style="font-size: 0.68rem;">-</span>
+                        <span class="text-muted font-monospace small" style="font-size: 0.72rem;">{{ (file.size/1024/1024).toFixed(2) }} MB</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+    setup(props) {
+        const metadata = ref(props.file.metadata);
+        const loading = ref(false);
+        const cardEl = ref(null);
+        const hasLoaded = ref(false);
+        const iconError = ref(false);
+
+        const DEFAULT_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0icmdiKDEwOCwgMTE3LCAxMjUpIiBvcGFjaXR5PSIuNSI+PHBhdGggZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNXYtMTBMMTIgMnptMCAyLjg2bDcuNSAzLjc1LTMuNSAxLjc1LTcuNS0zLjc1IDMuNS0xLjc1em0tOC41IDUuNTVMTEUgMTQuMXY3LjNsLTcuNS0zLjc1di03LjN6TTIyIDE3LjI1bC03LjUgMy43NXYtNy4zbDcuNS0zLjc1djcuM3oiLz48L3N2Zz4=';
+
+        const iconUrl = computed(() => {
+            if (iconError.value) return DEFAULT_ICON;
+            return metadata.value?.icon_url || DEFAULT_ICON;
+        });
+
+        watch(metadata, () => {
+            iconError.value = false;
+        });
+
+        const handleImgError = () => {
+            if (iconUrl.value === DEFAULT_ICON) return;
+            iconError.value = true;
+        };
+
+        const fetchMeta = async () => {
+            if (hasLoaded.value || metadata.value) return;
+            loading.value = true;
+            try {
+                const res = await api.get(`/api/mods/local/metadata?file=${encodeURIComponent(props.file.name)}`);
+                if (res.data.metadata) {
+                    metadata.value = res.data.metadata;
+                    props.file.metadata = res.data.metadata;
+                    props.file.hash = res.data.hash;
+                }
+            } catch (e) { console.error('Enrichment failed', props.file.name); }
+            finally {
+                loading.value = false;
+                hasLoaded.value = true;
+            }
+        };
+
+        onMounted(() => {
+            const observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchMeta();
+                    observer.disconnect();
+                }
+            }, { threshold: 0.1 });
+            if (cardEl.value) observer.observe(cardEl.value);
+        });
+
+        return { metadata, loading, cardEl, iconUrl, handleImgError };
+    }
+};
+
 export default {
-    components: { LazyModRow },
+    components: { LazyModRow, LazyModCard },
     template: `
     <div class="h-100 d-flex flex-column overflow-hidden"
          @dragenter.prevent="dragCounter++; isDragging = true" 
@@ -174,7 +260,8 @@ export default {
                             <h5 class="fw-bold">拖拽模组文件到此处上传</h5>
                         </div>
                     </div>
-                    <div class="table-responsive h-100 custom-scrollbar">
+                    <!-- Desktop Table View -->
+                    <div class="table-responsive h-100 custom-scrollbar d-none d-md-block">
                         <table class="table table-hover align-middle mb-0">
                             <thead>
                                 <tr class="small text-uppercase text-muted fw-bold">
@@ -203,6 +290,22 @@ export default {
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Mobile Card View -->
+                    <div class="d-md-none h-100 overflow-auto custom-scrollbar p-2.5 d-flex flex-column gap-2">
+                        <div v-if="loadingList" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <div class="mt-2 text-muted small">{{ $t('common.loading') }}...</div>
+                        </div>
+                        <template v-else>
+                            <LazyModCard v-for="file in filteredFiles" :key="file.name" :file="file" 
+                                v-model:selectedFiles="selectedFiles" @click-mod="showModDetails" />
+                        </template>
+                        <div v-if="!loadingList && filteredFiles.length === 0" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-box-open fa-2x mb-2 opacity-25 d-block"></i>
+                            {{ $t('mods.empty') }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -385,25 +488,38 @@ export default {
 
             <Transition name="scale">
                 <div v-if="conflictModal.visible" class="modal show d-block" @click.self="conflictModal.visible = false" style="z-index: 2070;">
-                    <div class="modal-dialog modal-dialog-centered modal-xl">
-                        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border); height: 80vh; max-height: 700px;">
-                            <div class="modal-header border-0 bg-warning text-dark py-3 shadow-sm d-flex justify-content-between align-items-center">
-                                <h5 class="modal-title fw-bold m-0 d-flex align-items-center gap-2">
+                    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden conflict-modal-content" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border); height: 85vh; max-height: 720px;">
+                            <div class="modal-header border-0 bg-warning text-dark py-2.5 py-md-3 px-3 px-md-4 shadow-sm d-flex justify-content-between align-items-center">
+                                <h5 class="modal-title fw-bold m-0 d-flex align-items-center gap-2 fs-6 fs-md-5">
                                     <i class="fa-solid fa-triangle-exclamation"></i>{{ $t('mods.conflict_title') }}
                                 </h5>
                                 <button type="button" class="btn-close" @click="conflictModal.visible = false"></button>
                             </div>
                             
-                            <!-- 二栏布局主体 -->
-                            <div class="modal-body p-0 d-flex flex-row overflow-hidden" style="flex: 1; min-height: 0;">
-                                <!-- 左侧栏：冲突模组列表 -->
-                                <div class="border-end d-flex flex-column custom-scrollbar overflow-auto" style="width: 320px; flex-shrink: 0; background: var(--c-surface-elevated, rgba(0,0,0,0.02)); border-color: var(--c-border) !important;">
-                                    <div class="p-3 border-bottom text-muted small fw-bold bg-body-tertiary" style="border-color: var(--c-border) !important;">
+                            <!-- 移动端若有多组冲突模组，显示横向滚动选项卡 -->
+                            <div v-if="duplicateModGroups.length > 1" class="d-md-none px-3 py-2 border-bottom overflow-x-auto d-flex gap-2 flex-nowrap bg-body-tertiary custom-scrollbar flex-shrink-0" style="border-color: var(--c-border) !important; -webkit-overflow-scrolling: touch;">
+                                <button v-for="(group, idx) in duplicateModGroups" :key="idx"
+                                    class="btn btn-sm rounded-pill text-nowrap py-1 px-3 d-flex align-items-center gap-1.5 flex-shrink-0"
+                                    :class="conflictModal.selectedGroupIdx === idx ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @click="conflictModal.selectedGroupIdx = idx">
+                                    <span class="small fw-semibold">{{ group.name }}</span>
+                                    <span class="badge rounded-pill" :class="conflictModal.selectedGroupIdx === idx ? 'bg-white text-primary' : 'bg-warning text-dark'" style="font-size: 0.65rem;">
+                                        {{ group.files.length }}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <!-- 二栏布局主体 (PC左右二栏，移动端主详情展示) -->
+                            <div class="modal-body p-0 d-flex flex-column flex-md-row overflow-hidden" style="flex: 1; min-height: 0;">
+                                <!-- 左侧栏：冲突模组列表 (PC保留侧边栏) -->
+                                <div class="d-none d-md-flex border-end flex-column custom-scrollbar overflow-auto conflict-sidebar flex-shrink-0" style="background: var(--c-surface-elevated, rgba(0,0,0,0.02)); border-color: var(--c-border) !important;">
+                                    <div class="p-2.5 p-md-3 border-bottom text-muted small fw-bold bg-body-tertiary" style="border-color: var(--c-border) !important;">
                                         {{ $t('mods.conflict_list', { count: duplicateModGroups.length }) }}
                                     </div>
                                     <div class="list-group list-group-flush flex-grow-1">
                                         <button v-for="(group, idx) in duplicateModGroups" :key="idx"
-                                            class="list-group-item list-group-item-action border-0 py-3 px-3 d-flex flex-column align-items-start gap-1 cursor-pointer"
+                                            class="list-group-item list-group-item-action border-0 py-2.5 px-3 d-flex flex-column align-items-start gap-1 cursor-pointer"
                                             :class="{ active: conflictModal.selectedGroupIdx === idx }"
                                             @click="conflictModal.selectedGroupIdx = idx"
                                             style="background: transparent; color: var(--c-text-primary);">
@@ -414,42 +530,42 @@ export default {
                                                 </span>
                                             </div>
                                             <span class="text-muted text-truncate w-100" style="font-size: 0.7rem; text-align: left;">
-                                                {{ $t('mods.earliest_time', { time: new Date(Math.min(...group.files.map(f => f.mtime))).toLocaleDateString() }) }}
+                                                {{ $t('mods.earliest_time', { time: getEarliestTime(group.files) }) }}
                                             </span>
                                         </button>
                                     </div>
                                 </div>
                                 
                                 <!-- 右侧栏：冲突模组详情 -->
-                                <div class="flex-grow-1 p-4 d-flex flex-column overflow-auto custom-scrollbar" style="min-width: 0; background: var(--c-surface);">
+                                <div class="flex-grow-1 p-3 p-md-4 d-flex flex-column overflow-auto custom-scrollbar" style="min-width: 0; background: var(--c-surface);">
                                     <div v-if="duplicateModGroups[conflictModal.selectedGroupIdx]" class="d-flex flex-column h-100">
-                                        <div class="mb-4 pb-3 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--c-border) !important;">
+                                        <div class="mb-3 mb-md-4 pb-2 pb-md-3 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--c-border) !important;">
                                             <div>
-                                                <h5 class="fw-bold mb-1" style="color: var(--c-text-primary);">{{ duplicateModGroups[conflictModal.selectedGroupIdx].name }}</h5>
-                                                <div class="small text-muted">{{ $t('mods.conflict_desc') }}</div>
+                                                <h5 class="fw-bold mb-1 fs-6 fs-md-5" style="color: var(--c-text-primary);">{{ duplicateModGroups[conflictModal.selectedGroupIdx].name }}</h5>
+                                                <div class="small text-muted" style="font-size: 0.75rem;">{{ $t('mods.conflict_desc') }}</div>
                                             </div>
                                         </div>
                                         
                                         <!-- 版本卡片列表 -->
-                                        <div class="d-flex flex-column gap-3 overflow-auto custom-scrollbar flex-grow-1 pr-1 pb-3">
+                                        <div class="d-flex flex-column gap-2.5 gap-md-3 overflow-auto custom-scrollbar flex-grow-1 pr-1 pb-2">
                                             <div v-for="(mod, mIdx) in duplicateModGroups[conflictModal.selectedGroupIdx].files" :key="mIdx"
-                                                class="card border rounded-3 p-3 shadow-sm d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3"
+                                                class="card border rounded-3 p-2.5 p-sm-3 shadow-sm d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2.5 gap-sm-3"
                                                 style="background: var(--c-surface-elevated, rgba(0,0,0,0.01)); border-color: var(--c-border) !important;">
                                                 <div class="min-width-0 flex-grow-1">
-                                                    <div class="d-flex align-items-center gap-2 mb-1.5">
-                                                        <i class="fa-solid fa-cube text-success fa-lg"></i>
-                                                        <span class="fw-bold text-truncate small" style="color: var(--c-text-primary); max-width: 320px;" :title="mod.name">{{ mod.name }}</span>
-                                                        <span v-if="mod.isDisabled" class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill" style="font-size: 0.65rem;">{{ $t('common.disabled') }}</span>
+                                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                                        <i class="fa-solid fa-cube text-success fa-lg flex-shrink-0"></i>
+                                                        <span class="fw-bold text-truncate small" style="color: var(--c-text-primary);" :title="mod.name">{{ mod.name }}</span>
+                                                        <span v-if="mod.isDisabled" class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill flex-shrink-0" style="font-size: 0.65rem;">{{ $t('common.disabled') }}</span>
                                                     </div>
-                                                    <div class="font-monospace text-muted mt-1 d-flex flex-wrap gap-x-3 gap-y-1" style="font-size: 0.7rem;">
+                                                    <div class="font-monospace text-muted mt-1 d-flex flex-wrap gap-x-3 gap-y-1" style="font-size: 0.72rem;">
                                                         <span>{{ $t('mods.file_size', { size: formatSize(mod.size) }) }}</span>
-                                                        <span>{{ $t('mods.mtime', { time: new Date(mod.mtime).toLocaleString() }) }}</span>
+                                                        <span>{{ $t('mods.mtime', { time: formatModTime(mod.mtime) }) }}</span>
                                                         <span v-if="mod.metadata?.version" class="text-primary fw-bold">{{ $t('mods.metadata_version', { version: mod.metadata.version }) }}</span>
                                                     </div>
                                                 </div>
-                                                <button class="btn btn-sm btn-outline-success px-3.5 py-1.5 rounded-pill shadow-sm fw-bold small flex-shrink-0"
+                                                <button class="btn btn-sm btn-outline-success px-3.5 py-1.5 rounded-pill shadow-sm fw-bold small flex-shrink-0 w-100 w-sm-auto"
                                                     @click="resolveConflictKeep(duplicateModGroups[conflictModal.selectedGroupIdx], mod)">
-                                                    {{ $t('mods.keep_this_version') }}
+                                                    <i class="fa-solid fa-check me-1"></i>{{ $t('mods.keep_this_version') }}
                                                 </button>
                                             </div>
                                         </div>
@@ -462,14 +578,14 @@ export default {
                             </div>
                             
                             <!-- 对话框底部 -->
-                            <div class="modal-footer border-0 px-4 py-3 d-flex justify-content-between align-items-center" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
-                                <div class="form-check form-switch m-0">
-                                    <input class="form-check-input cursor-pointer" type="checkbox" id="skipConfirmCheck" v-model="conflictModal.skipConfirm">
-                                    <label class="form-check-label text-muted small cursor-pointer fw-semibold" for="skipConfirmCheck">
+                            <div class="modal-footer border-0 px-3 px-md-4 py-2.5 py-md-3 d-flex flex-row justify-content-between align-items-center flex-nowrap" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
+                                <div class="form-check form-switch m-0 d-flex align-items-center gap-2" style="padding-left: 2.8em;">
+                                    <input class="form-check-input cursor-pointer m-0" type="checkbox" id="skipConfirmCheck" v-model="conflictModal.skipConfirm" style="cursor: pointer;">
+                                    <label class="form-check-label text-muted small cursor-pointer fw-semibold text-truncate" for="skipConfirmCheck" style="font-size: 0.75rem;">
                                         {{ $t('mods.skip_confirm') }}
                                     </label>
                                 </div>
-                                <button type="button" class="btn btn-secondary px-3 py-1.5 rounded-pill shadow-sm fw-bold small" @click="conflictModal.visible = false">{{ $t('common.close') }}</button>
+                                <button type="button" class="btn btn-secondary px-3.5 py-1 rounded-pill shadow-sm fw-bold small flex-shrink-0" @click="conflictModal.visible = false">{{ $t('common.close') }}</button>
                             </div>
                         </div>
                     </div>
@@ -879,6 +995,21 @@ export default {
             }
         }, { deep: true });
 
+        const getEarliestTime = (files) => {
+            if (!files || !files.length) return '';
+            const times = files.map(f => {
+                const t = new Date(f.mtime).getTime();
+                return isNaN(t) ? 0 : t;
+            }).filter(t => t > 0);
+            return times.length ? new Date(Math.min(...times)).toLocaleDateString() : '';
+        };
+
+        const formatModTime = (time) => {
+            if (!time) return '';
+            const d = new Date(time);
+            return isNaN(d.getTime()) ? '' : d.toLocaleString();
+        };
+
         const resolveConflictKeep = async (group, keepMod) => {
             const toDelete = group.files.filter(f => f.name !== keepMod.name).map(f => f.name);
             if (!toDelete.length) return;
@@ -926,7 +1057,7 @@ export default {
             showModDetails, translateBody, renderMarkdown,
             isDragging, dragCounter, uploadConfirmModal, compliantCheckedCount,
             nonCompliantCheckedCount, hasAnySelectedFiles, handleDrop, confirmUploadFromModal,
-            formatSize, duplicateModGroups, resolveConflictKeep,
+            formatSize, duplicateModGroups, resolveConflictKeep, getEarliestTime, formatModTime,
             uploadDropdownVisible, toggleUploadDropdown,
             conflictModal, openConflictModal
         };

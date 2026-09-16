@@ -272,7 +272,7 @@ export default {
             <h3 class="m-0 fw-bold"><i class="fa-solid fa-users me-2 text-primary"></i>{{ $t('players.title') }}</h3>
         </div>
 
-        <div class="card mb-4 border-primary" :class="{'player-section-open': activeMenu}" :style="activeMenu ? {position:'relative', zIndex:'1040'} : {}">
+        <div class="card mb-4 border-primary" :class="{'player-section-open': activeMenu}">
             <div class="card-header bg-primary-subtle fw-bold d-flex justify-content-between align-items-center">
                 <span><i class="fa-solid fa-signal me-2"></i>{{ $t('players.online_players') }}</span>
                 <span class="badge bg-primary fs-6">{{ filteredOnline.length }}{{ store.onlinePlayers.length !== filteredOnline.length ? ' / ' + store.onlinePlayers.length : '' }}</span>
@@ -301,32 +301,38 @@ export default {
                                     </div>
                                 </div>
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary border-0" @click.stop="toggleMenu(p)" :title="$t('players.more_actions')">
+                                    <button class="btn btn-sm btn-outline-secondary border-0 player-more-btn" @click.stop="toggleMenu(p, $event)" :title="$t('players.more_actions')">
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end" :class="{show: activeMenu === p}">
-                                        <li><a class="dropdown-item" @click="openInventory(p)"><i class="fa-solid fa-box-open me-2" style="color:#8b5cf6"></i>{{ $t('players.inventory') }}</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item" @click="askTeleport(p)"><i class="fa-solid fa-location-dot me-2 text-primary"></i>{{ $t('players.teleport') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askGamemode(p)"><i class="fa-solid fa-gamepad me-2 text-info"></i>{{ $t('players.gamemode') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askGiveItem(p)"><i class="fa-solid fa-gift me-2 text-success"></i>{{ $t('players.give_item') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askEffect(p)"><i class="fa-solid fa-flask me-2 text-purple"></i>{{ $t('players.effect') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askExperience(p)"><i class="fa-solid fa-star me-2 text-warning"></i>{{ $t('players.experience') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askTitle(p)"><i class="fa-solid fa-heading me-2 text-indigo"></i>{{ $t('players.title_action') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askMessage(p)"><i class="fa-solid fa-envelope me-2 text-cyan"></i>{{ $t('players.message') }}</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item" @click="sendCmd('clear ' + p)"><i class="fa-solid fa-broom me-2 text-warning"></i>{{ $t('players.clear_inv') }}</a></li>
-                                        <li><a class="dropdown-item" @click="sendCmd('kill ' + p)"><i class="fa-solid fa-skull me-2 text-danger"></i>{{ $t('players.kill') }}</a></li>
-                                        <li><a class="dropdown-item" @click="sendCmd('spawnpoint ' + p)"><i class="fa-solid fa-house me-2 text-secondary"></i>{{ $t('players.spawnpoint') }}</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item" @click="askWhitelist(p, 'add')"><i class="fa-solid fa-shield-halved me-2 text-success"></i>{{ $t('players.whitelist_add') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askOp(p)"><i class="fa-solid fa-crown me-2 text-warning"></i>{{ $t('players.op_give') }}</a></li>
-                                        <li><a class="dropdown-item" @click="askDeop(p)"><i class="fa-solid fa-crown me-2 text-secondary" style="opacity:0.5"></i>{{ $t('players.op_remove') }}</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item text-warning" @click="sendCmd('kick ' + p)"><i class="fa-solid fa-right-from-bracket me-2"></i>{{ $t('players.kick') }}</a></li>
-                                        <li><a class="dropdown-item text-danger" @click="askBan(p)"><i class="fa-solid fa-gavel me-2"></i>{{ $t('players.ban') }}</a></li>
-                                        <li><a class="dropdown-item text-danger" @click="askBanIp(p)"><i class="fa-solid fa-network-wired me-2"></i>{{ $t('players.ban_ip') }}</a></li>
-                                    </ul>
+                                    <Teleport to="body">
+                                        <Transition name="scale">
+                                            <ul v-if="activeMenu === p"
+                                                class="dropdown-menu player-dropdown-menu shadow-lg p-1 show d-block"
+                                                style="position: fixed; z-index: 2060; border-radius: 12px; min-width: 180px; max-height: calc(100vh - 40px); overflow-y: auto;"
+                                                :style="{ top: menuPos.top + 'px', right: menuPos.right + 'px' }"
+                                                @click="activeMenu = null">
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askTeleport(p)"><i class="fa-solid fa-location-dot me-2 text-primary"></i>{{ $t('players.teleport') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askGamemode(p)"><i class="fa-solid fa-gamepad me-2 text-info"></i>{{ $t('players.gamemode') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askGiveItem(p)"><i class="fa-solid fa-gift me-2 text-success"></i>{{ $t('players.give_item') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askEffect(p)"><i class="fa-solid fa-flask me-2 text-purple"></i>{{ $t('players.effect') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askExperience(p)"><i class="fa-solid fa-star me-2 text-warning"></i>{{ $t('players.experience') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askTitle(p)"><i class="fa-solid fa-heading me-2 text-indigo"></i>{{ $t('players.title_action') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askMessage(p)"><i class="fa-solid fa-envelope me-2 text-cyan"></i>{{ $t('players.message') }}</a></li>
+                                                <li><hr class="dropdown-divider my-1 opacity-10"></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="sendCmd('clear ' + p)"><i class="fa-solid fa-broom me-2 text-warning"></i>{{ $t('players.clear_inv') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="sendCmd('kill ' + p)"><i class="fa-solid fa-skull me-2 text-danger"></i>{{ $t('players.kill') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="sendCmd('spawnpoint ' + p)"><i class="fa-solid fa-house me-2 text-secondary"></i>{{ $t('players.spawnpoint') }}</a></li>
+                                                <li><hr class="dropdown-divider my-1 opacity-10"></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askWhitelist(p, 'add')"><i class="fa-solid fa-shield-halved me-2 text-success"></i>{{ $t('players.whitelist_add') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askOp(p)"><i class="fa-solid fa-crown me-2 text-warning"></i>{{ $t('players.op_give') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 cursor-pointer" @click="askDeop(p)"><i class="fa-solid fa-crown me-2 text-secondary" style="opacity:0.5"></i>{{ $t('players.op_remove') }}</a></li>
+                                                <li><hr class="dropdown-divider my-1 opacity-10"></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 text-warning cursor-pointer" @click="sendCmd('kick ' + p)"><i class="fa-solid fa-right-from-bracket me-2"></i>{{ $t('players.kick') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 text-danger cursor-pointer" @click="askBan(p)"><i class="fa-solid fa-gavel me-2"></i>{{ $t('players.ban') }}</a></li>
+                                                <li><a class="dropdown-item py-1.5 px-3 rounded-2 text-danger cursor-pointer" @click="askBanIp(p)"><i class="fa-solid fa-network-wired me-2"></i>{{ $t('players.ban_ip') }}</a></li>
+                                            </ul>
+                                        </Transition>
+                                    </Teleport>
                                 </div>
                             </div>
                         </div>
@@ -337,34 +343,34 @@ export default {
 
         <div class="card">
             <div class="card-header bg-body-tertiary py-2 px-3">
-                <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-auto no-scrollbar" style="margin: -0.5rem -0.75rem; padding: 0.5rem 0.75rem;">
-                    <li class="nav-item">
-                        <a class="nav-link" :class="{active: listType==='whitelist'}" @click="listType='whitelist'; loadLists()">
-                            <i class="fa-solid fa-shield-halved me-1"></i>{{ $t('players.whitelist') }}
-                            <span v-if="listType==='whitelist'" class="badge bg-secondary ms-1">{{ listData.length }}</span>
+                <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-x-auto no-scrollbar pb-1" style="margin: -0.5rem -0.75rem; padding: 0.5rem 0.75rem; -webkit-overflow-scrolling: touch;">
+                    <li class="nav-item flex-shrink-0">
+                        <a class="nav-link text-nowrap d-flex align-items-center" :class="{active: listType==='whitelist'}" @click="listType='whitelist'; loadLists()">
+                            <i class="fa-solid fa-shield-halved me-1.5"></i><span>{{ $t('players.whitelist') }}</span>
+                            <span v-if="listType==='whitelist'" class="badge bg-secondary ms-1.5">{{ listData.length }}</span>
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" :class="{active: listType==='ops'}" @click="listType='ops'; loadLists()">
-                            <i class="fa-solid fa-crown me-1"></i>{{ $t('players.ops') }}
-                            <span v-if="listType==='ops'" class="badge bg-secondary ms-1">{{ listData.length }}</span>
+                    <li class="nav-item flex-shrink-0">
+                        <a class="nav-link text-nowrap d-flex align-items-center" :class="{active: listType==='ops'}" @click="listType='ops'; loadLists()">
+                            <i class="fa-solid fa-crown me-1.5"></i><span>{{ $t('players.ops') }}</span>
+                            <span v-if="listType==='ops'" class="badge bg-secondary ms-1.5">{{ listData.length }}</span>
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" :class="{active: listType==='banned-players'}" @click="listType='banned-players'; loadLists()">
-                            <i class="fa-solid fa-ban me-1"></i>{{ $t('players.bans') }}
-                            <span v-if="listType==='banned-players'" class="badge bg-secondary ms-1">{{ listData.length }}</span>
+                    <li class="nav-item flex-shrink-0">
+                        <a class="nav-link text-nowrap d-flex align-items-center" :class="{active: listType==='banned-players'}" @click="listType='banned-players'; loadLists()">
+                            <i class="fa-solid fa-ban me-1.5"></i><span>{{ $t('players.bans') }}</span>
+                            <span v-if="listType==='banned-players'" class="badge bg-secondary ms-1.5">{{ listData.length }}</span>
                         </a>
                     </li>
                 </ul>
             </div>
             <div class="card-body">
-                <div class="d-flex gap-2 mb-3">
+                <div class="d-flex flex-column flex-md-row gap-2 mb-3">
                     <div class="input-group input-group-sm flex-grow-1">
                         <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
                         <input type="text" class="form-control border-start-0" :placeholder="$t('players.search_player')" v-model="listFilter">
                     </div>
-                    <div class="input-group input-group-sm" style="max-width: 300px;">
+                    <div class="input-group input-group-sm flex-shrink-0" style="max-width: 100%; width: auto;">
                         <input type="text" class="form-control" v-model="newPlayerName" :placeholder="$t('common.player_name')" @keyup.enter="modifyList('add')">
                         <button class="btn btn-outline-success" @click="modifyList('add')"><i class="fa-solid fa-plus me-1"></i>{{ $t('common.add') }}</button>
                     </div>
@@ -395,6 +401,117 @@ export default {
                 </div>
             </div>
         </div>
+
+        <!-- 移动端专属：玩家操作对话框/面板 (兼容二级弹窗) -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="mobileActionPlayer" class="modal-backdrop fade show" style="z-index: 2050; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);"></div>
+            </Transition>
+            <Transition name="scale">
+                <div v-if="mobileActionPlayer" class="modal show d-block" @click.self="mobileActionPlayer = null" style="z-index: 2060;">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 480px;">
+                        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border);">
+                            <div class="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center bg-body-tertiary">
+                                <div class="d-flex align-items-center gap-2.5 min-w-0">
+                                    <avatar :player="mobileActionPlayer" :size="34"></avatar>
+                                    <h5 class="modal-title fw-bold m-0 text-truncate">{{ mobileActionPlayer }}</h5>
+                                </div>
+                                <button type="button" class="btn-close" @click="mobileActionPlayer = null"></button>
+                            </div>
+                            <div class="modal-body p-3 overflow-auto custom-scrollbar" style="max-height: 70vh;">
+                                <div class="text-uppercase text-muted fw-bold small mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">常规管理</div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askTeleport(mobileActionPlayer))">
+                                            <i class="fa-solid fa-location-dot text-primary fa-lg"></i>
+                                            <span class="text-truncate">{{ $t('players.teleport') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askGamemode(mobileActionPlayer))">
+                                            <i class="fa-solid fa-gamepad text-info fa-lg"></i>
+                                            <span class="text-truncate">{{ $t('players.gamemode') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askGiveItem(mobileActionPlayer))">
+                                            <i class="fa-solid fa-gift text-success fa-lg"></i>
+                                            <span class="text-truncate">{{ $t('players.give_item') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askEffect(mobileActionPlayer))">
+                                            <i class="fa-solid fa-flask fa-lg" style="color: #a855f7;"></i>
+                                            <span class="text-truncate">{{ $t('players.effect') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askExperience(mobileActionPlayer))">
+                                            <i class="fa-solid fa-star text-warning fa-lg"></i>
+                                            <span class="text-truncate">{{ $t('players.experience') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askTitle(mobileActionPlayer))">
+                                            <i class="fa-solid fa-heading text-primary fa-lg"></i>
+                                            <span class="text-truncate">{{ $t('players.title_action') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-start gap-2 rounded-3 text-start small fw-semibold"
+                                            @click="handleMobileAction(() => askMessage(mobileActionPlayer))">
+                                            <i class="fa-solid fa-envelope text-info fa-lg"></i>
+                                            <span class="text-truncate">{{ $t('players.message') }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="text-uppercase text-muted fw-bold small mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">快捷指令</div>
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    <button class="btn btn-sm btn-outline-secondary" @click="handleMobileAction(() => sendCmd('clear ' + mobileActionPlayer))">
+                                        <i class="fa-solid fa-broom me-1 text-warning"></i>{{ $t('players.clear_inv') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @click="handleMobileAction(() => sendCmd('kill ' + mobileActionPlayer))">
+                                        <i class="fa-solid fa-skull me-1 text-danger"></i>{{ $t('players.kill') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @click="handleMobileAction(() => sendCmd('spawnpoint ' + mobileActionPlayer))">
+                                        <i class="fa-solid fa-house me-1 text-secondary"></i>{{ $t('players.spawnpoint') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @click="handleMobileAction(() => askWhitelist(mobileActionPlayer, 'add'))">
+                                        <i class="fa-solid fa-shield-halved me-1 text-success"></i>{{ $t('players.whitelist_add') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @click="handleMobileAction(() => askOp(mobileActionPlayer))">
+                                        <i class="fa-solid fa-crown me-1 text-warning"></i>{{ $t('players.op_give') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @click="handleMobileAction(() => askDeop(mobileActionPlayer))">
+                                        <i class="fa-solid fa-crown me-1 text-secondary" style="opacity: 0.5;"></i>{{ $t('players.op_remove') }}
+                                    </button>
+                                </div>
+
+                                <div class="text-uppercase text-danger fw-bold small mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">危险操作</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-sm btn-outline-warning" @click="handleMobileAction(() => sendCmd('kick ' + mobileActionPlayer))">
+                                        <i class="fa-solid fa-right-from-bracket me-1"></i>{{ $t('players.kick') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @click="handleMobileAction(() => askBan(mobileActionPlayer))">
+                                        <i class="fa-solid fa-gavel me-1"></i>{{ $t('players.ban') }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @click="handleMobileAction(() => askBanIp(mobileActionPlayer))">
+                                        <i class="fa-solid fa-network-wired me-1"></i>{{ $t('players.ban_ip') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
 
         <!-- MC 创造模式物品给予弹窗 -->
         <Teleport to="body">
@@ -623,84 +740,6 @@ export default {
             </Transition>
         </Teleport>
 
-        <!-- 玩家背包查看弹窗 -->
-        <Teleport to="body">
-            <Transition name="modal-fade">
-                <div class="modal fade show" v-if="showInventoryModal" style="display: block; z-index: 1050;">
-                    <div class="modal-backdrop fade show" @click="closeInventoryModal" style="z-index: -1;"></div>
-                    <div class="modal-dialog modal-dialog-centered modal-lg">
-                        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-                            <div class="modal-header border-bottom pb-3 pt-3 px-4 d-flex justify-content-between align-items-center">
-                                <h5 class="modal-title fw-bold text-body">
-                                    <i class="fa-solid fa-box-open me-2" style="color:#8b5cf6"></i>
-                                    <span>{{ $t('players.inventory') }}: {{ inventoryPlayer }}</span>
-                                </h5>
-                                <button type="button" class="btn-close" @click="closeInventoryModal"></button>
-                            </div>
-                            <div class="modal-body px-4 py-3">
-                                <div v-if="inventoryLoading" class="text-center py-5">
-                                    <div class="spinner-border text-primary" role="status"></div>
-                                    <div class="mt-2 text-muted">{{ $t('common.loading') }}</div>
-                                </div>
-                                <div v-else-if="inventoryError" class="text-center py-5">
-                                    <i class="fa-solid fa-exclamation-triangle fa-2x text-warning mb-2"></i>
-                                    <div class="text-muted">{{ inventoryError }}</div>
-                                </div>
-                                <div v-else>
-                                    <!-- 主背包 (槽位 9-35, 共27格) -->
-                                    <div class="mb-2">
-                                        <div class="small text-muted mb-1">{{ $t('players.inventory') || '背包' }}</div>
-                                        <div class="inventory-grid">
-                                            <div v-for="slot in 27" :key="'main'+slot" class="inventory-slot" :class="{'has-item': getInventoryItem(8 + slot)}">
-                                                <div v-if="getInventoryItem(8 + slot)" class="inventory-item">
-                                                    <img v-if="getItemIcon(getInventoryItem(8 + slot).id)" :src="getItemIcon(getInventoryItem(8 + slot).id)" class="inventory-item-img">
-                                                    <span v-else class="inventory-item-text">{{ getInventoryItem(8 + slot).id.replace('minecraft:', '').split('_')[0][0].toUpperCase() }}</span>
-                                                    <span v-if="getInventoryItem(8 + slot).count > 1" class="inventory-item-count">{{ getInventoryItem(8 + slot).count }}</span>
-                                                    <div class="inventory-item-tooltip">
-                                                        <div class="fw-bold">{{ getItemName(getInventoryItem(8 + slot)) }}</div>
-                                                        <div class="small text-muted">{{ getInventoryItem(8 + slot).id }}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- 快捷栏 (槽位 0-8) -->
-                                    <div>
-                                        <div class="small text-muted mb-1">{{ $t('players.hotbar') || '快捷栏' }}</div>
-                                        <div class="inventory-grid hotbar-grid">
-                                            <div v-for="slot in 9" :key="'hotbar'+slot" class="inventory-slot" :class="{'has-item': getInventoryItem(slot - 1)}">
-                                                <div v-if="getInventoryItem(slot - 1)" class="inventory-item">
-                                                    <img v-if="getItemIcon(getInventoryItem(slot - 1).id)" :src="getItemIcon(getInventoryItem(slot - 1).id)" class="inventory-item-img">
-                                                    <span v-else class="inventory-item-text">{{ getInventoryItem(slot - 1).id.replace('minecraft:', '').split('_')[0][0].toUpperCase() }}</span>
-                                                    <span v-if="getInventoryItem(slot - 1).count > 1" class="inventory-item-count">{{ getInventoryItem(slot - 1).count }}</span>
-                                                    <div class="inventory-item-tooltip">
-                                                        <div class="fw-bold">{{ getItemName(getInventoryItem(slot - 1)) }}</div>
-                                                        <div class="small text-muted">{{ getInventoryItem(slot - 1).id }}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- 统计信息 -->
-                                    <div class="mt-3 d-flex justify-content-between align-items-center text-muted small">
-                                        <span>{{ $t('players.total_items') }}: {{ inventoryItems.length }}</span>
-                                        <span>{{ $t('players.unique_items') }}: {{ new Set(inventoryItems.map(i => i.id)).size }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer border-top pt-3 px-4 pb-4">
-                                <button class="btn btn-outline-secondary rounded-pill px-4" @click="closeInventoryModal">{{ $t('common.close') }}</button>
-                                <button class="btn btn-outline-danger rounded-pill px-4" @click="confirmClearInventory" v-if="!inventoryLoading && inventoryItems.length > 0">
-                                    <i class="fa-solid fa-trash me-1"></i> {{ $t('players.clear_inv') }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </Transition>
-        </Teleport>
     </div>
     `,
     setup() {
@@ -710,6 +749,8 @@ export default {
         const onlineFilter = ref('');
         const listFilter = ref('');
         const activeMenu = ref(null);
+        const menuPos = ref({ top: 0, right: 0 });
+        const mobileActionPlayer = ref(null);
         const playerPings = ref({});
         const { proxy } = getCurrentInstance();
         const $t = proxy.$t;
@@ -730,14 +771,6 @@ export default {
         const effectDuration = ref(600);
         const effectLevel = ref(1);
         const hideParticles = ref(false);
-
-        // 玩家背包查看状态
-        const showInventoryModal = ref(false);
-        const inventoryPlayer = ref('');
-        const inventoryItems = ref([]);
-        const inventoryLoading = ref(false);
-        const inventoryError = ref(null);
-        const inventoryPlayerUuid = ref('');
 
         // 物品 ID 到图片编号的映射（从 items.json 加载）
         const itemIconMap = ref(new Map());
@@ -834,64 +867,6 @@ export default {
             }
         };
 
-        // 玩家背包查看
-        const openInventory = async (player) => {
-            inventoryPlayer.value = player;
-            inventoryItems.value = [];
-            inventoryError.value = null;
-            inventoryLoading.value = true;
-            showInventoryModal.value = true;
-            activeMenu.value = null;
-            inventoryPlayerUuid.value = '';
-
-            // Ensure items.json is loaded before fetching inventory
-            if (!itemsLoaded) await loadCreativeItems();
-
-            try {
-                const res = await api.get(`/api/server/player-inventory/${player}`);
-                inventoryItems.value = res.data.items || [];
-                inventoryPlayerUuid.value = res.data.uuid || '';
-                console.log('[Inventory] Loaded items:', inventoryItems.value.length);
-                console.log('[Inventory] All slots:', inventoryItems.value.map(i => `slot=${i.slot} id=${i.id}`));
-            } catch (e) {
-                inventoryError.value = e.response?.data?.error || e.message || 'Failed to load inventory';
-            } finally {
-                inventoryLoading.value = false;
-            }
-        };
-
-        const closeInventoryModal = () => {
-            showInventoryModal.value = false;
-        };
-
-        const getInventoryItem = (slot) => {
-            return inventoryItems.value.find(item => Number(item.slot) === slot);
-        };
-
-        const getItemIcon = (itemId) => {
-            const no = itemIconMap.value.get(itemId);
-            if (no) return `/img/items/${no}.png`;
-            // No mapping found - return null to indicate fallback text icon
-            return null;
-        };
-
-        const getItemName = (item) => {
-            // Try to find name from creativeItems
-            const found = creativeItems.value.find(i => i.id === item.id);
-            if (found) {
-                return store.lang === 'zh' ? found.namecn : found.nameen;
-            }
-            // Fallback to ID
-            return item.id.replace('minecraft:', '').replace(/_/g, ' ');
-        };
-
-        const confirmClearInventory = async () => {
-            if (!inventoryPlayer.value) return;
-            await sendCmd(`clear ${inventoryPlayer.value}`);
-            showInventoryModal.value = false;
-            setTimeout(() => openInventory(inventoryPlayer.value), 500);
-        };
-
         // 创造模式过滤
         const filteredItems = computed(() => {
             const query = itemSearchQuery.value.toLowerCase().trim();
@@ -924,12 +899,47 @@ export default {
             return 'text-danger';
         };
 
-        const toggleMenu = (player) => {
-            activeMenu.value = activeMenu.value === player ? null : player;
+        const toggleMenu = (player, e) => {
+            if (window.innerWidth < 768) {
+                mobileActionPlayer.value = player;
+                activeMenu.value = null;
+            } else {
+                if (activeMenu.value === player) {
+                    activeMenu.value = null;
+                } else {
+                    activeMenu.value = player;
+                    if (e && e.currentTarget) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const estimatedHeight = 440;
+                        let top = rect.bottom + 4;
+                        if (top + estimatedHeight > window.innerHeight && rect.top > estimatedHeight) {
+                            top = Math.max(10, rect.top - estimatedHeight - 4);
+                        } else if (top + estimatedHeight > window.innerHeight) {
+                            top = Math.max(10, window.innerHeight - estimatedHeight - 16);
+                        }
+                        menuPos.value = {
+                            top: Math.round(top),
+                            right: Math.round(Math.max(10, window.innerWidth - rect.right))
+                        };
+                    }
+                }
+            }
+        };
+
+        const handleMobileAction = (fn) => {
+            mobileActionPlayer.value = null;
+            setTimeout(() => {
+                if (typeof fn === 'function') {
+                    fn();
+                }
+            }, 120);
         };
 
         const closeMenu = (e) => {
-            if (activeMenu.value && !e.target.closest('.dropdown')) {
+            if (activeMenu.value) {
+                if (e && (e.target.closest('.player-more-btn') || e.target.closest('.player-dropdown-menu'))) {
+                    return;
+                }
                 activeMenu.value = null;
             }
         };
@@ -1211,6 +1221,8 @@ export default {
             loadLists();
             loadCreativeItems();
             document.addEventListener('click', closeMenu);
+            window.addEventListener('scroll', closeMenu, { passive: true });
+            window.addEventListener('resize', closeMenu, { passive: true });
             fetchPlayerPings();
             pingInterval = setInterval(() => {
                 loadOnlinePlayers();
@@ -1437,6 +1449,8 @@ export default {
 
         onUnmounted(() => {
             document.removeEventListener('click', closeMenu);
+            window.removeEventListener('scroll', closeMenu);
+            window.removeEventListener('resize', closeMenu);
             if (pingInterval) clearInterval(pingInterval);
             const style = document.getElementById('mc-creative-inv-style');
             if (style) style.remove();
@@ -1447,7 +1461,8 @@ export default {
             sendCmd, askTeleport, askGamemode, askGiveItem, askEffect, askExperience,
             askTitle, askMessage, askWhitelist, askOp, askDeop, askBan, askBanIp,
             onlineFilter, listFilter, filteredOnline, filteredList,
-            activeMenu, toggleMenu, playerPings, pingClass,
+            activeMenu, toggleMenu, menuPos, playerPings, pingClass,
+            mobileActionPlayer, handleMobileAction,
             
             // 创造背包相关返回
             showGiveModal, targetPlayer, selectedItem, giveQuantity, itemSearchQuery,
@@ -1459,12 +1474,7 @@ export default {
 
             // 状态效果相关返回
             STATUS_EFFECTS, showEffectModal, effectTargetPlayer, selectedEffect, effectDuration,
-            effectLevel, hideParticles, closeEffectModal, confirmGiveEffect, clearAllEffects,
-
-            // 玩家背包查看相关返回
-            showInventoryModal, inventoryPlayer, inventoryItems, inventoryLoading, inventoryError,
-            openInventory, closeInventoryModal, getInventoryItem, getItemIcon, getItemName, confirmClearInventory,
-            inventoryPlayerUuid
+            effectLevel, hideParticles, closeEffectModal, confirmGiveEffect, clearAllEffects
         };
     }
 };

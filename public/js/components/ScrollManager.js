@@ -8,11 +8,8 @@ export default {
     template: `
     <div class="animate-fade">
         <!-- 页面顶部 Header -->
-        <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
             <div class="d-flex align-items-center">
-                <button @click="store.view = store.prevView || 'dashboard'" class="btn-back me-3">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
                 <div>
                     <h3 class="m-0 fw-bold d-flex align-items-center">
                         <i class="fa-solid fa-scroll me-2 me-md-3 text-primary" style="color: #8b5cf6 !important;"></i>
@@ -133,9 +130,9 @@ export default {
             <Transition name="modal-fade">
                 <div class="modal fade show" v-if="showInstallModal" style="display: block; z-index: 1050;">
                     <div class="modal-backdrop fade show" @click="closeInstallModal" style="z-index: -1;"></div>
-                    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable my-3 mx-auto px-2 px-md-0" style="max-width: 680px;">
                         <div class="modal-content border-0 shadow-lg overflow-hidden" style="border-radius: 20px; background-color: var(--c-surface); color: var(--c-text-primary);">
-                            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                            <div class="modal-header border-0 pb-0 pt-3 pt-md-4 px-3 px-md-4">
                                 <h5 class="modal-title fw-bold d-flex align-items-center">
                                     <i class="fa-solid me-2" :class="analysisResult ? (analysisResult.isUpdate ? 'fa-arrows-rotate text-info' : 'fa-check-circle text-primary') : (!disclaimerAccepted ? 'fa-shield-halved text-warning' : 'fa-plus-circle text-primary')" style="color: #8b5cf6 !important;"></i>
                                     <span v-if="!disclaimerAccepted">{{ $t('scrolls.disclaimer_title') }}</span>
@@ -144,7 +141,7 @@ export default {
                                 </h5>
                                 <button type="button" class="btn-close" @click="closeInstallModal"></button>
                             </div>
-                            <div class="modal-body px-4 py-4">
+                            <div class="modal-body px-3 px-md-4 py-3 py-md-4">
                                 <!-- 阶段 1: 免责协议 -->
                                 <div v-if="!disclaimerAccepted" class="text-center py-3">
                                     <div class="rounded-3 d-inline-flex align-items-center justify-content-center bg-warning-subtle text-warning mb-3" style="width: 64px; height: 64px; border-radius: 16px !important;">
@@ -258,7 +255,7 @@ export default {
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                            <div class="modal-footer border-0 pt-0 pb-3 pb-md-4 px-3 px-md-4">
                                 <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @click="closeInstallModal" :disabled="installing || analyzing">
                                     {{ $t('common.cancel') }}
                                 </button>
@@ -298,16 +295,16 @@ export default {
             <Transition name="modal-fade">
                 <div class="modal fade show" v-if="showConfigModal" style="display: block; z-index: 1050;">
                     <div class="modal-backdrop fade show" @click="showConfigModal = false" style="z-index: -1;"></div>
-                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable my-3 mx-auto px-2 px-md-0" style="max-width: 540px;">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; background-color: var(--c-surface); color: var(--c-text-primary);">
-                            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                            <div class="modal-header border-0 pb-0 pt-3 pt-md-4 px-3 px-md-4">
                                 <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
                                     <i class="fa-solid fa-sliders" style="color: #8b5cf6;"></i>
                                     <span>{{ $t('scrolls.settings') || '配置卷轴' }}: {{ localize(currentScroll?.name) }}</span>
                                 </h5>
                                 <button type="button" class="btn-close" @click="showConfigModal = false"></button>
                             </div>
-                            <div class="modal-body px-4 py-4">
+                            <div class="modal-body px-3 px-md-4 py-3 py-md-4">
                                 <form @submit.prevent="saveScrollConfig">
                                     <div v-for="field in currentSchemaFields" :key="field.key" class="mb-3">
                                         <label class="form-label small fw-bold mb-1">{{ field.title || field.label || field.key }}</label>

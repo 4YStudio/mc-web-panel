@@ -1321,16 +1321,16 @@ export default {
             </div>
 
             <!-- System Stats Overview -->
-            <div v-if="store.consoleInfoPosition === 'top'" class="dashboard-grid mb-3 flex-shrink-0">
-                <div class="stagger-item">
-                    <div class="stat-card h-100">
+            <div v-if="store.consoleInfoPosition === 'top'" class="dashboard-grid mb-3 flex-shrink-0 w-100" style="min-width: 0;">
+                <div class="stagger-item w-100" style="min-width: 0;">
+                    <div class="stat-card h-100 w-100" style="min-width: 0;">
                         <div class="stat-card-header">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-server me-2"></i>{{ $t('dashboard.server_info') }}</h6>
                                  <span class="badge rounded-pill font-monospace" :class="dashboardStatusClass">{{ dashboardStatusText }}</span>
                             </div>
                         </div>
-                        <div class="stat-card-body">
+                        <div class="stat-card-body" style="min-width: 0;">
                               <div v-if="store.stats && store.stats.mc" class="d-flex align-items-end mb-2">
                                   <div class="fw-bold me-2" style="font-size: 2rem; line-height: 1;">{{ store.stats.mc.online }}</div>
                                   <div class="text-muted mb-1 small">/ {{ store.stats.mc.maxPlayers }} {{ $t('dashboard.online_players') }}</div>
@@ -1350,8 +1350,8 @@ export default {
                         </div>
                     </div>
                 </div>
-                <div class="stagger-item" style="animation-delay: 0.1s;">
-                     <div class="stat-card h-100">
+                <div class="stagger-item w-100" style="animation-delay: 0.1s; min-width: 0;">
+                     <div class="stat-card h-100 w-100" style="min-width: 0;">
                         <div class="stat-card-header">
                             <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
                         </div>
@@ -1392,36 +1392,38 @@ export default {
                     <button class="btn btn-primary fw-bold" @click="sendCommand">{{ $t('dashboard.send') }}</button>
                 </div>
 
-                <div v-if="showCmdPanel" class="cmd-panel mt-2">
-                    <div class="d-flex gap-2 mb-2 align-items-center flex-wrap">
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="cursor:pointer" :class="{'bg-primary text-white': cmdCategory === 'all'}" @click="cmdCategory='all'">{{ $t('dashboard.cmd_all') }}</span>
-                        <span v-for="cat in cmdCategories" :key="cat.key" class="badge border" style="cursor:pointer" :class="cmdCategory===cat.key ? 'bg-'+cat.color+' text-white' : 'bg-body-tertiary text-'+cat.color" @click="cmdCategory=cat.key">
-                            <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
-                        </span>
-                        <div class="input-group input-group-sm ms-auto" style="max-width:200px">
-                            <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted" style="font-size:0.7rem"></i></span>
-                            <input type="text" class="form-control border-start-0" :placeholder="$t('dashboard.cmd_search')" v-model="cmdSearch" style="font-size:0.8rem">
+                <Transition name="cmd-panel-slide">
+                    <div v-if="showCmdPanel" class="cmd-panel mt-2">
+                        <div class="d-flex gap-2 mb-2 align-items-center flex-wrap">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="cursor:pointer" :class="{'bg-primary text-white': cmdCategory === 'all'}" @click="cmdCategory='all'">{{ $t('dashboard.cmd_all') }}</span>
+                            <span v-for="cat in cmdCategories" :key="cat.key" class="badge border" style="cursor:pointer" :class="cmdCategory===cat.key ? 'bg-'+cat.color+' text-white' : 'bg-body-tertiary text-'+cat.color" @click="cmdCategory=cat.key">
+                                <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
+                            </span>
+                            <div class="input-group input-group-sm ms-auto" style="max-width:200px">
+                                <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted" style="font-size:0.7rem"></i></span>
+                                <input type="text" class="form-control border-start-0" :placeholder="$t('dashboard.cmd_search')" v-model="cmdSearch" style="font-size:0.8rem">
+                            </div>
+                        </div>
+                        <div class="cmd-list">
+                            <div v-for="cmd in filteredCommands" :key="cmd.name" class="cmd-item d-flex align-items-start gap-2 py-1 px-2 rounded" @click="useCommand(cmd)">
+                                <code class="text-primary flex-shrink-0" style="min-width:120px;font-size:0.75rem">{{ cmd.name }}</code>
+                                <span class="small text-muted flex-grow-1" style="font-size:0.7rem">{{ $t('dashboard.cmd_' + cmd.desc) }}</span>
+                                <i v-if="cmd.quick" class="fa-solid fa-bolt text-warning flex-shrink-0" style="font-size:0.65rem" :title="$t('dashboard.cmd_quick')"></i>
+                            </div>
+                            <div v-if="filteredCommands.length === 0" class="text-center text-muted py-2 small">
+                                {{ $t('dashboard.cmd_no_result') }}
+                            </div>
+                        </div>
+                        <div class="mt-2 border-top pt-2" v-if="quickCommands.length > 0">
+                            <div class="small fw-bold text-muted mb-1"><i class="fa-solid fa-bolt me-1 text-warning"></i>{{ $t('dashboard.cmd_quick_title') }}</div>
+                            <div class="d-flex flex-wrap gap-1">
+                                <button v-for="cmd in quickCommands" :key="cmd.name" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem" @click="sendQuickCommand(cmd.template)">
+                                    {{ cmd.name }}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="cmd-list">
-                        <div v-for="cmd in filteredCommands" :key="cmd.name" class="cmd-item d-flex align-items-start gap-2 py-1 px-2 rounded" @click="useCommand(cmd)">
-                            <code class="text-primary flex-shrink-0" style="min-width:120px;font-size:0.75rem">{{ cmd.name }}</code>
-                            <span class="small text-muted flex-grow-1" style="font-size:0.7rem">{{ $t('dashboard.cmd_' + cmd.desc) }}</span>
-                            <i v-if="cmd.quick" class="fa-solid fa-bolt text-warning flex-shrink-0" style="font-size:0.65rem" :title="$t('dashboard.cmd_quick')"></i>
-                        </div>
-                        <div v-if="filteredCommands.length === 0" class="text-center text-muted py-2 small">
-                            {{ $t('dashboard.cmd_no_result') }}
-                        </div>
-                    </div>
-                    <div class="mt-2 border-top pt-2" v-if="quickCommands.length > 0">
-                        <div class="small fw-bold text-muted mb-1"><i class="fa-solid fa-bolt me-1 text-warning"></i>{{ $t('dashboard.cmd_quick_title') }}</div>
-                        <div class="d-flex flex-wrap gap-1">
-                            <button v-for="cmd in quickCommands" :key="cmd.name" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem" @click="sendQuickCommand(cmd.template)">
-                                {{ cmd.name }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                </Transition>
             </div>
         </div>
 

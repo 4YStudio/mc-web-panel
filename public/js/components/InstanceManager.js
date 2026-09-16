@@ -130,8 +130,8 @@ export default {
 
         <div class="row g-3 g-md-4 transition-container">
             <div v-for="(inst, idx) in filteredInstances" :key="inst.id" class="col-md-6 col-lg-4 col-xl-3 animate-in" :style="{'animation-delay': (idx * 0.05) + 's'}">
-                <div class="card h-100 instance-card position-relative" :class="{'instance-card-active': store.currentInstanceId === inst.id}">
-                    <div class="card-body p-4 d-flex flex-column h-100">
+                <div class="card h-100 instance-card position-relative" tabindex="0" :class="{'instance-card-active': store.currentInstanceId === inst.id}">
+                    <div class="card-body p-3 p-md-4 d-flex flex-column h-100">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div class="d-flex align-items-center">
                                 <div class="me-3 position-relative" style="width: 44px; height: 44px;">
@@ -158,7 +158,7 @@ export default {
                             </div>
                         </div>
 
-                        <div class="small mb-4">
+                        <div class="small mb-3 mb-md-4">
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="text-muted">{{ $t('dashboard.online_players') }}</span>
                                 <span class="fw-bold">{{ inst.onlinePlayers || 0 }} / {{ inst.maxPlayers || 20 }}</span>
@@ -173,16 +173,16 @@ export default {
                         <div class="card-hover-swap-container mt-auto position-relative" style="height: 38px;">
                             <!-- Info Panel (visible when NOT hovered) -->
                             <div class="card-info-view w-100 h-100 d-flex align-items-center">
-                                <div class="d-flex flex-wrap gap-2">
-                                    <span class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">
+                                <div class="d-flex flex-wrap gap-1 gap-md-2 w-100">
+                                    <span class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-1.5 px-md-2 py-1 text-nowrap" style="font-size: 0.7rem; border-radius: 6px;">
                                         <i class="fa-solid fa-cube text-primary me-1"></i>
                                         {{ formatLoader(inst.loaderType) }}
                                     </span>
-                                    <span class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">
+                                    <span class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-1.5 px-md-2 py-1 text-nowrap" style="font-size: 0.7rem; border-radius: 6px;">
                                         <i class="fa-brands fa-java text-warning me-1"></i>
                                         {{ getJavaLabel(inst.javaPath) }}
                                     </span>
-                                    <span v-if="inst.port" class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">
+                                    <span v-if="inst.port" class="badge bg-light bg-opacity-10 text-body border border-secondary border-opacity-10 px-1.5 px-md-2 py-1 text-nowrap" style="font-size: 0.7rem; border-radius: 6px;">
                                         <i class="fa-solid fa-network-wired text-info me-1"></i>
                                         {{ inst.port }}
                                     </span>

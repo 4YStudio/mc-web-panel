@@ -6,27 +6,27 @@ import { showToast, openModal } from '../utils.js';
 export default {
     template: `
     <div class="animate-fade">
-        <div class="page-header d-flex justify-content-between align-items-center mb-4">
-            <div class="d-flex align-items-center">
-                <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-3">
+        <div class="page-header d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div class="d-flex align-items-center flex-shrink-0">
+                <button @click="store.view = store.prevView || 'instance-manager'" class="btn-back me-2 me-md-3">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
                 <div>
-                    <h3 class="m-0 fw-bold d-flex align-items-center">
+                    <h3 class="m-0 fw-bold d-flex align-items-center fs-5 fs-md-3 text-nowrap">
                         <i class="fa-solid fa-puzzle-piece me-2 me-md-3 text-primary"></i>
                         <span>{{ $t('plugins.title') }}</span>
                     </h3>
                     <p class="text-muted mb-0 mt-1 small d-none d-md-block">{{ $t('plugins.description') }}</p>
                 </div>
             </div>
-            <div class="d-flex gap-2">
-                <a href="https://4ystudio.github.io/mc-web-panel/market.html" target="_blank" class="btn btn-outline-info rounded-pill px-3 px-md-4">
+            <div class="d-flex gap-1.5 gap-md-2 align-items-center ms-auto">
+                <a href="https://4ystudio.github.io/mc-web-panel/market.html" target="_blank" class="btn btn-outline-info rounded-pill px-2.5 px-md-4 py-1.5 py-md-2" :title="$t('plugins.market_button')">
                     <i class="fa-solid fa-store"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.market_button') }}</span>
                 </a>
-                <a href="https://4ystudio.github.io/mc-web-panel/" target="_blank" class="btn btn-outline-primary rounded-pill px-3 px-md-4">
+                <a href="https://4ystudio.github.io/mc-web-panel/" target="_blank" class="btn btn-outline-primary rounded-pill px-2.5 px-md-4 py-1.5 py-md-2" :title="$t('plugins.guide_button')">
                     <i class="fa-solid fa-book"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.guide_button') }}</span>
                 </a>
-                <button class="btn btn-primary rounded-pill px-3 px-md-4 fw-bold shadow-sm" @click="openInstallModal">
+                <button class="btn btn-primary rounded-pill px-2.5 px-md-4 py-1.5 py-md-2 fw-bold shadow-sm" @click="openInstallModal" :title="$t('plugins.install')">
                     <i class="fa-solid fa-plus-circle"></i><span class="d-none d-md-inline ms-1">{{ $t('plugins.install') }}</span>
                 </button>
             </div>
@@ -150,7 +150,7 @@ export default {
                                 </h5>
                                 <button type="button" class="btn-close" @click="closeInstallModal"></button>
                             </div>
-                            <div class="modal-body px-4 py-4">
+                            <div class="modal-body p-3 p-md-4">
                                 <div v-if="showUninstallConfirm" class="text-center py-2">
                                     <div class="rounded-circle bg-danger-subtle text-danger mx-auto d-flex align-items-center justify-content-center mb-4" style="width: 80px; height: 80px;">
                                         <i class="fa-solid fa-trash-can" style="font-size: 2.2rem;"></i>
@@ -179,20 +179,20 @@ export default {
                                     </div>
                                 </div>
                                 <div v-else-if="analysisResult">
-                                    <div class="plugin-preview-card p-4 rounded-4 mb-3" :class="analysisResult.isUpdate ? 'bg-info-subtle border-info-subtle' : 'bg-primary-subtle border-primary-subtle'" style="border: 1px solid;">
-                                        <div class="d-flex align-items-start gap-3">
-                                            <div class="bg-white rounded-3 p-3 shadow-sm">
-                                                <i class="fa-solid fa-puzzle-piece text-primary" style="font-size: 2rem;"></i>
+                                    <div class="plugin-preview-card p-3 p-md-4 rounded-4 mb-3" :class="analysisResult.isUpdate ? 'bg-info-subtle border-info-subtle' : 'bg-primary-subtle border-primary-subtle'" style="border: 1px solid;">
+                                        <div class="d-flex align-items-start gap-2.5 gap-md-3">
+                                            <div class="rounded-3 p-2 p-md-3 shadow-sm d-flex align-items-center justify-content-center flex-shrink-0 bg-body border border-secondary border-opacity-10" style="width: 48px; height: 48px;">
+                                                <i class="fa-solid fa-puzzle-piece text-primary fs-3"></i>
                                             </div>
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center gap-2 mb-1">
-                                                    <h5 class="fw-bold mb-0">{{ localize(analysisResult.manifest?.name) }}</h5>
-                                                    <span class="badge rounded-pill" :class="analysisResult.isUpdate ? 'bg-info' : 'bg-primary'">
+                                            <div class="flex-grow-1" style="min-width: 0;">
+                                                <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                                    <h5 class="fw-bold mb-0 text-break">{{ localize(analysisResult.manifest?.name) }}</h5>
+                                                    <span class="badge rounded-pill flex-shrink-0" :class="analysisResult.isUpdate ? 'bg-info' : 'bg-primary'">
                                                         {{ analysisResult.isUpdate ? $t('plugins.update_badge') : $t('plugins.new_badge') }}
                                                     </span>
                                                 </div>
-                                                <p class="text-muted small mb-2">{{ localize(analysisResult.manifest?.description) }}</p>
-                                                <div class="d-flex flex-wrap gap-3 small">
+                                                <p class="text-muted small mb-2 text-break">{{ localize(analysisResult.manifest?.description) }}</p>
+                                                <div class="d-flex flex-wrap gap-2 gap-md-3 small">
                                                     <span><i class="fa-solid fa-code-branch me-1 text-muted"></i>{{ analysisResult.manifest?.version }}</span>
                                                     <span><i class="fa-solid fa-user me-1 text-muted"></i>{{ analysisResult.manifest?.author }}</span>
                                                 </div>

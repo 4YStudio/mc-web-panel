@@ -2,6 +2,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, Teleport } 
 
 export default {
     name: 'CustomSelect',
+    inheritAttrs: false,
     props: {
         modelValue: {
             default: ''
@@ -226,7 +227,7 @@ export default {
         };
     },
     template: `
-    <div class="custom-select" :class="{ 'is-open': isOpen, 'is-disabled': disabled, ['custom-select-' + size]: size }" :style="width ? { width } : {}" ref="triggerRef" @keydown="handleKeydown" tabindex="0">
+    <div class="custom-select" v-bind="$attrs" :class="{ 'is-open': isOpen, 'is-disabled': disabled, ['custom-select-' + size]: size }" :style="[width ? { width } : {}, $attrs.style]" ref="triggerRef" @keydown="handleKeydown" tabindex="0">
         <div class="custom-select-trigger" @click="toggle" :class="{ 'has-value': hasValue }">
             <span class="custom-select-value" v-if="hasValue">{{ selectedLabel }}</span>
             <span class="custom-select-placeholder" v-else>{{ placeholder }}</span>
