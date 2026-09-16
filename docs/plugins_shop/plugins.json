@@ -11,7 +11,7 @@
             "http.public"
         ],
         "icon": "fa-flask",
-        "fileSize": 623166,
+        "fileSize": 4138,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-api-test.zip"
     },
     {
@@ -25,7 +25,7 @@
             "http"
         ],
         "icon": "fa-clock-rotate-left",
-        "fileSize": 13051,
+        "fileSize": 12863,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-backup-instance.zip"
     },
     {
@@ -43,7 +43,7 @@
             "*"
         ],
         "icon": "fa-shield-halved",
-        "fileSize": 16762,
+        "fileSize": 16574,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-backup-mod.zip"
     },
     {
@@ -57,7 +57,7 @@
             "http"
         ],
         "icon": "fa-box-archive",
-        "fileSize": 9171,
+        "fileSize": 9344,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-backup.zip"
     },
     {
@@ -71,7 +71,7 @@
             "http"
         ],
         "icon": "fa-user-shield",
-        "fileSize": 6318761,
+        "fileSize": 12106,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-easyauth.zip"
     },
     {
@@ -86,7 +86,7 @@
             "process"
         ],
         "icon": "fa-network-wired",
-        "fileSize": 26742,
+        "fileSize": 26376,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-frp.zip"
     },
     {
@@ -102,7 +102,7 @@
             "command"
         ],
         "icon": "fa-map-location-dot",
-        "fileSize": 4082517,
+        "fileSize": 75143,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-map.zip"
     },
     {
@@ -118,7 +118,7 @@
             "command"
         ],
         "icon": "fa-cloud-arrow-down",
-        "fileSize": 10024,
+        "fileSize": 9928,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-modrinth.zip"
     },
     {
@@ -130,7 +130,7 @@
         "category": "tools",
         "permissions": [],
         "icon": "fa-chart-line",
-        "fileSize": 2498,
+        "fileSize": 2438,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-system-status.zip"
     },
     {
@@ -142,7 +142,7 @@
         "category": "tools",
         "permissions": [],
         "icon": "fa-microphone",
-        "fileSize": 4827,
+        "fileSize": 4731,
         "downloadUrl": "./plugins_shop/mc-panel-plugin-voicechat.zip"
     }
 ]

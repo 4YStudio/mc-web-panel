@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "build": "node build.js",
+    "pack:plugins": "node scripts/pack-plugins.js",
     "build:market": "node docs/plugins_shop/update.js && node docs/scrolls_shop/update.js",
     "build:scrolls-shop": "node docs/scrolls_shop/update.js"
   },
