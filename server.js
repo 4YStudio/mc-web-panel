@@ -26,7 +26,7 @@ const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 
-const APP_VERSION = '2.4.4';
+const APP_VERSION = '2.4.6';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -325,6 +325,7 @@ const DEFAULT_CONFIG = {
     passwordSalt: '',
     secret: '',
     isSetup: false,
+    host: '0.0.0.0',
     port: 3000,
     defaultLang: 'zh',
     theme: 'auto',
@@ -411,6 +412,9 @@ function generateCaptcha() {
 }
 
 let appConfig = fs.existsSync(CONFIG_FILE) ? { ...DEFAULT_CONFIG, ...fs.readJsonSync(CONFIG_FILE) } : { ...DEFAULT_CONFIG };
+if (!appConfig.host) {
+    appConfig.host = '0.0.0.0';
+}
 
 // 生成 sessionSecret 和 cliSecret
 if (!appConfig.sessionSecret) {
@@ -421,7 +425,8 @@ if (!appConfig.cliSecret) {
 }
 
 // 立即保存配置文件
-if (!fs.existsSync(CONFIG_FILE) || !appConfig.cliSecret) {
+const fileConfig = fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE) : null;
+if (!fileConfig || !appConfig.cliSecret || !fileConfig.host) {
     fs.ensureDirSync(DATA_DIR);
     fs.writeJsonSync(CONFIG_FILE, appConfig, { spaces: 2 });
 }
@@ -557,6 +562,73 @@ const getUserArgs = () => {
     });
 };
 
+// Helper: 从命令行参数中解析 --key 或 --key=value
+const getCliOption = (name) => {
+    for (let i = 0; i < process.argv.length; i++) {
+        const arg = process.argv[i];
+        if (arg === `--${name}` && i + 1 < process.argv.length) {
+            return process.argv[i + 1];
+        }
+        if (arg.startsWith(`--${name}=`)) {
+            return arg.slice(name.length + 3);
+        }
+    }
+    return null;
+};
+
+// Helper: 获取本机活跃局域网 IPv4 地址
+const getNetworkAddresses = () => {
+    const interfaces = os.networkInterfaces();
+    const addresses = [];
+    try {
+        for (const name of Object.keys(interfaces)) {
+            for (const net of interfaces[name]) {
+                if (net.family === 'IPv4' && !net.internal) {
+                    addresses.push(net.address);
+                }
+            }
+        }
+    } catch (e) { }
+    return addresses;
+};
+
+// Helper: 打印包含详细访问地址与修改指引的启动横幅
+const printStartupBanner = ({ host, port, pid = null, isDaemon = false }) => {
+    const lanIps = getNetworkAddresses();
+    const appName = APP_EXECUTABLE ? path.basename(APP_EXECUTABLE) : 'mc-web-panel';
+
+    console.log('');
+    if (isDaemon && pid) {
+        console.log(`  ✅ 面板已在后台启动 (PID: ${pid})`);
+    } else {
+        console.log(`  ☘️  MC Web Panel v${APP_VERSION}`);
+    }
+    console.log('');
+    console.log(`  ➜  本地访问:  http://localhost:${port}`);
+    if (host === '127.0.0.1') {
+        console.log(`  ➜  监听接口:  127.0.0.1:${port}`);
+        console.log('');
+        console.log('  ⚠️  [安全提示] 当前仅监听 127.0.0.1 本地回环地址，外部设备无法直接访问。');
+        console.log('     如需允许局域网或远程访问，请将 host 修改为 0.0.0.0');
+    } else {
+        if (lanIps.length > 0) {
+            for (const ip of lanIps) {
+                console.log(`  ➜  网络访问:  http://${ip}:${port}`);
+            }
+        }
+        console.log(`  ➜  监听接口:  ${host || '0.0.0.0'}:${port}`);
+    }
+    console.log('');
+    console.log('  ⚙️  [配置指引] 如需修改监听地址或端口：');
+    console.log(`  • 配置文件:   ${CONFIG_FILE} (修改 "host" 与 "port" 字段)`);
+    console.log('  • Web 界面:   登录面板 -> [面板设置] -> [网络与服务配置]');
+    console.log(`  • 快捷命令:   ./${appName} host <IP> [端口]  (例如: ./${appName} host 0.0.0.0 3000)`);
+    if (APP_EXECUTABLE) {
+        console.log(`  • 停止服务:   ./${appName} stop`);
+    }
+    console.log('');
+};
+
 // Helper: 检查 PID 是否存活
 const isPidAlive = (pid) => {
     try { process.kill(pid, 0); return true; } catch (e) { return false; }
@@ -588,20 +660,61 @@ const cleanPid = () => {
 const userArgs = getUserArgs();
 const command = (userArgs[0] || '').toLowerCase();
 
-// 不需要启动面板的命令：host / reset / stop / restart / help
-if (command === 'host') {
-    const newPort = parseInt(userArgs[1], 10);
-    if (!newPort || newPort < 1024 || newPort > 65535) {
-        console.log('用法: ./mc-web-panel host <端口号>');
-        console.log('端口范围: 1024 - 65535');
+// 不需要启动面板的命令：host / port / reset / stop / restart / help
+if (command === 'host' || command === 'port') {
+    const arg1 = userArgs[1];
+    const arg2 = userArgs[2];
+
+    if (!arg1) {
+        console.log('用法:');
+        console.log('  ./mc-web-panel host <IP地址> [端口]    (例如: ./mc-web-panel host 0.0.0.0 3000)');
+        console.log('  ./mc-web-panel host <端口>             (例如: ./mc-web-panel host 8080)');
+        console.log('  ./mc-web-panel port <端口>             (例如: ./mc-web-panel port 8080)');
         process.exit(1);
     }
+
     fs.ensureDirSync(DATA_DIR);
     let config = fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE) : {};
-    config.port = newPort;
+    let updatedHost = null;
+    let updatedPort = null;
+
+    const isPortNumber = (val) => {
+        const p = parseInt(val, 10);
+        return !isNaN(p) && String(p) === String(val).trim() && p >= 1 && p <= 65535;
+    };
+
+    if (command === 'port') {
+        if (!isPortNumber(arg1)) {
+            console.log('❌ 错误: 端口号必须为 1 - 65535 之间的整数');
+            process.exit(1);
+        }
+        updatedPort = parseInt(arg1, 10);
+    } else {
+        // command === 'host'
+        if (isPortNumber(arg1) && !arg2) {
+            updatedPort = parseInt(arg1, 10);
+        } else {
+            updatedHost = arg1.trim();
+            if (arg2) {
+                if (!isPortNumber(arg2)) {
+                    console.log('❌ 错误: 第二个参数指定端口号必须为 1 - 65535 之间的整数');
+                    process.exit(1);
+                }
+                updatedPort = parseInt(arg2, 10);
+            }
+        }
+    }
+
+    if (updatedHost) config.host = updatedHost;
+    if (updatedPort) config.port = updatedPort;
+
     fs.writeJsonSync(CONFIG_FILE, config, { spaces: 2 });
-    console.log(`✅ 面板端口已更改为 ${newPort}`);
-    console.log('如果面板正在运行，请执行 restart 使其生效。');
+
+    console.log('✅ 面板网络配置已更新:');
+    if (updatedHost) console.log(`   监听地址 (Host): ${config.host}`);
+    if (updatedPort) console.log(`   监听端口 (Port): ${config.port}`);
+    console.log(`   配置文件路径:    ${CONFIG_FILE}`);
+    console.log('提示：如果面板正在运行，请执行 restart 使其生效。');
     process.exit(0);
 }
 
@@ -710,15 +823,18 @@ if (command === 'stop') {
     console.log(`  ./${name} [命令] [选项]`);
     console.log('');
     console.log('命令:');
-    console.log('  start          启动面板（后台运行，默认）');
-    console.log('  stop           停止面板');
-    console.log('  restart        重启面板');
-    console.log('  host <端口>    修改面板端口');
-    console.log('  reset          重置 2FA 密钥');
-    console.log('  help           显示帮助');
+    console.log('  start                  启动面板（后台运行，默认）');
+    console.log('  stop                   停止面板');
+    console.log('  restart                重启面板');
+    console.log('  host <地址> [端口]      修改面板监听地址及端口 (例如: host 0.0.0.0 3000)');
+    console.log('  port <端口>             修改面板端口 (例如: port 3000)');
+    console.log('  reset                  重置 2FA 密钥');
+    console.log('  help                   显示帮助');
     console.log('');
     console.log('选项:');
-    console.log('  --force, -f    强制停止/重启（跳过运行中实例检查，可能导致数据丢失）');
+    console.log('  --host <地址>          指定监听地址 (优先级高于配置文件)');
+    console.log('  --port <端口>          指定监听端口 (优先级高于配置文件)');
+    console.log('  --force, -f            强制停止/重启（跳过运行中实例检查，可能导致数据丢失）');
     process.exit(0);
 } else {
     // start 命令（默认行为）
@@ -754,9 +870,10 @@ function doStart() {
         process.exit(1);
     });
     child.unref();
-    console.log(`✅ 面板已在后台启动 (PID: ${child.pid})`);
-    console.log(`   访问地址: http://localhost:${(fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE).port : null) || 3000}`);
-    console.log(`   停止: ./${path.basename(APP_EXECUTABLE)} stop`);
+    const cfg = fs.existsSync(CONFIG_FILE) ? fs.readJsonSync(CONFIG_FILE) : {};
+    const host = getCliOption('host') || process.env.HOST || process.env.PANEL_HOST || cfg.host || '0.0.0.0';
+    const port = parseInt(getCliOption('port') || process.env.PORT || cfg.port || 3000, 10);
+    printStartupBanner({ host, port, pid: child.pid, isDaemon: true });
     process.exit(0);
 }
 
@@ -2539,6 +2656,8 @@ threaded_server_support=false
         try {
             // 返回配置,但脱敏处理 secret
             const config = { ...appConfig };
+            config.host = config.host || '0.0.0.0';
+            config.lanIps = getNetworkAddresses();
             if (config.secret) {
                 config.secret = config.secret.substring(0, 4) + '****' + config.secret.substring(config.secret.length - 4);
             }
@@ -3186,9 +3305,17 @@ threaded_server_support=false
     // 2. 保存面板配置
     app.post('/api/panel/config', requirePermission('panel.settings'), async (req, res) => {
         try {
-            const { port, defaultLang, theme, consoleInfoPosition, loaderType, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance, webhooks } = req.body;
+            const { host, port, defaultLang, theme, consoleInfoPosition, loaderType, jarName, javaArgs, sessionTimeout, maxLogHistory, monitorInterval, javaPath, aiEndpoint, aiKey, aiModel, githubProxy, appearance, webhooks } = req.body;
 
             // 验证配置
+            if (host !== undefined) {
+                if (typeof host !== 'string' || !host.trim()) {
+                    return res.status(400).json({ error: '无效的监听地址' });
+                }
+                if (host.trim().length > 255) {
+                    return res.status(400).json({ error: '监听地址长度不能超过 255 个字符' });
+                }
+            }
             if (port && (port < 1024 || port > 65535)) {
                 return res.status(400).json({ error: '端口必须在 1024-65535 之间' });
             }
@@ -3217,6 +3344,7 @@ threaded_server_support=false
                 return res.status(400).json({ error: '无效的加载器类型' });
             }
 
+            if (host !== undefined) appConfig.host = host.trim();
             if (port !== undefined) appConfig.port = port;
             if (defaultLang !== undefined) appConfig.defaultLang = defaultLang;
             if (theme !== undefined) appConfig.theme = theme;
@@ -5701,6 +5829,9 @@ threaded_server_support=false
     });
 
 
-    const listenPort = process.env.PORT || appConfig.port || 3000;
-    server.listen(listenPort, () => console.log(`MC Panel v${APP_VERSION} running on http://localhost:${listenPort}`));
+    const listenHost = getCliOption('host') || process.env.HOST || process.env.PANEL_HOST || appConfig.host || '0.0.0.0';
+    const listenPort = parseInt(getCliOption('port') || process.env.PORT || appConfig.port || 3000, 10);
+    server.listen(listenPort, listenHost, () => {
+        printStartupBanner({ host: listenHost, port: listenPort });
+    });
 }

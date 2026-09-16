@@ -24,7 +24,8 @@ try {
 
 const cliSecret = config.cliSecret;
 const port = config.port || 3000;
-const apiBase = `http://localhost:${port}/api`;
+const host = (config.host && config.host !== '0.0.0.0' && config.host !== '::') ? config.host : '127.0.0.1';
+const apiBase = `http://${host}:${port}/api`;
 
 if (!cliSecret) {
     console.error('🔴 面板 cliSecret 未配置，请重新启动面板以自动生成。');

@@ -1,6 +1,6 @@
 {
   "name": "mc-web-panel",
-  "version": "2.4.5",
+  "version": "2.4.6",
   "description": "A web panel for Minecraft servers.",
   "main": "index.js",
   "bin": "server.js",
@@ -11,9 +11,21 @@
     "build:market": "node docs/plugins_shop/update.js && node docs/scrolls_shop/update.js",
     "build:scrolls-shop": "node docs/scrolls_shop/update.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "minecraft",
+    "minecraft-server",
+    "web-panel"
+  ],
+  "author": "4YStudio",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4YStudio/mc-web-panel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/4YStudio/mc-web-panel/issues"
+  },
+  "homepage": "https://github.com/4YStudio/mc-web-panel#readme",
   "type": "commonjs",
   "dependencies": {
     "adm-zip": "^0.5.16",

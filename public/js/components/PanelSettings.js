@@ -72,10 +72,22 @@ export default {
                                 <h6 class="settings-card-title">
                                     <i class="fa-solid fa-network-wired text-primary"></i>网络与服务配置
                                 </h6>
-                                <p class="settings-card-desc">面板对外服务的网络端口及控制台日志展示偏好</p>
+                                <p class="settings-card-desc">面板对外服务的网络接口、端口及控制台日志展示偏好</p>
                             </div>
                             <div class="settings-card-body">
                                 <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.host') }}</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fa-solid fa-server text-muted"></i></span>
+                                            <input type="text" class="form-control" v-model="config.host" placeholder="0.0.0.0">
+                                        </div>
+                                        <div class="d-flex gap-2 mt-1">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 small" style="font-size: 0.75rem;" @click="config.host = '0.0.0.0'">{{ $t('panel_settings.host_all') }}</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 small" style="font-size: 0.75rem;" @click="config.host = '127.0.0.1'">{{ $t('panel_settings.host_local') }}</button>
+                                        </div>
+                                        <div class="form-text small opacity-75 mt-1">{{ $t('panel_settings.host_desc') }}</div>
+                                    </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.port') }}</label>
                                         <div class="input-group">
@@ -83,6 +95,13 @@ export default {
                                             <input type="number" class="form-control" v-model.number="config.port" min="1024" max="65535">
                                         </div>
                                         <div class="form-text small opacity-75 mt-1">{{ $t('panel_settings.port_desc') }}</div>
+                                    </div>
+                                    <div class="col-12" v-if="lanIps && lanIps.length">
+                                        <div class="alert alert-light border py-2 px-3 mb-0 small text-muted d-flex align-items-center flex-wrap gap-2">
+                                            <i class="fa-solid fa-circle-info text-info"></i>
+                                            <span>{{ $t('panel_settings.lan_addresses') }}:</span>
+                                            <span v-for="ip in lanIps" :key="ip" class="badge bg-secondary bg-opacity-25 text-body font-monospace">http://{{ ip }}:{{ config.port }}</span>
+                                        </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.console_info_position') }}</label>
@@ -780,6 +799,7 @@ export default {
         });
 
         const config = reactive({
+            host: '0.0.0.0',
             port: 3000,
             defaultLang: 'zh',
             theme: 'auto',
@@ -797,6 +817,7 @@ export default {
             githubProxy: ''
         });
 
+        const lanIps = ref([]);
         const javaArgsText = ref('');
         const webhookText = ref('');
         const jars = ref([]);
@@ -938,6 +959,9 @@ export default {
                 loading.value = true;
                 const res = await api.get('/api/panel/config');
                 Object.assign(config, res.data);
+                if (res.data.lanIps) {
+                    lanIps.value = res.data.lanIps;
+                }
                 accountForm.username = res.data.username || 'admin';
                 javaArgsText.value = (config.javaArgs || []).join('\n');
                 webhookText.value = (config.webhooks || []).join('\n');
@@ -1371,7 +1395,7 @@ export default {
         });
 
         return {
-            store, loading, saving, testingAI, config, javaArgsText, webhookText, jars,
+            store, loading, saving, testingAI, config, lanIps, javaArgsText, webhookText, jars,
             saveConfig, testAI, reset2FA, disable2FA,
             updatingAccount, accountForm, updateAccount, showPass,
             appearance, activeAppearanceTab, appearanceTabs,

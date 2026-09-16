@@ -2,11 +2,11 @@
 
 # 🎮 MC Web Panel
 
-[![GitHub stars](https://img.shields.io/github/stars/your-username/mc-web-panel?style=social)](https://github.com/your-username/mc-web-panel/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/your-username/mc-web-panel?style=social)](https://github.com/your-username/mc-web-panel/network/members)
-[![GitHub license](https://img.shields.io/github/license/your-username/mc-web-panel)](https://github.com/your-username/mc-web-panel/blob/main/LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/your-username/mc-web-panel)](https://github.com/your-username/mc-web-panel/releases)
-[![GitHub issues](https://img.shields.io/github/issues/your-username/mc-web-panel)](https://github.com/your-username/mc-web-panel/issues)
+[![GitHub stars](https://img.shields.io/github/stars/4YStudio/mc-web-panel?style=social)](https://github.com/4YStudio/mc-web-panel/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/4YStudio/mc-web-panel?style=social)](https://github.com/4YStudio/mc-web-panel/network/members)
+[![GitHub license](https://img.shields.io/github/license/4YStudio/mc-web-panel)](https://github.com/4YStudio/mc-web-panel/blob/main/LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/4YStudio/mc-web-panel)](https://github.com/4YStudio/mc-web-panel/releases)
+[![GitHub issues](https://img.shields.io/github/issues/4YStudio/mc-web-panel)](https://github.com/4YStudio/mc-web-panel/issues)
 
 一个轻量级、现代化且高性能的 Minecraft 服务器管理面板
 
@@ -80,7 +80,7 @@ MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecr
 
 #### 方式一：使用可执行文件（推荐）
 
-1. 从 [Releases](https://github.com/your-username/mc-web-panel/releases) 页面下载对应平台的执行文件
+1. 从 [Releases](https://github.com/4YStudio/mc-web-panel/releases) 页面下载对应平台的执行文件
 2. 将其放置在一个空目录中（推荐）
 3. 运行可执行文件：
    - **Linux**: `./mc-web-panel-linux-x64 start`
@@ -94,7 +94,7 @@ MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecr
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/your-username/mc-web-panel.git
+git clone https://github.com/4YStudio/mc-web-panel.git
 cd mc-web-panel
 
 # 2. 安装依赖
@@ -114,18 +114,20 @@ npm run build
 | `start` | 启动面板（后台运行，默认行为） |
 | `stop` | 停止面板 |
 | `restart` | 重启面板 |
-| `host <端口>` | 修改面板端口（如 `host 3001`） |
+| `host <地址> [端口]` | 修改面板监听地址及端口（如 `host 0.0.0.0 3000` 或 `host 8080`） |
+| `port <端口>` | 修改面板端口（如 `port 8080`） |
 | `reset` | 重置 2FA 密钥并打印新密钥 |
 | `help` | 显示帮助信息 |
 
 **使用示例：**
 
 ```bash
-./mc-web-panel-linux-x64 start       # 后台启动面板
-./mc-web-panel-linux-x64 stop        # 停止面板
-./mc-web-panel-linux-x64 restart     # 重启面板
-./mc-web-panel-linux-x64 host 8080   # 将端口改为 8080
-./mc-web-panel-linux-x64 reset       # 重置 2FA 密钥
+./mc-web-panel-linux-x64 start              # 后台启动面板
+./mc-web-panel-linux-x64 stop               # 停止面板
+./mc-web-panel-linux-x64 restart            # 重启面板
+./mc-web-panel-linux-x64 host 0.0.0.0 8080  # 同时修改监听地址与端口
+./mc-web-panel-linux-x64 port 8080          # 将端口改为 8080
+./mc-web-panel-linux-x64 reset              # 重置 2FA 密钥
 ```
 
 ### 🤝 贡献指南
@@ -209,7 +211,7 @@ This panel features dedicated GUI integration for:
 
 #### Method 1: Using Executable (Recommended)
 
-1. Download the executable for your platform from the [Releases](https://github.com/your-username/mc-web-panel/releases) page
+1. Download the executable for your platform from the [Releases](https://github.com/4YStudio/mc-web-panel/releases) page
 2. Place it in an empty directory (recommended)
 3. Run the executable:
    - **Linux**: `./mc-web-panel-linux-x64 start`
@@ -223,7 +225,7 @@ If you prefer to run the panel from source code (requires Node.js 18+):
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/mc-web-panel.git
+git clone https://github.com/4YStudio/mc-web-panel.git
 cd mc-web-panel
 
 # 2. Install dependencies
@@ -243,18 +245,20 @@ npm run build
 | `start` | Start the panel (runs in background, default) |
 | `stop` | Stop the panel |
 | `restart` | Restart the panel |
-| `host <port>` | Change the panel port (e.g., `host 3001`) |
+| `host <ip> [port]` | Change the panel listening address and/or port (e.g., `host 0.0.0.0 3000` or `host 8080`) |
+| `port <port>` | Change the panel port (e.g., `port 8080`) |
 | `reset` | Reset the 2FA key and print the new secret |
 | `help` | Show help information |
 
 **Examples:**
 
 ```bash
-./mc-web-panel-linux-x64 start       # Start panel in background
-./mc-web-panel-linux-x64 stop        # Stop panel
-./mc-web-panel-linux-x64 restart     # Restart panel
-./mc-web-panel-linux-x64 host 8080   # Change port to 8080
-./mc-web-panel-linux-x64 reset       # Reset 2FA credentials
+./mc-web-panel-linux-x64 start              # Start panel in background
+./mc-web-panel-linux-x64 stop               # Stop panel
+./mc-web-panel-linux-x64 restart            # Restart panel
+./mc-web-panel-linux-x64 host 0.0.0.0 8080  # Change both listening address and port
+./mc-web-panel-linux-x64 port 8080          # Change port to 8080
+./mc-web-panel-linux-x64 reset              # Reset 2FA credentials
 ```
 
 ### 🤝 Contributing
@@ -276,6 +280,6 @@ This project is licensed under the [MIT License](./LICENSE).
 
 <div align="center">
 
-Made with ❤️ by [your-username](https://github.com/your-username)
+Made with ❤️ by [4YStudio](https://github.com/4YStudio)
 
 </div>
