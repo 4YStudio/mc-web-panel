@@ -1412,6 +1412,73 @@ h3 { font-size: 1.25rem; }
     transform: translateY(-2px);
 }
 
+.resource-widget {
+    transition: transform var(--transition-elegant), border-color var(--transition-elegant), box-shadow var(--transition-elegant);
+}
+
+.resource-widget:hover {
+    transform: translateY(-2px);
+    border-color: rgba(var(--c-primary-rgb), 0.35) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.resource-icon-badge {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.resource-percent-val {
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.resource-meta-tile {
+    min-height: 54px;
+    transition: transform var(--transition-elegant), border-color var(--transition-elegant), box-shadow var(--transition-elegant);
+}
+
+.resource-meta-tile:hover {
+    transform: translateY(-2px);
+    border-color: rgba(var(--c-primary-rgb), 0.35) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 768px) {
+    .resource-widget {
+        padding: 0.5rem 0.6rem !important;
+        min-height: 76px !important;
+    }
+    .resource-meta-tile {
+        padding: 0.4rem 0.5rem !important;
+        min-height: 46px !important;
+        gap: 0.45rem !important;
+    }
+    .resource-meta-tile .fw-bold {
+        font-size: 0.78rem !important;
+        letter-spacing: -0.2px !important;
+    }
+    .resource-meta-tile .text-muted {
+        font-size: 0.65rem !important;
+    }
+    .resource-icon-badge {
+        width: 26px !important;
+        height: 26px !important;
+        min-width: 26px !important;
+        font-size: 0.75rem !important;
+        border-radius: 6px !important;
+    }
+    .resource-percent-val {
+        font-size: 1.125rem !important;
+    }
+}
+
 .instance-card-btn-group .btn {
     border-radius: 0;
     font-size: 0.8125rem;
@@ -1438,28 +1505,56 @@ h3 { font-size: 1.25rem; }
     padding: 0.625rem 1.25rem;
 }
 
-.cmd-panel {
-    background: var(--c-surface);
+/* PC 端指令助手悬浮浮层 (Desktop Floating Palette) */
+.cmd-pc-palette {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--c-surface-elevated, #1c2128);
     border: 1px solid var(--c-border);
-    border-radius: var(--card-radius);
-    padding: 0.75rem;
+    border-radius: var(--card-radius, 12px);
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    z-index: 1020;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 420px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.cmd-pc-header {
+    background: var(--c-surface);
+    border-color: var(--c-border-subtle) !important;
+}
+
+.cmd-pc-list {
+    overflow-y: auto;
     max-height: 350px;
-    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
-.cmd-list {
-    max-height: 200px;
-    overflow-y: auto;
+.cmd-pc-item {
+    transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
-.cmd-item {
-    cursor: pointer;
-    transition: background var(--transition-fast);
-    border-radius: 6px;
+.cmd-pc-item:hover {
+    background: var(--c-primary-glow, rgba(var(--c-primary-rgb), 0.12));
+    transform: translateX(2px);
 }
 
-.cmd-item:hover {
-    background: var(--c-primary-glow);
+/* PC 浮层入场/离场动效 */
+.cmd-palette-enter-active,
+.cmd-palette-leave-active {
+    transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: bottom center;
+}
+
+.cmd-palette-enter-from,
+.cmd-palette-leave-to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
 }
 
 .tracking-tight {
@@ -2117,6 +2212,31 @@ h3 { font-size: 1.25rem; }
 
 .file-row .btn-link:active {
     transform: scale(0.85);
+}
+
+/* 文件管理：搜索框统一样式与操作列防遮挡 */
+.file-search-container {
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.file-search-container:focus-within {
+    border-color: rgba(var(--c-primary-rgb), 0.5) !important;
+    box-shadow: 0 0 0 2px rgba(var(--c-primary-rgb), 0.12);
+}
+
+.file-col-actions {
+    width: 44px;
+}
+
+@media (min-width: 768px) {
+    .file-col-actions {
+        width: 170px !important;
+        min-width: 170px !important;
+    }
+    .file-col-time {
+        width: 180px !important;
+        min-width: 180px !important;
+    }
 }
 
 /* 玩家管理：在线玩家菜单展开时，确保该卡片与下拉菜单层级置顶，防止被下方列表卡片遮挡 */
@@ -3041,41 +3161,279 @@ h3 { font-size: 1.25rem; }
 
 @media (max-width: 768px) {
     .dashboard-grid {
-        grid-template-columns: 100% !important;
-        gap: 0.75rem;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scroll-snap-type: x mandatory !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 0.75rem !important;
         width: 100% !important;
         max-width: 100% !important;
+        padding-bottom: 2px !important;
+        scrollbar-width: none !important;
+    }
+    .dashboard-grid::-webkit-scrollbar {
+        display: none !important;
     }
     .dashboard-grid > * {
-        min-width: 0 !important;
-        max-width: 100% !important;
+        flex: 0 0 100% !important;
         width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        scroll-snap-align: start !important;
+        scroll-snap-stop: always !important;
+        box-sizing: border-box !important;
     }
     .stat-card {
         min-width: 0 !important;
         max-width: 100% !important;
         width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
     }
+    .stat-card-header {
+        padding: 0.625rem 0.875rem 0.375rem !important;
+    }
     .stat-card-body {
+        padding: 0.375rem 0.875rem 0.625rem !important;
         min-width: 0 !important;
         max-width: 100% !important;
         overflow: hidden !important;
         word-break: break-word !important;
     }
+    .console-output {
+        padding: 0.625rem 0.875rem !important;
+        font-size: 0.72rem !important;
+        line-height: 1.55 !important;
+        min-height: 140px !important;
+    }
+    .dashboard-grid.mobile-collapsed {
+        display: none !important;
+    }
+    .page-header {
+        padding: 0.5rem 0.75rem !important;
+        margin-bottom: 0.625rem !important;
+    }
 }
 
-/* 指令助手滑动过渡动画 (Command Helper Slide Animation) */
-.cmd-panel-slide-enter-active,
-.cmd-panel-slide-leave-active {
-    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    transform-origin: bottom center;
+/* ==========================================================================
+   控制台状态卡片移动端平滑高度形变与折叠动效 (Mobile Stats Morphing Height Transition)
+   ========================================================================== */
+
+/* 桌面端 (>= 768px)：完全保持原生静态布局，绝不介入任何高度形变与折叠 */
+@media (min-width: 768px) {
+    .console-stats-section {
+        height: auto !important;
+        overflow: visible !important;
+    }
+    .stats-expanded-content {
+        position: static !important;
+        opacity: 1 !important;
+        transform: none !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+    .mobile-mini-bar {
+        display: none !important;
+    }
 }
-.cmd-panel-slide-enter-from,
-.cmd-panel-slide-leave-to {
-    opacity: 0 !important;
-    transform: translateY(14px) scale(0.98) !important;
+
+/* 移动端 (< 768px)：从大卡片高度逐渐变小缩小成小卡片，展开时从小卡片高度逐渐变大展开成大卡片 */
+@media (max-width: 768px) {
+    .console-stats-section {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        box-sizing: border-box;
+        will-change: height;
+    }
+
+    /* 移动端迷你单行状态条 */
+    .mobile-mini-bar {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.85rem !important;
+        background: var(--c-surface, #ffffff) !important;
+        border: 1px solid var(--c-border) !important;
+        border-radius: var(--card-radius, 12px) !important;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 40px;
+        user-select: none;
+        transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .mobile-mini-bar:active {
+        transform: scale(0.99);
+    }
+    .mobile-mini-bar.bar-active {
+        position: relative;
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+        visibility: visible;
+    }
+    .mobile-mini-bar.bar-inactive {
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-8px);
+        visibility: hidden;
+        z-index: 1;
+    }
+
+    /* 移动端展开状态容器 */
+    .stats-expanded-content {
+        width: 100%;
+        box-sizing: border-box;
+        transition: opacity 0.24s ease, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stats-expanded-content.mobile-content-active {
+        position: relative;
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+        visibility: visible;
+    }
+    .stats-expanded-content.mobile-content-inactive {
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-12px);
+        visibility: hidden;
+        z-index: 1;
+    }
+}
+
+/* ==========================================================================
+   移动端指令助手半屏底部抽屉 (Mobile Command Bottom Sheet)
+   ========================================================================== */
+.cmd-mobile-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1060;
+    pointer-events: none;
+}
+
+.cmd-mobile-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.58);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    pointer-events: auto;
+    z-index: 1060;
+}
+
+.cmd-mobile-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 76vh;
+    background: var(--c-surface-elevated, #1c2128);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+    z-index: 1061;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 12px);
+}
+
+.cmd-sheet-handle-area {
+    width: 100%;
+    padding: 10px 0 6px;
+    display: flex;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.cmd-sheet-handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(128, 128, 128, 0.45);
+}
+
+.cmd-sheet-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(var(--c-primary-rgb), 0.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+}
+
+.cmd-mobile-search {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.cmd-mobile-cats {
+    padding-top: 2px;
+}
+
+.cmd-mobile-list {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1 1 auto;
+    max-height: calc(76vh - 180px);
+    padding-bottom: 24px !important;
+}
+
+.cmd-mobile-card {
+    transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+    border-color: var(--c-border-subtle) !important;
+}
+
+.cmd-mobile-card:active {
+    transform: scale(0.985);
+    background: rgba(var(--c-primary-rgb), 0.08) !important;
+    border-color: rgba(var(--c-primary-rgb), 0.3) !important;
+}
+
+/* 动效：移动端抽屉平滑滑入/滑出 */
+.cmd-sheet-enter-active,
+.cmd-sheet-leave-active {
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+
+.cmd-sheet-enter-from,
+.cmd-sheet-leave-to {
+    transform: translateY(100%);
+    opacity: 0;
+}
+
+/* 动效：暗色毛玻璃遮罩淡入/淡出 */
+.cmd-fade-enter-active,
+.cmd-fade-leave-active {
+    transition: opacity 0.28s ease;
+}
+
+.cmd-fade-enter-from,
+.cmd-fade-leave-to {
+    opacity: 0;
 }
 
 /* Card Hover Swap Animation */

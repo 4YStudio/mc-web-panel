@@ -243,7 +243,10 @@ class ScrollEngine {
                 delete require.cache[require.resolve(entryPath)];
                 const scrollFunc = require(entryPath);
                 if (typeof scrollFunc === 'function') {
-                    await scrollFunc(context);
+                    const scrollExports = await scrollFunc(context);
+                    if (scrollExports) {
+                        record.exports = scrollExports;
+                    }
                     record.active = true;
                     const displayName = typeof manifest.name === 'object' ? (manifest.name.zh || manifest.name.en || scrollId) : (manifest.name || scrollId);
                     console.log(`[ScrollEngine:${instanceId}] 卷轴 [${displayName}] 已成功激活`);
@@ -267,6 +270,19 @@ class ScrollEngine {
 
         const record = holder.scrolls.get(scrollId);
         if (!record) return;
+
+        // 0. 执行卷轴自定义销毁清理钩子（destroy / cleanup）
+        if (record.exports) {
+            try {
+                if (typeof record.exports.destroy === 'function') {
+                    record.exports.destroy();
+                } else if (typeof record.exports === 'function') {
+                    record.exports();
+                }
+            } catch (err) {
+                console.error(`[ScrollEngine:${instanceId}] 卷轴 [${scrollId}] 卸载钩子执行异常:`, err);
+            }
+        }
 
         // 1. 清理该卷轴在当前实例下注册的所有定时器
         if (record.timers) {

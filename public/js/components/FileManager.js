@@ -1,4 +1,4 @@
-import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, getCurrentInstance } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal, t, uploadFileWithChunk, isLargeFile } from '../utils.js';
@@ -19,7 +19,7 @@ export default {
                 <div class="row g-2 align-items-center mb-2">
                     <div class="col-12 col-md-auto flex-grow-1 overflow-hidden">
                         <nav aria-label="breadcrumb">
-                            <ol class="breadcrumb mb-0 p-2 border-secondary rounded flex-nowrap overflow-auto no-scrollbar" style="font-size: 0.9rem; background-color: var(--c-surface) !important; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: row; align-items: center;">
+                            <ol class="breadcrumb mb-0 p-2 rounded-3 flex-nowrap overflow-auto no-scrollbar file-breadcrumb-bar" style="font-size: 0.9rem; background-color: var(--c-surface) !important; border: 1px solid rgba(255,255,255,0.1); min-height: 38px; display: flex; flex-direction: row; align-items: center;">
                                 <li class="breadcrumb-item text-primary cursor-pointer breadcrumb-nav-item" @click="changeDir('')">
                                     <i class="fa-solid fa-house"></i>
                                 </li>
@@ -33,9 +33,21 @@ export default {
                         </nav>
                     </div>
                     <div class="col-12 col-md-auto">
-                        <div class="input-group input-group-sm mb-0">
-                            <span class="input-group-text border-secondary border-end-0" style="backdrop-filter: none; background-color: var(--c-surface) !important;"><i class="fa-solid fa-search opacity-50"></i></span>
-                            <input type="text" class="form-control border-secondary border-start-0 px-2" style="backdrop-filter: none; color: inherit; background-color: var(--c-surface) !important;" v-model="searchQuery" :placeholder="$t('common.search') + '...'">
+                        <div class="file-search-container d-flex align-items-center px-2.5 rounded-3 border" 
+                             style="background-color: var(--c-surface); border-color: rgba(255,255,255,0.1) !important; min-height: 38px; min-width: 200px;">
+                            <i class="fa-solid fa-magnifying-glass text-muted me-2" style="font-size: 0.8rem;"></i>
+                            <input type="text" 
+                                   class="file-search-input bg-transparent border-0 p-0 text-body flex-grow-1" 
+                                   style="outline: none; font-size: 0.85rem; box-shadow: none;" 
+                                   v-model="searchQuery" 
+                                   :placeholder="$t('common.search') + '...'">
+                            <button v-if="searchQuery" 
+                                    type="button"
+                                    class="btn btn-link btn-xs text-muted p-0 ms-1 border-0" 
+                                    @click="searchQuery = ''" 
+                                    style="text-decoration: none;">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -95,8 +107,8 @@ export default {
                                     <th style="width: 38px;" class="px-2 px-md-3"><input type="checkbox" v-model="selectAll" class="form-check-input"></th>
                                     <th>{{ $t('common.name') }}</th>
                                     <th style="width: 80px;" class="d-none d-sm-table-cell">{{ $t('common.size') }}</th>
-                                    <th style="width: 140px;" class="d-none d-md-table-cell">{{ $t('common.time') }}</th>
-                                    <th style="width: 44px;" class="text-end px-2 px-md-3">
+                                    <th class="d-none d-md-table-cell file-col-time" style="width: 175px;">{{ $t('common.time') }}</th>
+                                    <th class="text-end px-2 px-md-3 file-col-actions">
                                         <span class="d-none d-md-inline">{{ $t('common.actions') }}</span>
                                     </th>
                                 </tr>
@@ -114,11 +126,11 @@ export default {
                                     </td>
                                     
                                     <td class="d-none d-sm-table-cell small">{{ f.isDir ? '-' : formatSize(f.size) }}</td>
-                                    <td class="small text-muted d-none d-md-table-cell">{{ new Date(f.mtime).toLocaleString() }}</td>
+                                    <td class="small text-muted d-none d-md-table-cell text-nowrap">{{ new Date(f.mtime).toLocaleString() }}</td>
                                     
-                                    <td class="text-end px-2 px-md-3 py-2">
+                                    <td class="text-end px-2 px-md-3 py-2 file-actions-cell">
                                         <!-- Desktop actions -->
-                                        <div class="d-none d-md-flex justify-content-end gap-1">
+                                        <div class="d-none d-md-flex justify-content-end gap-1 flex-nowrap align-items-center">
                                             <button v-if="isArchive(f.name)" class="btn btn-xs btn-link text-warning p-1" @click.stop="extractFile(f.name)" :title="$t('files.extract')">
                                                 <i class="fa-solid fa-file-zipper"></i>
                                             </button>
@@ -136,8 +148,8 @@ export default {
                                             </button>
                                         </div>
                                         <!-- Mobile actions dropdown -->
-                                        <div class="d-md-none dropdown">
-                                            <button class="btn btn-link btn-xs text-secondary p-1" type="button" @click.stop="toggleActionMenu(f.name)">
+                                        <div class="d-md-none dropdown file-action-dropdown-wrapper">
+                                            <button class="btn btn-link btn-xs text-secondary p-1 file-more-btn" type="button" @click.stop="toggleActionMenu(f.name)">
                                                 <i class="fa-solid fa-ellipsis-vertical"></i>
                                             </button>
                                             <Transition name="scale">
@@ -818,7 +830,25 @@ export default {
             activeActionMenu.value = activeActionMenu.value === name ? null : name;
         };
 
-        onMounted(() => loadFiles());
+        const handleDocClick = (e) => {
+            if (activeActionMenu.value) {
+                if (e && e.target && e.target.closest && e.target.closest('.file-more-btn')) {
+                    return;
+                }
+                activeActionMenu.value = null;
+            }
+        };
+
+        onMounted(() => {
+            loadFiles();
+            document.addEventListener('click', handleDocClick);
+            document.addEventListener('touchstart', handleDocClick, { passive: true });
+        });
+
+        onUnmounted(() => {
+            document.removeEventListener('click', handleDocClick);
+            document.removeEventListener('touchstart', handleDocClick);
+        });
 
         return {
             currentPath, pathParts, fileList, filteredFiles, selectedFiles, selectAll, searchQuery,

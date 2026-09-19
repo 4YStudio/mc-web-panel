@@ -110,22 +110,43 @@ export default {
 
                 <div class="stat-card mb-3 shadow-none overflow-hidden" style="border-radius: 12px;">
                     <div class="stat-card-body p-3">
-                        <div class="mb-3">
+                        <div class="mb-2.5">
                             <div class="d-flex justify-content-between small mb-1 fw-bold" style="font-size: 0.75rem;">
                                 <span>CPU</span>
-                                <span class="text-muted">{{ store.stats.cpu }}%</span>
+                                <span class="text-muted font-monospace">{{ store.stats.cpu || 0 }}%</span>
                             </div>
                             <div class="progress" style="height: 3px; border-radius: 2px;">
-                                <div class="progress-bar" :style="{width: store.stats.cpu + '%'}"></div>
+                                <div class="progress-bar" :class="Number(store.stats.cpu) > 80 ? 'bg-danger' : 'bg-primary'" :style="{width: (store.stats.cpu || 0) + '%'}"></div>
+                            </div>
+                        </div>
+                        <div class="mb-2.5">
+                            <div class="d-flex justify-content-between small mb-1 fw-bold" style="font-size: 0.75rem;">
+                                <span>RAM</span>
+                                <span class="text-muted font-monospace">{{ store.stats.mem?.percentage || 0 }}%</span>
+                            </div>
+                            <div class="progress" style="height: 3px; border-radius: 2px;">
+                                <div class="progress-bar" :class="Number(store.stats.mem?.percentage) > 85 ? 'bg-danger' : 'bg-warning'" :style="{width: (store.stats.mem?.percentage || 0) + '%'}"></div>
+                            </div>
+                        </div>
+                        <div class="mb-2.5">
+                            <div class="d-flex justify-content-between small mb-1 fw-bold" style="font-size: 0.75rem;">
+                                <span>SWAP</span>
+                                <span class="text-muted font-monospace">
+                                    <template v-if="Number(store.stats.swap?.total || 0) > 0">{{ store.stats.swap?.percentage || 0 }}%</template>
+                                    <template v-else>-</template>
+                                </span>
+                            </div>
+                            <div class="progress" style="height: 3px; border-radius: 2px;">
+                                <div class="progress-bar bg-info" :class="{'bg-danger': Number(store.stats.swap?.percentage) > 80}" :style="{width: (Number(store.stats.swap?.total || 0) > 0 ? (store.stats.swap?.percentage || 0) : 0) + '%'}"></div>
                             </div>
                         </div>
                         <div>
                             <div class="d-flex justify-content-between small mb-1 fw-bold" style="font-size: 0.75rem;">
-                                <span>MEM</span>
-                                <span class="text-muted">{{ store.stats.mem.percentage }}%</span>
+                                <span>DISK</span>
+                                <span class="text-muted font-monospace">{{ store.stats.disk?.percentage || 0 }}%</span>
                             </div>
                             <div class="progress" style="height: 3px; border-radius: 2px;">
-                                <div class="progress-bar bg-warning" :style="{width: store.stats.mem.percentage + '%'}"></div>
+                                <div class="progress-bar" :class="Number(store.stats.disk?.percentage) > 90 ? 'bg-danger' : 'bg-success'" :style="{width: (store.stats.disk?.percentage || 0) + '%'}"></div>
                             </div>
                         </div>
                     </div>

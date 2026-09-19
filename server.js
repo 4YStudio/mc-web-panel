@@ -27,7 +27,7 @@ const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 const sharp = require('sharp');
 
-const APP_VERSION = '2.4.7';
+const APP_VERSION = '2.4.8';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -1627,18 +1627,77 @@ if (cluster.isPrimary) {
     });
 
     // --- 监控 ---
+    let cachedDiskStats = null;
+    let lastDiskCheck = 0;
+
+    async function getDiskUsage() {
+        const now = Date.now();
+        if (cachedDiskStats && (now - lastDiskCheck < 10000)) {
+            return cachedDiskStats;
+        }
+        try {
+            const disks = await si.fsSize();
+            if (Array.isArray(disks) && disks.length > 0) {
+                const realDisks = disks.filter(d => d.size > 0 && d.type !== 'tmpfs' && d.type !== 'efivarfs' && d.type !== 'devtmpfs');
+                const cwd = process.cwd();
+                let matched = null;
+                let maxLen = -1;
+                for (const d of realDisks) {
+                    if (d.mount && cwd.startsWith(d.mount) && d.mount.length > maxLen) {
+                        matched = d;
+                        maxLen = d.mount.length;
+                    }
+                }
+                if (!matched && realDisks.length > 0) {
+                    matched = realDisks.find(d => d.mount === '/' || d.mount.toLowerCase().startsWith('c:')) || realDisks[0];
+                }
+                if (!matched && disks.length > 0) {
+                    matched = disks[0];
+                }
+
+                if (matched && matched.size > 0) {
+                    const totalG = (matched.size / 1024 / 1024 / 1024).toFixed(1);
+                    const usedG = (matched.used / 1024 / 1024 / 1024).toFixed(1);
+                    const percent = matched.use !== undefined ? Number(matched.use).toFixed(1) : ((matched.used / matched.size) * 100).toFixed(1);
+                    cachedDiskStats = {
+                        total: totalG,
+                        used: usedG,
+                        percentage: percent,
+                        mount: matched.mount || '/'
+                    };
+                    lastDiskCheck = now;
+                    return cachedDiskStats;
+                }
+            }
+        } catch (e) { }
+
+        return cachedDiskStats || { total: '0.0', used: '0.0', percentage: '0.0', mount: '/' };
+    }
+
     setInterval(async () => {
         if (io.engine.clientsCount > 0) {
             try {
-                const load = await si.currentLoad();
-                const mem = await si.mem();
+                const [load, mem, diskStats] = await Promise.all([
+                    si.currentLoad(),
+                    si.mem(),
+                    getDiskUsage()
+                ]);
+
+                const swaptotal = mem.swaptotal || 0;
+                const swapused = mem.swapused || 0;
                 const systemStats = {
                     cpu: load.currentLoad.toFixed(1),
                     mem: {
                         total: (mem.total / 1024 / 1024 / 1024).toFixed(1),
                         used: (mem.active / 1024 / 1024 / 1024).toFixed(1),
                         percentage: ((mem.active / mem.total) * 100).toFixed(1)
-                    }
+                    },
+                    swap: {
+                        total: (swaptotal / 1024 / 1024 / 1024).toFixed(1),
+                        used: (swapused / 1024 / 1024 / 1024).toFixed(1),
+                        percentage: swaptotal > 0 ? ((swapused / swaptotal) * 100).toFixed(1) : '0.0'
+                    },
+                    disk: diskStats
                 };
 
                 const allInstancesStatus = [];

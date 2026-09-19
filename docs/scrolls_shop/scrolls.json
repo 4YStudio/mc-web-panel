@@ -211,44 +211,88 @@
             "zh": "单人快速跳过夜晚",
             "en": "Fast Sleep"
         },
-        "version": "1.3.0",
+        "version": "2.4.0",
         "author": "4YStudio",
         "description": {
-            "zh": "多人联机时，只要有一名玩家上床睡觉（或输入聊天指令），即可触发全服通知并平滑迎来白昼。原生支持 1.17+ 官方游戏规则与全版本聊天快捷跳夜。",
-            "en": "Allows a single player sleeping in bed (or typing chat command) to skip the night. Supports Minecraft 1.17+ native rule and chat commands."
+            "zh": "极速零轮询原生事件驱动，彻底告别抽搐抖动与控制台刷屏。玩家躺床上或输入指令即可触发高沉浸式跳夜仪式：全服富文本可点击按钮、ActionBar 进度倒计时与钟声、熬夜否决机制、群星流转日出动效与清晨活力增益。",
+            "en": "Zero-polling native event-driven night skip. Features clickable chat buttons, starry time-lapse dawn animation, global ActionBar countdown, veto/nosleep mechanism, and morning buffs."
         },
         "category": "interactive",
         "icon": "fa-bed",
         "color": "#3b82f6",
         "configSchema": {
-            "enableNativeGamerule": {
-                "type": "boolean",
-                "title": "启用 1.17+ 原生规则自动下发",
-                "default": true,
-                "description": "自动将 gamerule playersSleepingPercentage 设为 1，1人入睡原生自动跳夜"
+            "sleepMode": {
+                "type": "select",
+                "title": "跳夜表现模式",
+                "default": "timelapse",
+                "description": "群星流转：亲历日月星辰飞速流转的震撼拂晓；倒计时：等待倒计时后瞬变清晨；即时：立即迎来清晨",
+                "options": [
+                    {
+                        "value": "timelapse",
+                        "label": "群星流转 (平滑拂晓动效，推荐)"
+                    },
+                    {
+                        "value": "countdown",
+                        "label": "经典倒计时 (提示音+瞬变)"
+                    },
+                    {
+                        "value": "instant",
+                        "label": "极速即时 (触发立即天亮)"
+                    }
+                ]
             },
             "countdownSec": {
                 "type": "number",
-                "title": "倒计时时长 (秒)",
+                "title": "破晓倒计时 (秒)",
                 "default": 3,
                 "min": 0,
                 "max": 10,
-                "description": "触发跳夜后等待多少秒执行昼夜切换"
+                "description": "发起跳夜后等待多少秒迎来白昼（为玩家提供投票或否决反应时间）"
             },
-            "enableChatCommand": {
+            "allowVeto": {
                 "type": "boolean",
-                "title": "启用聊天栏快捷跳夜指令",
+                "title": "允许玩家熬夜否决机制",
                 "default": true,
-                "description": "允许玩家在聊天栏发送 !sleep、!day、睡觉、晚安 快捷跳过黑夜"
+                "description": "允许正在野外刷怪或需要黑夜的玩家点击 [我要熬夜] 或输入 !nosleep 取消跳夜或拉回黑夜"
+            },
+            "enableClickableChat": {
+                "type": "boolean",
+                "title": "聊天栏富文本可点击按钮",
+                "default": true,
+                "description": "广播时附带 [✔ 我也入睡] 和 [✖ 我要熬夜] 可直接点击的交互按钮"
+            },
+            "enableActionBar": {
+                "type": "boolean",
+                "title": "屏幕底部快捷栏 (ActionBar) 倒计时",
+                "default": true,
+                "description": "倒计时期间在全服玩家屏幕下方实时跳动进度条与剩余秒数"
             },
             "announceTitle": {
                 "type": "boolean",
                 "title": "全屏大标题与破晓音效",
                 "default": true,
-                "description": "跳过夜晚时是否向全服玩家屏幕展示醒目的大标题并播放音效"
+                "description": "破晓瞬间向全服展示金色大标题“☀ 旭日初升 ☀”并播放清脆音效"
+            },
+            "morningBuff": {
+                "type": "boolean",
+                "title": "早睡早起“清晨祝福”增益",
+                "default": true,
+                "description": "天亮时为入睡玩家或参与跳夜的玩家施加 30 秒速度与饱腹增益奖励"
+            },
+            "clearWeather": {
+                "type": "boolean",
+                "title": "跳夜时自动驱散恶劣天气",
+                "default": true,
+                "description": "跳过夜晚时自动将降雨或雷暴清除为晴天 (weather clear)"
+            },
+            "enableChatCommand": {
+                "type": "boolean",
+                "title": "启用聊天栏快捷指令",
+                "default": true,
+                "description": "允许玩家在聊天栏发送 !sleep、睡觉、!nosleep、熬夜 等自然语言指令"
             }
         },
-        "fileSize": 3682,
+        "fileSize": 8052,
         "downloadUrl": "./scrolls_shop/fast-sleep.zip"
     },
     {

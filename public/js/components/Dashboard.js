@@ -1,7 +1,8 @@
 import { store } from '../store.js';
 import { api } from '../api.js';
 import { showToast, formatLog, t, openModal } from '../utils.js';
-import { ref, computed, nextTick, watch, onMounted } from '/js/vue.esm-browser.js';
+import { messages } from '../i18n.js';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from '/js/vue.esm-browser.js';
 import SetupWizard from './SetupWizard.js';
 
 const COMMAND_SCHEMAS = {
@@ -1196,7 +1197,285 @@ const COMMAND_SCHEMAS = {
             }
         ],
         assemble: (p) => `tick ${p.action}${p.action === 'rate' ? ' ' + p.value : ''}`
+    },
+    kill: {
+        titlecn: '清除实体/自杀 (Kill)',
+        titleen: 'Kill Entities',
+        params: [
+            {
+                key: 'target',
+                labelcn: '目标实体',
+                labelen: 'Target Entity',
+                type: 'select_input',
+                options: [
+                    { value: '@s', labelcn: '自己 (自杀 @s)', labelen: 'Self (@s)' },
+                    { value: '@e[type=!player]', labelcn: '清除所有非玩家实体 (@e[type=!player])', labelen: 'All non-player entities' },
+                    { value: '@e[type=monster]', labelcn: '清除所有怪物 (@e[type=monster])', labelen: 'All monsters' },
+                    { value: '@e[type=item]', labelcn: '清除所有掉落物 (@e[type=item])', labelen: 'All dropped items' },
+                    { value: '@a', labelcn: '所有玩家 (@a)', labelen: 'All players (@a)' }
+                ],
+                default: '@s',
+                placeholder: 'e.g. @s 或 @e[type=!player]'
+            }
+        ],
+        assemble: (p) => `kill ${p.target || '@s'}`
+    },
+    whitelist: {
+        titlecn: '管理服务器白名单',
+        titleen: 'Manage Server Whitelist',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'list', labelcn: '查看白名单列表 (list)', labelen: 'List players' },
+                    { value: 'add', labelcn: '添加玩家 (add)', labelen: 'Add player' },
+                    { value: 'remove', labelcn: '移除玩家 (remove)', labelen: 'Remove player' },
+                    { value: 'on', labelcn: '开启白名单 (on)', labelen: 'Turn on' },
+                    { value: 'off', labelcn: '关闭白名单 (off)', labelen: 'Turn off' },
+                    { value: 'reload', labelcn: '重新加载配置 (reload)', labelen: 'Reload config' }
+                ],
+                default: 'list'
+            },
+            {
+                key: 'player',
+                labelcn: '目标玩家',
+                labelen: 'Player Name',
+                type: 'text',
+                vif: (p) => p.action === 'add' || p.action === 'remove',
+                placeholder: '玩家游戏名 (Player name)'
+            }
+        ],
+        assemble: (p) => `whitelist ${p.action}${p.action === 'add' || p.action === 'remove' ? ' ' + (p.player || '') : ''}`
     }
+};
+
+const COMMAND_ALIASES = {
+    time: [
+        '时间', '改时间', '调时间', '修改时间', '设置时间', '换时间', '变白天', '变黑夜',
+        '白天', '白昼', '黑夜', '夜晚', '晚上', '正午', '午夜', '日出', '日落', '早晨', '清晨', '半夜',
+        'day', 'night', 'noon', 'midnight', 'sunrise', 'sunset', 'time'
+    ],
+    weather: [
+        '天气', '改天气', '设置天气', '调天气', '换天气',
+        '晴天', '大晴天', '放晴', '下雨', '雨天', '暴雨', '大雨', '停雨',
+        '雷雨', '打雷', '雷暴', '暴风雨',
+        'clear', 'rain', 'thunder', 'storm', 'weather'
+    ],
+    gamemode: [
+        '模式', '改模式', '游戏模式', '切换模式', '换模式', '调模式', '设置模式',
+        '创造', '创造模式', '生存', '生存模式', '冒险', '冒险模式', '旁观模式', '旁观者',
+        '上帝模式', '无敌', '飞行', 'gm', 'gmc', 'gms', 'gma', 'gmsp',
+        'creative', 'survival', 'adventure', 'spectator', 'gamemode'
+    ],
+    defaultgamemode: [
+        '默认模式', '默认游戏模式', '初始模式', '进服模式', '默认生存', '默认创造'
+    ],
+    difficulty: [
+        '难度', '改难度', '调难度', '游戏难度', '设置难度',
+        '和平', '简单', '普通', '困难', '怪物生成', '怪物攻击', '禁止生成怪物',
+        'peaceful', 'easy', 'normal', 'hard', 'difficulty'
+    ],
+    clear: [
+        '清空', '清背包', '清空背包', '清理背包', '清除背包', '清除物品', '删背包', '没收背包', '垃圾', '清空物品',
+        'clear inventory', 'clean', 'clear'
+    ],
+    experience: [
+        '经验', '加经验', '经验值', '等级', '升到', '升级', '调等级', '经验球', '经验条', '加级', '修改等级',
+        'xp', 'exp', 'level', 'experience'
+    ],
+    teleport: [
+        '传送', '传送到', 'tp', '拉人', '找人', '回家', '坐标', '瞬间移动', '飞到', '瞬移', '传人', '移动到',
+        'teleport', 'tpa', 'tpahere'
+    ],
+    spreadplayers: [
+        '随机传送', '散布', '分散', '散开', '随机散布', 'rtp', '传送到随机位置'
+    ],
+    spawnpoint: [
+        '出生点', '重生点', '复活点', '设家', '老家', '个人出生点', '设置复活点'
+    ],
+    setworldspawn: [
+        '世界出生点', '主城出生点', '全服出生点', '世界重生点', '主城', '设置世界出生点'
+    ],
+    gamerule: [
+        '规则', '游戏规则', '修改规则', '改规则', '设置规则',
+        '死亡不掉落', '不掉落', '防爆', '防苦力怕', '生物破坏', '时间流动', '停止时间', '天气流动', '自然生成', '立即复活', '保留背包', '命令方块日志',
+        'keepinventory', 'mobgriefing', 'dodaylightcycle', 'doweathercycle', 'domobspawning', 'gamerule'
+    ],
+    give: [
+        '给物品', '发东西', '给予', '刷物品', '发钻石', '拿物品', '刷东西', '获取物品', '给装备', '发装备', '发道具', '刷铁',
+        'item', 'diamond', 'give'
+    ],
+    summon: [
+        '召唤', '生成', '刷怪', '生成生物', '生成实体', '招怪', '刷村民', '刷僵尸', '刷末影龙', '刷凋零', '召生物', '造怪',
+        'spawn', 'mob', 'summon'
+    ],
+    kill: [
+        '杀死', '自杀', '处决', '清除实体', '清怪', '杀怪', '消灭', '秒杀', '杀人', '清除所有生物', '清实体',
+        'suicide', 'slay', 'kill'
+    ],
+    damage: [
+        '伤害', '扣血', '掉血', '造成伤害', '扣生命', '打人', '攻击', '打血',
+        'hurt', 'wound', 'damage'
+    ],
+    effect: [
+        '药水', '效果', '状态', '药水效果', 'buff', 'debuff', '加速', '速度', '夜视', '力量', '隐形', '急迫', '跳跃提升', '缓慢', '抗性提升', '发光', '生命恢复', '虚弱',
+        'potion', 'speed', 'strength', 'invisibility', 'night_vision', 'effect'
+    ],
+    enchant: [
+        '附魔', '魔咒', '附魔书', '强化', '武器附魔', '装备附魔', '锋利', '保护', '击退', '时运', '精准采集', '力量', '无限', '火焰附加',
+        'sharpness', 'protection', 'fortune', 'enchant'
+    ],
+    kick: [
+        '踢出', '踢人', '移除玩家', '请离', '踢掉', '断开连接', 'kick'
+    ],
+    ban: [
+        '封禁', '封号', '拉黑', '黑名单', '封人', '禁入', '永久封禁', '封禁玩家', 'ban'
+    ],
+    'ban-ip': [
+        '封ip', '封禁ip', '拉黑ip', '禁ip', 'ip封禁', 'ban-ip'
+    ],
+    banlist: [
+        '封禁列表', '黑名单列表', '查封禁', '解封列表', '查黑名单', 'banlist'
+    ],
+    pardon: [
+        '解封', '解禁', '特赦', '放出来', '解除封号', '解封玩家', '取消封禁', 'unban', 'pardon'
+    ],
+    'pardon-ip': [
+        '解封ip', '解除ip封禁', 'ip解封', '特赦ip', 'pardon-ip'
+    ],
+    op: [
+        '管理员', '给管理', '设为管理', '给权', '给op', '提权', '腐竹', '服主', '权限', '设置管理员', '加管理', 'op'
+    ],
+    deop: [
+        '撤销管理', '取消管理', '降权', '撤op', '移除管理员', '下管理', '撤销权限', 'deop'
+    ],
+    whitelist: [
+        '白名单', '进服名单', '准入名单', '开启白名单', '加白名单', '移出白名单', '加白', '审核名单', 'whitelist'
+    ],
+    'save-all': [
+        '保存', '存档', '防回档', '保存世界', '存盘', '保存地图', '写入磁盘', '立即保存', 'save-all', 'save'
+    ],
+    'save-off': [
+        '关闭自动保存', '暂停保存', 'save-off'
+    ],
+    'save-on': [
+        '开启自动保存', '恢复保存', 'save-on'
+    ],
+    stop: [
+        '关闭服务器', '关服', '停服', '停止', '关闭', '下线', '重启服务器', 'stop'
+    ],
+    seed: [
+        '种子', '世界种子', '地图种子', '查种子', '地形种子', 'seed'
+    ],
+    locate: [
+        '寻找', '定位', '找村庄', '找要塞', '找神殿', '找末地', '找地狱堡垒', '找遗迹', '找群系', '群系', '结构', '最近的', '导航',
+        'village', 'fortress', 'mansion', 'monument', 'stronghold', 'locate'
+    ],
+    say: [
+        '全服公告', '公告', '广播', '说话', '全服喊话', '发消息', '喇叭', '通知', 'say'
+    ],
+    msg: [
+        '私聊', '密聊', '悄悄话', '私信', '密语', 'tell', 'whisper', 'msg'
+    ],
+    tellraw: [
+        '彩色字', 'json消息', '富文本', '高亮消息', '点击消息', '高级文本', 'tellraw'
+    ],
+    title: [
+        '大标题', '屏幕大字', '标题', '字幕', '屏幕显示', '居中文字', 'actionbar', 'title'
+    ],
+    playsound: [
+        '播放声音', '播放音效', '声音', '音乐', '放歌', '音效', '唱片', '播放音频', 'playsound'
+    ],
+    stopsound: [
+        '停止声音', '停止音乐', '静音', '关声音', '停音效', 'stopsound'
+    ],
+    particle: [
+        '粒子', '粒子效果', '特效', '烟花', '光效', '爱心', '爆炸', 'particle'
+    ],
+    setblock: [
+        '放置方块', '放方块', '改方块', '替换方块', '生成方块', '下落方块', 'setblock'
+    ],
+    fill: [
+        '填充', '铺地', '整地', '大面积填方块', '挖坑', '造墙', '填平', 'fill'
+    ],
+    fillbiome: [
+        '改生物群系', '填充群系', '改环境', '换群系', 'fillbiome'
+    ],
+    clone: [
+        '复制', '克隆', '复制建筑', '搬家', '平移建筑', '搬迁', 'clone'
+    ],
+    worldborder: [
+        '世界边界', '边界', '边境', '缩圈', '毒圈', '世界限制', '扩大边界', '缩小边界', 'worldborder'
+    ],
+    scoreboard: [
+        '记分板', '计分板', '积分', '分数', '排行榜', '杀敌数', '死亡数', 'scoreboard'
+    ],
+    bossbar: [
+        '血条', 'boss条', '顶栏血条', '顶部显示', '进度条', 'boss栏', 'bossbar'
+    ],
+    tick: [
+        '刻', '游戏刻', '加速时间', '冻结时间', '时间流速', '暂停游戏', 'tps', 'tick速率', 'tick'
+    ],
+    datapack: [
+        '数据包', 'datapack管理', '启用数据包', '禁用数据包', '模组包', 'datapack'
+    ],
+    reload: [
+        '重载', '刷新', '重新加载', '刷新配置', '重载函数', '重载数据包', 'reload'
+    ],
+    list: [
+        '在线玩家', '查人', '玩家列表', '查在线', '谁在线', '查看在线', 'list'
+    ],
+    advancement: [
+        '进度', '成就', '解锁成就', '获得成就', '完成进度', '进度授予', 'advancement'
+    ],
+    attribute: [
+        '属性', '生命上限', '血量上限', '移动速度', '攻击力', '修改属性', '实体属性', 'attribute'
+    ],
+    item: [
+        '修改物品', '替换物品', '修改装备', '主手', '副手', '头盔', '胸甲', 'item'
+    ],
+    setidletimeout: [
+        '挂机', '挂机踢出', '超时踢出', '空闲时间', '自动踢出', '挂机时间', 'setidletimeout'
+    ],
+    tag: [
+        '标签', '添加标签', '移除标签', '实体标记', 'tag'
+    ],
+    team: [
+        '队伍', '分队', '团队', '队伍颜色', '同队伤害', '友军伤害', 'team'
+    ],
+    ride: [
+        '骑乘', '骑马', '下马', '骑生物', '下坐骑', 'ride'
+    ],
+    spectate: [
+        '旁观', '幽灵观察', '观战', '第一视角', 'spectate'
+    ],
+    recipe: [
+        '配方', '合成表', '解锁配方', '合成配方', 'recipe'
+    ],
+    rotate: [
+        '旋转', '转身', '朝向', '旋转朝向', 'rotate'
+    ],
+    forceload: [
+        '常载区块', '强制加载', '强载', '区块常驻', '保持加载', 'forceload'
+    ],
+    function: [
+        '函数', '执行函数', '运行函数', 'mcfunction', 'function'
+    ],
+    execute: [
+        '高级执行', '条件执行', 'execute', 'run', '作为执行'
+    ],
+    data: [
+        'nbt', '数据修改', '实体数据', '方块数据', '查看nbt', 'data'
+    ],
+    debug: [
+        '调试', '性能分析', '卡顿排查', 'debug'
+    ],
+    help: [
+        '帮助', '指令帮助', '命令列表', 'help'
+    ]
 };
 
 const MC_COMMANDS = [
@@ -1320,111 +1599,523 @@ export default {
                 </div>
             </div>
 
-            <!-- System Stats Overview -->
-            <div v-if="store.consoleInfoPosition === 'top'" class="dashboard-grid mb-3 flex-shrink-0 w-100" style="min-width: 0;">
-                <div class="stagger-item w-100" style="min-width: 0;">
-                    <div class="stat-card h-100 w-100" style="min-width: 0;">
-                        <div class="stat-card-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-server me-2"></i>{{ $t('dashboard.server_info') }}</h6>
-                                 <span class="badge rounded-pill font-monospace" :class="dashboardStatusClass">{{ dashboardStatusText }}</span>
+            <div v-if="store.consoleInfoPosition === 'top'"
+                 ref="statsSectionRef"
+                 class="console-stats-section mb-2 mb-md-3 flex-shrink-0 w-100"
+                 :class="{ 'mobile-is-collapsed': mobileCollapsed }">
+
+                <!-- 1. Mobile-only Mini Collapsed Bar -->
+                <div ref="miniBarRef"
+                     class="mobile-mini-bar cursor-pointer d-md-none"
+                     :class="{ 'bar-active': mobileCollapsed, 'bar-inactive': !mobileCollapsed }"
+                     @click="toggleMobileCollapse">
+                    <div class="d-flex align-items-center gap-2 text-truncate min-w-0">
+                        <span class="badge rounded-pill font-monospace" :class="dashboardStatusClass" style="font-size: 0.68rem; padding: 0.25rem 0.55rem;">{{ dashboardStatusText }}</span>
+                        <div class="vr mx-0.5 opacity-25"></div>
+                        <span class="text-body font-monospace text-truncate"><i class="fa-solid fa-users text-success me-1"></i>{{ store.stats?.mc?.online || 0 }}/{{ store.stats?.mc?.maxPlayers || 0 }}</span>
+                        <div class="vr mx-0.5 opacity-25"></div>
+                        <span class="text-body font-monospace"><i class="fa-solid fa-microchip text-primary me-1"></i>{{ store.stats.cpu || 0 }}%</span>
+                        <div class="vr mx-0.5 opacity-25"></div>
+                        <span class="text-body font-monospace"><i class="fa-solid fa-memory text-info me-1"></i>{{ store.stats.mem?.percentage || 0 }}%</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 flex-shrink-0 ms-2" style="font-size: 0.72rem;">
+                        <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem;"></i>
+                        <span>{{ $t('dashboard.expand_info') || '展开' }}</span>
+                    </button>
+                </div>
+
+                <!-- 2. Main Stats Content (Desktop full grid, Mobile expanded view) -->
+                <div ref="expandedContentRef"
+                     class="stats-expanded-content"
+                     :class="{ 'mobile-content-active': !mobileCollapsed, 'mobile-content-inactive': mobileCollapsed }">
+                    <!-- Mobile Stats Navigation & Toggle (Visible only on mobile: d-md-none) -->
+                    <div class="d-flex d-md-none justify-content-between align-items-center mb-2 px-0.5 flex-shrink-0">
+                        <div class="btn-group btn-group-sm p-0.5 rounded-pill bg-body-tertiary border shadow-sm">
+                            <button type="button" class="btn btn-sm rounded-pill px-2.5 py-1 font-monospace"
+                                    :class="activeMobileCard === 0 ? 'btn-primary shadow-sm' : 'btn-ghost text-muted'"
+                                    @click.stop="setMobileCard(0)">
+                                <i class="fa-solid fa-server me-1"></i>{{ store.lang === 'zh' ? '服务器信息' : 'Server' }}
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-2.5 py-1 font-monospace"
+                                    :class="activeMobileCard === 1 ? 'btn-primary shadow-sm' : 'btn-ghost text-muted'"
+                                    @click.stop="setMobileCard(1)">
+                                <i class="fa-solid fa-microchip me-1"></i>{{ store.lang === 'zh' ? '系统资源' : 'System' }}
+                            </button>
+                        </div>
+                        
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1 d-flex align-items-center gap-1.5"
+                                @click.stop="toggleMobileCollapse"
+                                :title="$t('dashboard.collapse_info') || '收起'">
+                            <i class="fa-solid fa-chevron-up" style="font-size: 0.65rem;"></i>
+                            <span style="font-size: 0.75rem;">{{ $t('dashboard.collapse_info') || '收起' }}</span>
+                        </button>
+                    </div>
+
+                    <!-- System Stats Overview -->
+                    <div ref="dashboardGridRef"
+                         @scroll="onGridScroll"
+                         class="dashboard-grid mb-0 mb-md-3 flex-shrink-0 w-100" 
+                         style="min-width: 0;">
+                        <div class="stagger-item w-100" style="min-width: 0;">
+                            <div class="stat-card h-100 w-100 d-flex flex-column" style="min-width: 0;">
+                                <div class="stat-card-header flex-shrink-0">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1 text-truncate pe-2" style="font-size: 0.6875rem;" :title="activeInstanceName || $t('dashboard.server_info')">
+                                            <i class="fa-solid fa-server me-2"></i>{{ activeInstanceName || $t('dashboard.server_info') }}
+                                        </h6>
+                                        <span class="badge rounded-pill font-monospace flex-shrink-0" :class="dashboardStatusClass">{{ dashboardStatusText }}</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card-body d-flex flex-column justify-content-between flex-grow-1" style="min-width: 0;">
+                                    <!-- 1. Player Status & MOTD Hero Section -->
+                                    <div class="mb-2 mb-md-2.5">
+                                        <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                            <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
+                                                <div class="resource-icon-badge text-success flex-shrink-0" style="background: rgba(25, 135, 84, 0.12);">
+                                                    <i class="fa-solid fa-users"></i>
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="fw-bold text-body text-truncate" style="font-size: 0.85rem; line-height: 1.2;">{{ $t('dashboard.online_players') }}</div>
+                                                    <div class="text-muted text-truncate font-monospace" style="font-size: 0.7rem; line-height: 1.2;">
+                                                        <span v-if="store.stats?.mc?.online > 0" class="text-success fw-medium">{{ store.stats.mc.onlinePlayerList?.slice(0, 3).join(', ') }}{{ (store.stats.mc.onlinePlayerList?.length > 3 ? '...' : '') }}</span>
+                                                        <span v-else-if="store.serverStatus === 'running' || store.isRunning" class="text-muted opacity-75">{{ $t('dashboard.no_players') }}</span>
+                                                        <span v-else class="text-muted opacity-75">{{ store.lang === 'zh' ? '离线' : 'Offline' }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="text-end ps-1 flex-shrink-0">
+                                                <div class="font-monospace fw-bold resource-percent-val" :class="(store.stats?.mc?.online > 0) ? 'text-success' : 'text-body'">
+                                                    {{ store.stats?.mc ? store.stats.mc.online : '-' }}<span class="small fw-normal text-muted" style="font-size: 0.75rem; margin-left: 2px;">/ {{ store.stats?.mc ? store.stats.mc.maxPlayers : '-' }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="progress my-1.5" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);">
+                                            <div class="progress-bar" :class="(store.serverStatus === 'running' || store.isRunning) ? 'bg-success' : 'bg-secondary'" :style="{width: (store.stats?.mc?.maxPlayers > 0 ? ((store.stats.mc.online / store.stats.mc.maxPlayers) * 100) : 0) + '%'}"></div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center justify-content-between text-muted font-monospace px-2.5 py-1 rounded-2 mt-1.5" style="font-size: 0.72rem; min-height: 26px; background: rgba(128, 128, 128, 0.08);">
+                                            <div class="d-flex align-items-center text-truncate min-w-0 me-2">
+                                                <i class="fa-solid fa-quote-left me-1.5 opacity-50 flex-shrink-0" style="font-size: 0.65rem;"></i>
+                                                <span class="text-truncate" :title="displayMotd">{{ displayMotd }}</span>
+                                            </div>
+                                            <span class="flex-shrink-0 opacity-75 d-none d-md-inline" style="font-size: 0.6875rem;">{{ store.stats?.mc?.maxPlayers > 0 ? Math.round((store.stats.mc.online / store.stats.mc.maxPlayers) * 100) : 0 }}%</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. Server Metadata 2x2 Grid -->
+                                    <div class="row g-2 g-md-2.5 flex-grow-1">
+                                        <!-- Game Version -->
+                                        <div class="col-6">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                                <div class="resource-icon-badge text-success flex-shrink-0" style="background: rgba(25, 135, 84, 0.12);">
+                                                    <i class="fa-solid fa-cube"></i>
+                                                </div>
+                                                <div class="min-w-0 flex-grow-1">
+                                                    <div class="text-muted text-truncate" style="font-size: 0.6875rem; line-height: 1.2;">{{ $t('dashboard.target') }}</div>
+                                                    <div class="fw-bold font-monospace text-body text-truncate" style="font-size: 0.82rem; line-height: 1.3;" :title="store.stats.version?.mc || 'Unknown'">
+                                                        {{ store.stats.version?.mc || 'Unknown' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Loader / Core -->
+                                        <div class="col-6">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                                <div class="resource-icon-badge flex-shrink-0" style="color: #a855f7; background: rgba(168, 85, 247, 0.12);">
+                                                    <i class="fa-solid fa-layer-group"></i>
+                                                </div>
+                                                <div class="min-w-0 flex-grow-1">
+                                                    <div class="text-muted text-truncate" style="font-size: 0.6875rem; line-height: 1.2;">{{ $t('dashboard.loader') }}</div>
+                                                    <div class="fw-bold font-monospace text-body text-truncate" style="font-size: 0.82rem; line-height: 1.3;" :title="formattedLoader">
+                                                        {{ formattedLoader }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Java Environment -->
+                                        <div class="col-6">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                                <div class="resource-icon-badge text-warning flex-shrink-0" style="background: rgba(255, 170, 0, 0.12);">
+                                                    <i class="fa-solid fa-mug-hot"></i>
+                                                </div>
+                                                <div class="min-w-0 flex-grow-1">
+                                                    <div class="text-muted text-truncate" style="font-size: 0.6875rem; line-height: 1.2;">{{ $t('dashboard.java_version') }}</div>
+                                                    <div class="fw-bold font-monospace text-body text-truncate" style="font-size: 0.82rem; line-height: 1.3;" :title="store.stats.javaVersion || 'Checking...'">
+                                                        {{ store.stats.javaVersion || 'Checking...' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Server Port -->
+                                        <div class="col-6">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                                <div class="resource-icon-badge text-info flex-shrink-0" style="background: rgba(13, 202, 240, 0.12);">
+                                                    <i class="fa-solid fa-network-wired"></i>
+                                                </div>
+                                                <div class="min-w-0 flex-grow-1">
+                                                    <div class="text-muted text-truncate" style="font-size: 0.6875rem; line-height: 1.2;">{{ $t('dashboard.port') }}</div>
+                                                    <div class="fw-bold font-monospace text-body text-truncate" style="font-size: 0.82rem; line-height: 1.3;" :title="store.stats?.mc?.port ? (':' + store.stats.mc.port) : ':25565'">
+                                                        :{{ (store.stats?.mc?.port && store.stats.mc.port !== '-') ? store.stats.mc.port : '25565' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="stat-card-body" style="min-width: 0;">
-                              <div v-if="store.stats && store.stats.mc" class="d-flex align-items-end mb-2">
-                                  <div class="fw-bold me-2" style="font-size: 2rem; line-height: 1;">{{ store.stats.mc.online }}</div>
-                                  <div class="text-muted mb-1 small">/ {{ store.stats.mc.maxPlayers }} {{ $t('dashboard.online_players') }}</div>
-                              </div>
-                             
-                              <div v-if="store.stats && store.stats.mc" class="progress mb-3" style="height: 4px;">
-                                 <div class="progress-bar bg-success" :style="{width: (store.stats.mc.maxPlayers > 0 ? (store.stats.mc.online/store.stats.mc.maxPlayers*100) : 0) + '%'}"></div>
-                              </div>
-                              <div v-if="store.stats && store.stats.mc" class="text-truncate small text-muted font-monospace mb-2"><i class="fa-solid fa-quote-left me-2 opacity-50"></i>{{ store.stats.mc.motd }}</div>
-                             
-                             <div class="d-flex justify-content-between small text-muted border-top pt-2 mt-2 flex-wrap gap-2" style="font-size: 0.6875rem; border-color: var(--c-border-subtle) !important;">
-                                <span>{{ $t('dashboard.target') }}: {{ store.stats.version?.mc || 'Unknown' }}</span>
-                                <span>{{ $t('dashboard.loader') }}: {{ store.stats.version?.loader || 'Unknown' }}</span>
-                                <span>{{ $t('properties.loader_type') }}: {{ (store.stats.loaderType || 'fabric') === 'neoforge' ? 'NeoForge' : (store.stats.loaderType || 'fabric').charAt(0).toUpperCase() + (store.stats.loaderType || 'fabric').slice(1) }}</span>
-                                <span>{{ $t('dashboard.java_version') }}: <span class="fw-bold">{{ store.stats.javaVersion || 'Checking...' }}</span></span>
+                        <div class="stagger-item w-100" style="animation-delay: 0.1s; min-width: 0;">
+                             <div class="stat-card h-100 w-100 d-flex flex-column" style="min-width: 0;">
+                                <div class="stat-card-header flex-shrink-0">
+                                    <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
+                                </div>
+                                <div class="stat-card-body d-flex flex-column justify-content-between flex-grow-1" style="min-width: 0;">
+                                    <div class="row g-2 g-md-3 h-100">
+                                        <!-- 1. CPU -->
+                                        <div class="col-6">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                                    <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
+                                                        <div class="resource-icon-badge text-primary" style="background: rgba(var(--c-primary-rgb), 0.12);">
+                                                            <i class="fa-solid fa-microchip"></i>
+                                                        </div>
+                                                        <div class="min-w-0">
+                                                            <div class="fw-bold text-body text-truncate" style="font-size: 0.85rem; line-height: 1.2;">CPU</div>
+                                                            <div class="text-muted text-truncate d-none d-md-block" style="font-size: 0.7rem; line-height: 1.2;">{{ $t('dashboard.cpu_usage') }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-end ps-1 flex-shrink-0">
+                                                        <div class="font-monospace fw-bold resource-percent-val" :class="Number(store.stats.cpu) > 80 ? 'text-danger' : 'text-body'">
+                                                            {{ store.stats.cpu || 0 }}<span class="small fw-normal opacity-75" style="font-size: 0.75rem; margin-left: 1px;">%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="progress my-1" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);">
+                                                    <div class="progress-bar" :class="Number(store.stats.cpu) > 80 ? 'bg-danger' : 'bg-primary'" :style="{width: (store.stats.cpu || 0) + '%'}"></div>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center text-muted font-monospace" style="font-size: 0.7rem;">
+                                                    <span class="text-truncate">{{ $t('dashboard.status') }}</span>
+                                                    <span :class="Number(store.stats.cpu) > 80 ? 'text-danger fw-bold' : 'text-body-secondary'">{{ Number(store.stats.cpu) > 80 ? $t('dashboard.status_high') : $t('dashboard.status_normal') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- 2. RAM -->
+                                        <div class="col-6">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                                    <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
+                                                        <div class="resource-icon-badge text-warning" style="background: rgba(255, 170, 0, 0.12);">
+                                                            <i class="fa-solid fa-memory"></i>
+                                                        </div>
+                                                        <div class="min-w-0">
+                                                            <div class="fw-bold text-body text-truncate" style="font-size: 0.85rem; line-height: 1.2;">RAM</div>
+                                                            <div class="text-muted text-truncate d-none d-md-block" style="font-size: 0.7rem; line-height: 1.2;">{{ $t('dashboard.ram_usage') }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-end ps-1 flex-shrink-0">
+                                                        <div class="font-monospace fw-bold resource-percent-val" :class="Number(store.stats.mem?.percentage) > 85 ? 'text-danger' : 'text-body'">
+                                                            {{ store.stats.mem?.percentage || 0 }}<span class="small fw-normal opacity-75" style="font-size: 0.75rem; margin-left: 1px;">%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="progress my-1" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);">
+                                                    <div class="progress-bar" :class="Number(store.stats.mem?.percentage) > 85 ? 'bg-danger' : 'bg-warning'" :style="{width: (store.stats.mem?.percentage || 0) + '%'}"></div>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center text-muted font-monospace" style="font-size: 0.7rem;">
+                                                    <span class="text-truncate">{{ store.stats.mem?.used || 0 }}<span class="d-none d-md-inline"> </span>G<span class="d-none d-md-inline">B</span></span>
+                                                    <span class="opacity-75">/ {{ store.stats.mem?.total || 0 }}<span class="d-none d-md-inline"> </span>G<span class="d-none d-md-inline">B</span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- 3. SWAP -->
+                                        <div class="col-6">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                                    <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
+                                                        <div class="resource-icon-badge text-info" style="background: rgba(13, 202, 240, 0.12);">
+                                                            <i class="fa-solid fa-arrows-rotate"></i>
+                                                        </div>
+                                                        <div class="min-w-0">
+                                                            <div class="fw-bold text-body text-truncate" style="font-size: 0.85rem; line-height: 1.2;">SWAP</div>
+                                                            <div class="text-muted text-truncate d-none d-md-block" style="font-size: 0.7rem; line-height: 1.2;">{{ $t('dashboard.swap_usage') }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-end ps-1 flex-shrink-0">
+                                                        <div class="font-monospace fw-bold resource-percent-val" :class="{'text-danger': Number(store.stats.swap?.percentage) > 80, 'text-muted fw-normal': Number(store.stats.swap?.total || 0) === 0}">
+                                                            <template v-if="Number(store.stats.swap?.total || 0) > 0">{{ store.stats.swap?.percentage || 0 }}<span class="small fw-normal opacity-75" style="font-size: 0.75rem; margin-left: 1px;">%</span></template>
+                                                            <template v-else>-</template>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="progress my-1" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);">
+                                                    <div class="progress-bar bg-info" :class="{'bg-danger': Number(store.stats.swap?.percentage) > 80}" :style="{width: (Number(store.stats.swap?.total || 0) > 0 ? (store.stats.swap?.percentage || 0) : 0) + '%'}"></div>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center text-muted font-monospace" style="font-size: 0.7rem;">
+                                                    <template v-if="Number(store.stats.swap?.total || 0) > 0">
+                                                        <span class="text-truncate">{{ store.stats.swap?.used || 0 }}<span class="d-none d-md-inline"> </span>G<span class="d-none d-md-inline">B</span></span>
+                                                        <span class="opacity-75">/ {{ store.stats.swap?.total || 0 }}<span class="d-none d-md-inline"> </span>G<span class="d-none d-md-inline">B</span></span>
+                                                    </template>
+                                                    <template v-else>
+                                                        <span class="text-truncate opacity-75">{{ $t('dashboard.swap_unconfigured') }}</span>
+                                                        <span class="opacity-50">OFF</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- 4. DISK -->
+                                        <div class="col-6">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                                    <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
+                                                        <div class="resource-icon-badge text-success" style="background: rgba(25, 135, 84, 0.12);">
+                                                            <i class="fa-solid fa-hard-drive"></i>
+                                                        </div>
+                                                        <div class="min-w-0">
+                                                            <div class="fw-bold text-body text-truncate" style="font-size: 0.85rem; line-height: 1.2;">DISK</div>
+                                                            <div class="text-muted text-truncate d-none d-md-block" style="font-size: 0.7rem; line-height: 1.2;">{{ $t('dashboard.disk_usage') }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-end ps-1 flex-shrink-0">
+                                                        <div class="font-monospace fw-bold resource-percent-val" :class="Number(store.stats.disk?.percentage) > 90 ? 'text-danger' : 'text-body'">
+                                                            {{ store.stats.disk?.percentage || 0 }}<span class="small fw-normal opacity-75" style="font-size: 0.75rem; margin-left: 1px;">%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="progress my-1" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);">
+                                                    <div class="progress-bar" :class="Number(store.stats.disk?.percentage) > 90 ? 'bg-danger' : 'bg-success'" :style="{width: (store.stats.disk?.percentage || 0) + '%'}"></div>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center text-muted font-monospace" style="font-size: 0.7rem;">
+                                                    <span class="text-truncate">{{ store.stats.disk?.used || 0 }}<span class="d-none d-md-inline"> </span>G<span class="d-none d-md-inline">B</span></span>
+                                                    <span class="opacity-75">/ {{ store.stats.disk?.total || 0 }}<span class="d-none d-md-inline"> </span>G<span class="d-none d-md-inline">B</span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                              </div>
                         </div>
                     </div>
-                </div>
-                <div class="stagger-item w-100" style="animation-delay: 0.1s; min-width: 0;">
-                     <div class="stat-card h-100 w-100" style="min-width: 0;">
-                        <div class="stat-card-header">
-                            <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
-                        </div>
-                        <div class="stat-card-body">
-                             <div class="mb-3">
-                                 <div class="d-flex justify-content-between small mb-1 fw-bold">
-                                     <span>{{ $t('dashboard.cpu_usage') }}</span>
-                                     <span :class="{'text-danger': store.stats.cpu > 80}">{{ store.stats.cpu }}%</span>
-                                 </div>
-                                 <div class="progress" style="height: 4px;">
-                                    <div class="progress-bar" :style="{width: store.stats.cpu + '%'}"></div>
-                                 </div>
-                             </div>
-                             <div>
-                                 <div class="d-flex justify-content-between small mb-1 fw-bold">
-                                     <span>{{ $t('dashboard.mem_usage') }} ({{ store.stats.mem.percentage }}%)</span>
-                                     <span class="text-muted font-monospace" style="font-size: 0.6875rem;">{{ store.stats.mem.used }}G / {{ store.stats.mem.total }}G</span>
-                                 </div>
-                                 <div class="progress" style="height: 4px;">
-                                    <div class="progress-bar bg-warning" :style="{width: store.stats.mem.percentage + '%'}"></div>
-                                 </div>
-                             </div>
-                        </div>
-                     </div>
+
+                    <!-- Mobile Carousel Dot Indicators (Visible only on mobile: d-md-none) -->
+                    <div class="d-flex d-md-none justify-content-center gap-1.5 mt-2 mb-1 flex-shrink-0">
+                        <span class="rounded-pill" 
+                              @click.stop="setMobileCard(0)"
+                              style="cursor: pointer;"
+                              :style="{ width: activeMobileCard === 0 ? '16px' : '6px', height: '5px', background: activeMobileCard === 0 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                        <span class="rounded-pill" 
+                              @click.stop="setMobileCard(1)"
+                              style="cursor: pointer;"
+                              :style="{ width: activeMobileCard === 1 ? '16px' : '6px', height: '5px', background: activeMobileCard === 1 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                    </div>
                 </div>
             </div>
 
-            <div class="console-output flex-grow-1 mb-3 position-relative" id="consoleBox">
+            <div class="console-output flex-grow-1 mb-2 mb-md-3 position-relative" id="consoleBox">
                 <div v-for="(log,i) in store.logs" :key="i" v-html="formatLog(log)"></div>
             </div>
             
-            <div class="flex-shrink-0">
+            <div class="flex-shrink-0 position-relative" ref="cmdBarRef">
                 <div class="input-group cmd-input-group">
-                    <input type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')">
-                    <button class="btn btn-outline-secondary" @click="showCmdPanel = !showCmdPanel" :title="$t('dashboard.cmd_helper')">
+                    <input ref="cmdInputRef" type="text" class="form-control" v-model="command" @keyup.enter="sendCommand" :placeholder="$t('dashboard.send_cmd_placeholder')">
+                    <button class="btn" :class="showCmdPanel ? 'btn-primary text-white' : 'btn-outline-secondary'" @click="toggleCmdPanel" :title="$t('dashboard.cmd_helper')">
                         <i class="fa-solid fa-terminal"></i>
                     </button>
                     <button class="btn btn-primary fw-bold" @click="sendCommand">{{ $t('dashboard.send') }}</button>
                 </div>
 
-                <Transition name="cmd-panel-slide">
-                    <div v-if="showCmdPanel" class="cmd-panel mt-2">
-                        <div class="d-flex gap-2 mb-2 align-items-center flex-wrap">
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="cursor:pointer" :class="{'bg-primary text-white': cmdCategory === 'all'}" @click="cmdCategory='all'">{{ $t('dashboard.cmd_all') }}</span>
-                            <span v-for="cat in cmdCategories" :key="cat.key" class="badge border" style="cursor:pointer" :class="cmdCategory===cat.key ? 'bg-'+cat.color+' text-white' : 'bg-body-tertiary text-'+cat.color" @click="cmdCategory=cat.key">
-                                <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
-                            </span>
-                            <div class="input-group input-group-sm ms-auto" style="max-width:200px">
-                                <span class="input-group-text bg-body-tertiary border-end-0"><i class="fa-solid fa-search text-muted" style="font-size:0.7rem"></i></span>
-                                <input type="text" class="form-control border-start-0" :placeholder="$t('dashboard.cmd_search')" v-model="cmdSearch" style="font-size:0.8rem">
+                <!-- PC Floating Popover Palette (Desktop >= 768px) -->
+                <Transition name="cmd-palette">
+                    <div v-if="showCmdPanel && !isMobile" class="cmd-pc-palette">
+                        <!-- Header with Category Badges, Search Bar, and Close Button -->
+                        <div class="cmd-pc-header d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                            <div class="d-flex align-items-center gap-1.5 flex-nowrap">
+                                <span class="badge rounded-pill cursor-pointer px-2.5 py-1.5 transition-fast"
+                                      :class="cmdCategory === 'all' ? 'bg-primary text-white shadow-sm' : 'bg-body-secondary text-secondary'"
+                                      @click="cmdCategory = 'all'">
+                                    {{ $t('dashboard.cmd_all') }}
+                                </span>
+                                <span v-for="cat in cmdCategories" :key="cat.key"
+                                      class="badge rounded-pill cursor-pointer px-2.5 py-1.5 transition-fast"
+                                      :class="cmdCategory === cat.key ? 'bg-' + cat.color + ' text-white shadow-sm' : 'bg-body-secondary text-' + cat.color"
+                                      @click="cmdCategory = cat.key">
+                                    <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
+                                </span>
                             </div>
-                        </div>
-                        <div class="cmd-list">
-                            <div v-for="cmd in filteredCommands" :key="cmd.name" class="cmd-item d-flex align-items-start gap-2 py-1 px-2 rounded" @click="useCommand(cmd)">
-                                <code class="text-primary flex-shrink-0" style="min-width:120px;font-size:0.75rem">{{ cmd.name }}</code>
-                                <span class="small text-muted flex-grow-1" style="font-size:0.7rem">{{ $t('dashboard.cmd_' + cmd.desc) }}</span>
-                                <i v-if="cmd.quick" class="fa-solid fa-bolt text-warning flex-shrink-0" style="font-size:0.65rem" :title="$t('dashboard.cmd_quick')"></i>
-                            </div>
-                            <div v-if="filteredCommands.length === 0" class="text-center text-muted py-2 small">
-                                {{ $t('dashboard.cmd_no_result') }}
-                            </div>
-                        </div>
-                        <div class="mt-2 border-top pt-2" v-if="quickCommands.length > 0">
-                            <div class="small fw-bold text-muted mb-1"><i class="fa-solid fa-bolt me-1 text-warning"></i>{{ $t('dashboard.cmd_quick_title') }}</div>
-                            <div class="d-flex flex-wrap gap-1">
-                                <button v-for="cmd in quickCommands" :key="cmd.name" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem" @click="sendQuickCommand(cmd.template)">
-                                    {{ cmd.name }}
+
+                            <div class="input-group input-group-sm ms-auto" style="max-width: 220px;">
+                                <span class="input-group-text bg-body-tertiary border-end-0 text-muted"><i class="fa-solid fa-search" style="font-size:0.75rem"></i></span>
+                                <input type="text" class="form-control border-start-0 border-end-0 ps-0" :placeholder="$t('dashboard.cmd_search')" v-model="cmdSearch" style="font-size:0.8rem">
+                                <button v-if="cmdSearch" class="btn btn-sm btn-outline-secondary border-start-0" type="button" @click="cmdSearch = ''">
+                                    <i class="fa-solid fa-xmark"></i>
                                 </button>
+                            </div>
+
+                            <button class="btn btn-sm btn-ghost text-muted p-1 ms-1" @click="showCmdPanel = false" title="关闭 (ESC)">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Command List -->
+                        <div class="cmd-pc-list px-2 py-1.5">
+                            <div v-for="cmd in filteredCommands" :key="cmd.name"
+                                 class="cmd-pc-item d-flex align-items-center justify-content-between gap-3 py-2 px-2.5 rounded-2 cursor-pointer"
+                                 @click="useCommand(cmd)">
+                                <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
+                                    <code class="text-primary fw-bold font-monospace flex-shrink-0" style="font-size: 0.8125rem;">/{{ cmd.name }}</code>
+                                    <span class="text-body fw-medium text-truncate small flex-shrink-0" style="font-size: 0.775rem;">{{ getCmdTitle(cmd) }}</span>
+                                    <span v-if="cmd._matchBadge" class="badge bg-warning-subtle text-warning border border-warning-subtle py-0 px-1 font-monospace flex-shrink-0" style="font-size: 0.65rem;">
+                                        {{ cmd._matchBadge }}
+                                    </span>
+                                    <span class="text-muted text-truncate small opacity-75 d-none d-lg-inline" style="font-size: 0.725rem;">{{ $t('dashboard.cmd_' + cmd.desc) }}</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1.5 flex-shrink-0">
+                                    <span v-if="hasSchema(cmd.name)" class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.65rem;">
+                                        <i class="fa-solid fa-sliders me-1"></i>配置
+                                    </span>
+                                    <span v-else class="badge bg-body-secondary text-muted font-monospace" style="font-size: 0.65rem;">
+                                        <i class="fa-solid fa-arrow-turn-down me-1"></i>填入
+                                    </span>
+                                    <button v-if="cmd.quick" class="btn btn-sm btn-ghost text-warning p-0.5 ms-1"
+                                            :title="$t('dashboard.cmd_quick')"
+                                            @click.stop="sendQuickCommand(cmd.template)">
+                                        <i class="fa-solid fa-bolt" style="font-size:0.8rem"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div v-if="filteredCommands.length === 0" class="text-center text-muted py-4 small">
+                                <i class="fa-solid fa-inbox d-block mb-1 fs-5 opacity-50"></i>
+                                {{ $t('dashboard.cmd_no_result') }}
                             </div>
                         </div>
                     </div>
                 </Transition>
             </div>
+
+            <!-- Mobile Bottom Sheet (Teleported to body, Mobile <= 768px) -->
+            <Teleport to="body">
+                <div v-if="isMobile && showCmdPanel" class="cmd-mobile-wrapper">
+                    <!-- Backdrop -->
+                    <Transition name="cmd-fade" appear>
+                        <div class="cmd-mobile-backdrop" @click="showCmdPanel = false"></div>
+                    </Transition>
+
+                    <!-- Bottom Sheet -->
+                    <Transition name="cmd-sheet" appear>
+                        <div class="cmd-mobile-sheet">
+                            <!-- Drag Handle Area -->
+                            <div class="cmd-sheet-handle-area" @click="showCmdPanel = false">
+                                <div class="cmd-sheet-handle"></div>
+                            </div>
+
+                            <!-- Sheet Header -->
+                            <div class="cmd-sheet-header px-3 pb-2 pt-1 d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="cmd-sheet-icon">
+                                        <i class="fa-solid fa-terminal text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="m-0 fw-bold d-flex align-items-center gap-2">
+                                            {{ $t('dashboard.cmd_helper') }}
+                                            <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.65rem;">
+                                                {{ filteredCommands.length }}
+                                            </span>
+                                        </h6>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-ghost text-muted rounded-circle p-1.5" @click="showCmdPanel = false">
+                                    <i class="fa-solid fa-xmark fs-6"></i>
+                                </button>
+                            </div>
+
+                            <!-- Search Input in Sheet -->
+                            <div class="px-3 pb-2">
+                                <div class="input-group input-group-sm cmd-mobile-search">
+                                    <span class="input-group-text bg-body-tertiary border-end-0 text-muted"><i class="fa-solid fa-search"></i></span>
+                                    <input type="text" class="form-control border-start-0 border-end-0 ps-0"
+                                           :placeholder="$t('dashboard.cmd_search')"
+                                           v-model="cmdSearch">
+                                    <button v-if="cmdSearch" class="btn btn-sm btn-outline-secondary border-start-0" type="button" @click="cmdSearch = ''">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Category Chips (Single-line horizontal swipe, NO WRAPPING!) -->
+                            <div class="cmd-mobile-cats px-3 pb-2.5 d-flex flex-nowrap overflow-x-auto no-scrollbar gap-1.5">
+                                <button type="button" class="btn btn-sm rounded-pill flex-shrink-0 text-nowrap px-3 py-1 font-monospace"
+                                        :class="cmdCategory === 'all' ? 'btn-primary shadow-sm' : 'btn-outline-secondary'"
+                                        style="font-size: 0.76rem;"
+                                        @click="cmdCategory = 'all'">
+                                    {{ $t('dashboard.cmd_all') }}
+                                </button>
+                                <button v-for="cat in cmdCategories" :key="cat.key"
+                                        type="button" class="btn btn-sm rounded-pill flex-shrink-0 text-nowrap px-3 py-1 font-monospace"
+                                        :class="cmdCategory === cat.key ? 'btn-' + cat.color + ' text-white shadow-sm' : 'btn-outline-secondary'"
+                                        style="font-size: 0.76rem;"
+                                        @click="cmdCategory = cat.key">
+                                    <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
+                                </button>
+                            </div>
+
+                            <!-- Mobile Command Cards List -->
+                            <div class="cmd-mobile-list px-3 pb-4">
+                                <div v-for="cmd in filteredCommands" :key="cmd.name"
+                                     class="cmd-mobile-card p-2.5 mb-2 rounded-3 border bg-body-tertiary cursor-pointer"
+                                     @click="useCommand(cmd)">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                            <code class="text-primary fw-bold font-monospace" style="font-size: 0.85rem;">/{{ cmd.name }}</code>
+                                            <span class="fw-bold small text-body" style="font-size: 0.8rem;">{{ getCmdTitle(cmd) }}</span>
+                                            <span class="badge rounded-pill bg-body-secondary text-muted font-monospace" style="font-size: 0.65rem;">
+                                                {{ $t('dashboard.cmd_cat_' + cmd.category) }}
+                                            </span>
+                                            <span v-if="cmd._matchBadge" class="badge bg-warning-subtle text-warning border border-warning-subtle py-0 px-1.5 font-monospace" style="font-size: 0.65rem;">
+                                                {{ cmd._matchBadge }}
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <button v-if="hasSchema(cmd.name)"
+                                                    class="btn btn-sm btn-primary-subtle text-primary py-0.5 px-2 rounded-pill font-monospace"
+                                                    style="font-size: 0.7rem;">
+                                                <i class="fa-solid fa-sliders me-1"></i>配置
+                                            </button>
+                                            <button v-else
+                                                    class="btn btn-sm btn-outline-secondary py-0.5 px-2 rounded-pill font-monospace"
+                                                    style="font-size: 0.7rem;">
+                                                <i class="fa-solid fa-arrow-turn-down me-1"></i>填入
+                                            </button>
+                                            <button v-if="cmd.quick"
+                                                    class="btn btn-sm btn-outline-warning py-0.5 px-1.5 rounded-pill"
+                                                    :title="$t('dashboard.cmd_quick')"
+                                                    @click.stop="sendQuickCommand(cmd.template)">
+                                                <i class="fa-solid fa-bolt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="small text-muted" style="font-size: 0.75rem; line-height: 1.35;">
+                                        {{ $t('dashboard.cmd_' + cmd.desc) }}
+                                    </div>
+
+                                    <div v-if="cmd.syntax" class="mt-1 text-secondary opacity-75 font-monospace text-truncate" style="font-size: 0.68rem;">
+                                        {{ cmd.syntax }}
+                                    </div>
+                                </div>
+
+                                <div v-if="filteredCommands.length === 0" class="text-center text-muted py-5">
+                                    <i class="fa-solid fa-magnifying-glass fs-3 mb-2 opacity-50"></i>
+                                    <div>{{ $t('dashboard.cmd_no_result') }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
+            </Teleport>
         </div>
 
         <!-- Startup Settings Modal -->
@@ -1567,6 +2258,123 @@ export default {
     `,
     setup() {
         const command = ref('');
+        const activeMobileCard = ref(0);
+        const mobileCollapsed = ref(localStorage.getItem('mc_mobile_dashboard_collapsed') === 'true');
+        const dashboardGridRef = ref(null);
+        const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+        const statsSectionRef = ref(null);
+        const miniBarRef = ref(null);
+        const expandedContentRef = ref(null);
+        let collapseTransitionTimer = null;
+
+        const updateMobile = () => {
+            if (typeof window !== 'undefined') {
+                isMobile.value = window.innerWidth <= 768;
+            }
+        };
+
+        const setMobileCard = (index) => {
+            activeMobileCard.value = index;
+            if (dashboardGridRef.value) {
+                const children = dashboardGridRef.value.children;
+                if (children && children[index]) {
+                    children[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+                }
+            }
+        };
+
+        const onGridScroll = (e) => {
+            if (!e || !e.target) return;
+            const target = e.target;
+            const scrollLeft = target.scrollLeft;
+            const totalScrollable = target.scrollWidth - target.clientWidth;
+            if (totalScrollable > 0) {
+                const newIndex = (scrollLeft / totalScrollable) > 0.4 ? 1 : 0;
+                if (activeMobileCard.value !== newIndex) {
+                    activeMobileCard.value = newIndex;
+                }
+            }
+        };
+
+        const toggleMobileCollapse = () => {
+            const section = statsSectionRef.value;
+            const miniBar = miniBarRef.value;
+            const expanded = expandedContentRef.value;
+
+            if (typeof window !== 'undefined' && window.innerWidth > 768) {
+                return;
+            }
+
+            if (!section || !miniBar || !expanded) {
+                mobileCollapsed.value = !mobileCollapsed.value;
+                localStorage.setItem('mc_mobile_dashboard_collapsed', mobileCollapsed.value ? 'true' : 'false');
+                return;
+            }
+
+            if (collapseTransitionTimer) {
+                clearTimeout(collapseTransitionTimer);
+                collapseTransitionTimer = null;
+            }
+
+            if (!mobileCollapsed.value) {
+                // 当前展开 -> 执行平滑高度缩小为小卡片
+                const startH = section.offsetHeight;
+                const targetH = miniBar.offsetHeight || 42;
+
+                section.style.height = startH + 'px';
+                section.style.overflow = 'hidden';
+                section.style.transition = 'height 0.32s cubic-bezier(0.16, 1, 0.3, 1)';
+                void section.offsetHeight;
+
+                mobileCollapsed.value = true;
+                localStorage.setItem('mc_mobile_dashboard_collapsed', 'true');
+
+                requestAnimationFrame(() => {
+                    section.style.height = targetH + 'px';
+                });
+
+                collapseTransitionTimer = setTimeout(() => {
+                    if (section && mobileCollapsed.value) {
+                        section.style.height = '';
+                        section.style.overflow = '';
+                        section.style.transition = '';
+                    }
+                    collapseTransitionTimer = null;
+                }, 340);
+            } else {
+                // 当前收起 -> 执行平滑高度增大展开为大卡片
+                const startH = section.offsetHeight;
+
+                expanded.style.visibility = 'visible';
+                expanded.style.position = 'absolute';
+                const targetH = expanded.scrollHeight || 268;
+
+                section.style.height = startH + 'px';
+                section.style.overflow = 'hidden';
+                section.style.transition = 'height 0.34s cubic-bezier(0.16, 1, 0.3, 1)';
+                void section.offsetHeight;
+
+                mobileCollapsed.value = false;
+                localStorage.setItem('mc_mobile_dashboard_collapsed', 'false');
+
+                requestAnimationFrame(() => {
+                    section.style.height = targetH + 'px';
+                });
+
+                collapseTransitionTimer = setTimeout(() => {
+                    if (section && !mobileCollapsed.value) {
+                        section.style.height = '';
+                        section.style.overflow = '';
+                        section.style.transition = '';
+                        if (expanded) expanded.style.position = '';
+                    }
+                    collapseTransitionTimer = null;
+                }, 360);
+            }
+        };
+
+        const cmdBarRef = ref(null);
+        const cmdInputRef = ref(null);
         const startupModal = ref(null);
         const saving = ref(false);
         const jars = ref([]);
@@ -1580,6 +2388,25 @@ export default {
         const paramValues = ref({});
         const cmdParamModalInstance = ref(null);
 
+        const hasSchema = (name) => !!COMMAND_SCHEMAS[name];
+
+        const toggleCmdPanel = () => {
+            showCmdPanel.value = !showCmdPanel.value;
+        };
+
+        const handleGlobalKeydown = (e) => {
+            if (e.key === 'Escape' && showCmdPanel.value) {
+                showCmdPanel.value = false;
+            }
+        };
+
+        const handleGlobalClick = (e) => {
+            if (!showCmdPanel.value || isMobile.value) return;
+            if (cmdBarRef.value && !cmdBarRef.value.contains(e.target)) {
+                showCmdPanel.value = false;
+            }
+        };
+
         const cmdCategories = [
             { key: 'player', icon: 'fa-solid fa-user', color: 'primary' },
             { key: 'server', icon: 'fa-solid fa-server', color: 'success' },
@@ -1588,20 +2415,175 @@ export default {
             { key: 'advanced', icon: 'fa-solid fa-code', color: 'secondary' },
         ];
 
-        const filteredCommands = computed(() => {
-            let cmds = MC_COMMANDS;
-            if (cmdCategory.value !== 'all') {
-                cmds = cmds.filter(c => c.category === cmdCategory.value);
+        const isSubsequence = (sub, str) => {
+            let i = 0, j = 0;
+            while (i < sub.length && j < str.length) {
+                if (sub[i] === str[j]) i++;
+                j++;
             }
-            const s = cmdSearch.value.toLowerCase().trim();
-            if (s) {
-                cmds = cmds.filter(c => c.name.includes(s) || c.syntax.toLowerCase().includes(s));
-            }
-            return cmds;
-        });
+            return i === sub.length;
+        };
 
-        const quickCommands = computed(() => {
-            return MC_COMMANDS.filter(c => c.quick && c.category === cmdCategory.value);
+        const getCmdTitle = (cmd) => {
+            const schema = COMMAND_SCHEMAS[cmd.name];
+            if (schema) {
+                return store.lang === 'zh'
+                    ? (schema.titlecn || t('dashboard.cmd_' + cmd.desc))
+                    : (schema.titleen || t('dashboard.cmd_' + cmd.desc));
+            }
+            return t('dashboard.cmd_' + cmd.desc);
+        };
+
+        const filteredCommands = computed(() => {
+            const raw = cmdSearch.value.toLowerCase().trim().replace(/^\/+/, '');
+            if (!raw) {
+                let cmds = MC_COMMANDS;
+                if (cmdCategory.value !== 'all') {
+                    cmds = cmds.filter(c => c.category === cmdCategory.value);
+                }
+                return cmds.map(c => ({ ...c, _matchBadge: null }));
+            }
+
+            const tokens = raw.split(/\s+/).filter(Boolean);
+            const results = [];
+
+            for (const cmd of MC_COMMANDS) {
+                const schema = COMMAND_SCHEMAS[cmd.name];
+                const aliases = COMMAND_ALIASES[cmd.name] || [];
+                const descZh = (messages.zh?.dashboard?.['cmd_' + cmd.desc] || '').toLowerCase();
+                const descEn = (messages.en?.dashboard?.['cmd_' + cmd.desc] || '').toLowerCase();
+                const titlecn = (schema?.titlecn || '').toLowerCase();
+                const titleen = (schema?.titleen || '').toLowerCase();
+                const catZh = (messages.zh?.dashboard?.['cmd_cat_' + cmd.category] || '').toLowerCase();
+                const catEn = (messages.en?.dashboard?.['cmd_cat_' + cmd.category] || '').toLowerCase();
+                const syntax = (cmd.syntax || '').toLowerCase();
+
+                // Extract option labels & values from schema
+                const optionStrings = [];
+                if (schema && schema.params) {
+                    for (const p of schema.params) {
+                        if (p.labelcn) optionStrings.push(p.labelcn.toLowerCase());
+                        if (p.labelen) optionStrings.push(p.labelen.toLowerCase());
+                        if (p.options) {
+                            for (const opt of p.options) {
+                                if (opt.value) optionStrings.push(opt.value.toLowerCase());
+                                if (opt.labelcn) optionStrings.push(opt.labelcn.toLowerCase());
+                                if (opt.labelen) optionStrings.push(opt.labelen.toLowerCase());
+                            }
+                        }
+                    }
+                }
+
+                let totalScore = 0;
+                let allTokensMatched = true;
+                let matchedReason = '';
+
+                for (const token of tokens) {
+                    let tokenScore = 0;
+                    let tokenReason = '';
+
+                    // 1. Exact command name match
+                    if (cmd.name === token) {
+                        tokenScore += 10000;
+                        tokenReason = `/${cmd.name}`;
+                    } else if (cmd.name.startsWith(token)) {
+                        tokenScore += 5000;
+                        tokenReason = `/${cmd.name}`;
+                    } else if (cmd.name.includes(token)) {
+                        tokenScore += 2500;
+                        tokenReason = `/${cmd.name}`;
+                    }
+
+                    // 2. Exact alias match
+                    const exactAlias = aliases.find(a => a.toLowerCase() === token);
+                    if (exactAlias) {
+                        tokenScore += 4000;
+                        if (!tokenReason) tokenReason = `别名: ${exactAlias}`;
+                    } else {
+                        // Alias prefix / contains
+                        const containAlias = aliases.find(a => {
+                            const al = a.toLowerCase();
+                            return al.includes(token) || (token.length >= 2 && token.includes(al));
+                        });
+                        if (containAlias) {
+                            tokenScore += 2000;
+                            if (!tokenReason) tokenReason = `别名: ${containAlias}`;
+                        }
+                    }
+
+                    // 3. Schema title match
+                    if (titlecn) {
+                        if (titlecn === token) {
+                            tokenScore += 3500;
+                            if (!tokenReason) tokenReason = schema.titlecn;
+                        } else if (titlecn.includes(token) || (token.length >= 2 && token.includes(titlecn))) {
+                            tokenScore += 2200;
+                            if (!tokenReason) tokenReason = schema.titlecn;
+                        } else if (token.length >= 2 && isSubsequence(token, titlecn)) {
+                            tokenScore += 1600;
+                            if (!tokenReason) tokenReason = schema.titlecn;
+                        }
+                    }
+                    if (titleen && (titleen.includes(token) || token.includes(titleen))) {
+                        tokenScore += 1500;
+                    }
+
+                    // 4. Description match
+                    if (descZh.includes(token)) {
+                        tokenScore += 1800;
+                        if (!tokenReason) tokenReason = `描述匹配`;
+                    } else if (token.length >= 2 && isSubsequence(token, descZh)) {
+                        tokenScore += 1200;
+                        if (!tokenReason) tokenReason = `描述匹配`;
+                    }
+                    if (descEn.includes(token)) {
+                        tokenScore += 1000;
+                    }
+
+                    // 5. Schema options match (e.g. "白天", "死亡不掉落", "创造")
+                    const matchedOpt = optionStrings.find(opt => opt.includes(token) || (token.length >= 2 && opt.length >= 2 && (isSubsequence(token, opt) || token.includes(opt))));
+                    if (matchedOpt) {
+                        tokenScore += 1500;
+                        if (!tokenReason) tokenReason = `预设: ${matchedOpt.split(' ')[0]}`;
+                    }
+
+                    // 6. Syntax match
+                    if (syntax.includes(token)) {
+                        tokenScore += 300;
+                    }
+
+                    // 7. Category match
+                    if (catZh.includes(token) || catEn.includes(token)) {
+                        tokenScore += 200;
+                    }
+
+                    if (tokenScore === 0) {
+                        allTokensMatched = false;
+                        break;
+                    }
+
+                    totalScore += tokenScore;
+                    if (!matchedReason) matchedReason = tokenReason;
+                }
+
+                if (allTokensMatched && totalScore > 0) {
+                    // Category priority bonus if user explicitly selected a category tab
+                    if (cmdCategory.value !== 'all' && cmd.category === cmdCategory.value) {
+                        totalScore += 1000;
+                    }
+                    results.push({
+                        cmd,
+                        score: totalScore,
+                        matchedReason
+                    });
+                }
+            }
+
+            results.sort((a, b) => b.score - a.score);
+            return results.map(r => ({
+                ...r.cmd,
+                _matchBadge: r.matchedReason
+            }));
         });
 
         const useCommand = (cmd) => {
@@ -1612,12 +2594,34 @@ export default {
                 for (const param of schema.params) {
                     vals[param.key] = param.default !== undefined ? param.default : '';
                 }
+                const s = cmdSearch.value.toLowerCase().trim().replace(/^\/+/, '');
+                if (s) {
+                    for (const param of schema.params) {
+                        if (param.options) {
+                            const matchedOpt = param.options.find(opt => {
+                                const val = (opt.value || '').toLowerCase();
+                                const labelcn = (opt.labelcn || '').toLowerCase();
+                                const labelen = (opt.labelen || '').toLowerCase();
+                                return val === s || labelcn.includes(s) || labelen.includes(s) ||
+                                    (s.length >= 2 && (val.includes(s) || labelcn.includes(s) || isSubsequence(s, labelcn)));
+                            });
+                            if (matchedOpt) {
+                                vals[param.key] = matchedOpt.value;
+                            }
+                        }
+                    }
+                }
                 paramValues.value = vals;
                 cmdParamModalInstance.value.show();
                 showCmdPanel.value = false;
             } else {
                 command.value = cmd.template || cmd.name + ' ';
                 showCmdPanel.value = false;
+                nextTick(() => {
+                    if (cmdInputRef.value) {
+                        cmdInputRef.value.focus();
+                    }
+                });
             }
         };
 
@@ -1633,6 +2637,11 @@ export default {
         const insertCommand = () => {
             command.value = assembledCommand.value;
             cmdParamModalInstance.value.hide();
+            nextTick(() => {
+                if (cmdInputRef.value) {
+                    cmdInputRef.value.focus();
+                }
+            });
         };
 
         const executeConfiguredCommand = async () => {
@@ -1648,12 +2657,18 @@ export default {
         };
 
         const sendQuickCommand = async (template) => {
+            if (!template) return;
             if (!store.isRunning) {
                 showToast('common.server_offline', 'warning');
                 return;
             }
-            await api.post('/api/server/command', { command: template });
-            showToast(t('dashboard.toast_sent'));
+            try {
+                await api.post('/api/server/command', { command: template });
+                showToast(t('dashboard.toast_sent'));
+                showCmdPanel.value = false;
+            } catch (e) {
+                showToast(e.message || 'common.error', 'danger');
+            }
         };
 
         const scrollToBottom = () => {
@@ -1711,10 +2726,20 @@ export default {
         watch(() => store.logs.length, scrollToBottom);
 
         onMounted(() => {
+            updateMobile();
+            window.addEventListener('resize', updateMobile);
+            window.addEventListener('keydown', handleGlobalKeydown);
+            document.addEventListener('click', handleGlobalClick);
             scrollToBottom();
             setTimeout(scrollToBottom, 100);
             startupModal.value = new bootstrap.Modal(document.getElementById('startupModal'));
             cmdParamModalInstance.value = new bootstrap.Modal(document.getElementById('cmdParamModal'));
+        });
+
+        onUnmounted(() => {
+            window.removeEventListener('resize', updateMobile);
+            window.removeEventListener('keydown', handleGlobalKeydown);
+            document.removeEventListener('click', handleGlobalClick);
         });
 
         const dashboardStatusClass = computed(() => {
@@ -1737,6 +2762,30 @@ export default {
                 case 'stopped':
                 default: return t('dashboard.state_stopped');
             }
+        });
+
+        const formattedLoader = computed(() => {
+            const type = store.stats?.loaderType || 'fabric';
+            const typeName = type === 'neoforge' ? 'NeoForge' : (type.charAt(0).toUpperCase() + type.slice(1));
+            const ver = store.stats?.version?.loader;
+            if (ver && ver !== 'Unknown') {
+                return `${typeName} ${ver}`;
+            }
+            return typeName;
+        });
+
+        const activeInstanceName = computed(() => {
+            const inst = store.instanceList?.find(i => i.id === store.currentInstanceId);
+            return inst ? inst.name : '';
+        });
+
+        const displayMotd = computed(() => {
+            const raw = store.stats?.mc?.motd;
+            if (raw && raw !== '-' && raw !== 'Loading...') {
+                const cleaned = raw.replace(/§[0-9a-fk-or]/gi, '').trim();
+                if (cleaned) return cleaned;
+            }
+            return activeInstanceName.value || 'Minecraft Server';
         });
 
         const serverAction = async (act) => {
@@ -1815,9 +2864,15 @@ export default {
         return {
             store, command, serverAction, forceStop, sendCommand, formatLog,
             onSetupComplete, openStartupSettings, saveStartupSettings, saving, form, jars, fetchJars,
-            showCmdPanel, cmdCategory, cmdSearch, cmdCategories, filteredCommands, quickCommands,
-            useCommand, sendQuickCommand,
+            showCmdPanel, cmdCategory, cmdSearch, cmdCategories, filteredCommands,
+            useCommand, sendQuickCommand, hasSchema, toggleCmdPanel, getCmdTitle,
+            cmdBarRef, cmdInputRef,
             dashboardStatusClass, dashboardStatusText,
+            formattedLoader, activeInstanceName, displayMotd,
+
+            // Mobile stats state & handlers
+            activeMobileCard, mobileCollapsed, dashboardGridRef, setMobileCard, onGridScroll, toggleMobileCollapse, isMobile,
+            statsSectionRef, miniBarRef, expandedContentRef,
 
             // 指令助手参数配置相关返回
             selectedSchema, paramValues, assembledCommand, insertCommand, executeConfiguredCommand
