@@ -27,7 +27,7 @@ const { pipeline } = require('node:stream/promises');
 const PluginLoader = require('./plugin-loader');
 const sharp = require('sharp');
 
-const APP_VERSION = '2.4.8';
+const APP_VERSION = '2.5.1';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
