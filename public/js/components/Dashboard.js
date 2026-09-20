@@ -1249,8 +1249,739 @@ const COMMAND_SCHEMAS = {
             }
         ],
         assemble: (p) => `whitelist ${p.action}${p.action === 'add' || p.action === 'remove' ? ' ' + (p.player || '') : ''}`
+    },
+    fill: {
+        titlecn: '填充区域方块 (Fill)',
+        titleen: 'Fill Blocks in Region',
+        params: [
+            { key: 'from', labelcn: '起始坐标', labelen: 'From Coords', type: 'text', default: '~ ~ ~', placeholder: 'e.g. ~ ~ ~' },
+            { key: 'to', labelcn: '结束坐标', labelen: 'To Coords', type: 'text', default: '~5 ~5 ~5', placeholder: 'e.g. ~5 ~5 ~5' },
+            {
+                key: 'block',
+                labelcn: '方块 ID',
+                labelen: 'Block ID',
+                type: 'select_input',
+                options: [
+                    { value: 'minecraft:stone', labelcn: '石头 (stone)', labelen: 'stone' },
+                    { value: 'minecraft:air', labelcn: '空气/清除 (air)', labelen: 'air' },
+                    { value: 'minecraft:dirt', labelcn: '泥土 (dirt)', labelen: 'dirt' },
+                    { value: 'minecraft:glass', labelcn: '玻璃 (glass)', labelen: 'glass' },
+                    { value: 'minecraft:oak_planks', labelcn: '橡木木板 (oak_planks)', labelen: 'oak_planks' },
+                    { value: 'minecraft:obsidian', labelcn: '黑曜石 (obsidian)', labelen: 'obsidian' },
+                    { value: 'minecraft:water', labelcn: '水 (water)', labelen: 'water' },
+                    { value: 'minecraft:lava', labelcn: '岩浆 (lava)', labelen: 'lava' }
+                ],
+                default: 'minecraft:stone',
+                placeholder: 'e.g. minecraft:stone'
+            },
+            {
+                key: 'mode',
+                labelcn: '填充模式',
+                labelen: 'Fill Mode',
+                type: 'select',
+                options: [
+                    { value: 'replace', labelcn: '替换现有方块 (replace)', labelen: 'replace' },
+                    { value: 'keep', labelcn: '仅填充空气格 (keep)', labelen: 'keep' },
+                    { value: 'destroy', labelcn: '破坏方块掉落 (destroy)', labelen: 'destroy' },
+                    { value: 'hollow', labelcn: '中空结构 (hollow)', labelen: 'hollow' },
+                    { value: 'outline', labelcn: '仅保留外框 (outline)', labelen: 'outline' }
+                ],
+                default: 'replace'
+            }
+        ],
+        assemble: (p) => `fill ${p.from || '~ ~ ~'} ${p.to || '~ ~ ~'} ${p.block || 'minecraft:stone'} ${p.mode || 'replace'}`
+    },
+    clone: {
+        titlecn: '复制区域方块 (Clone)',
+        titleen: 'Clone Blocks in Region',
+        params: [
+            { key: 'begin', labelcn: '起始坐标', labelen: 'Begin Coords', type: 'text', default: '~ ~ ~', placeholder: 'e.g. ~ ~ ~' },
+            { key: 'end', labelcn: '结束坐标', labelen: 'End Coords', type: 'text', default: '~5 ~5 ~5', placeholder: 'e.g. ~5 ~5 ~5' },
+            { key: 'destination', labelcn: '粘贴目标坐标', labelen: 'Destination Coords', type: 'text', default: '~10 ~ ~', placeholder: 'e.g. ~10 ~ ~' },
+            {
+                key: 'mask',
+                labelcn: '遮罩模式',
+                labelen: 'Mask Mode',
+                type: 'select',
+                options: [
+                    { value: 'replace', labelcn: '完全覆盖包含空气 (replace)', labelen: 'replace' },
+                    { value: 'masked', labelcn: '忽略源区域空气方块 (masked)', labelen: 'masked' }
+                ],
+                default: 'replace'
+            },
+            {
+                key: 'mode',
+                labelcn: '复制模式',
+                labelen: 'Clone Mode',
+                type: 'select',
+                options: [
+                    { value: 'normal', labelcn: '常规复制 (normal)', labelen: 'normal' },
+                    { value: 'force', labelcn: '重叠强制覆盖 (force)', labelen: 'force' },
+                    { value: 'move', labelcn: '剪切移动 (move)', labelen: 'move' }
+                ],
+                default: 'normal'
+            }
+        ],
+        assemble: (p) => `clone ${p.begin || '~ ~ ~'} ${p.end || '~ ~ ~'} ${p.destination || '~ ~ ~'} ${p.mask || 'replace'} ${p.mode || 'normal'}`
+    },
+    msg: {
+        titlecn: '向玩家发送私聊 (Msg/Tell)',
+        titleen: 'Send Private Message',
+        params: [
+            { key: 'target', labelcn: '目标玩家', labelen: 'Target Player', type: 'player_select', default: '@s' },
+            { key: 'message', labelcn: '私聊内容', labelen: 'Message', type: 'text', placeholder: '输入私聊内容', default: '你好！' }
+        ],
+        assemble: (p) => `msg ${p.target || '@s'} ${p.message || ''}`
+    },
+    particle: {
+        titlecn: '生成粒子特效 (Particle)',
+        titleen: 'Spawn Particle Effects',
+        params: [
+            {
+                key: 'particle',
+                labelcn: '粒子类型',
+                labelen: 'Particle ID',
+                type: 'select_input',
+                options: [
+                    { value: 'minecraft:flame', labelcn: '火焰粒子 (flame)', labelen: 'flame' },
+                    { value: 'minecraft:heart', labelcn: '爱心 (heart)', labelen: 'heart' },
+                    { value: 'minecraft:happy_villager', labelcn: '村民开心绿色十字 (happy_villager)', labelen: 'happy_villager' },
+                    { value: 'minecraft:portal', labelcn: '传送门紫色粒子 (portal)', labelen: 'portal' },
+                    { value: 'minecraft:explosion', labelcn: '爆炸烟雾 (explosion)', labelen: 'explosion' },
+                    { value: 'minecraft:totem_of_undying', labelcn: '不死图腾金绿闪光 (totem)', labelen: 'totem' },
+                    { value: 'minecraft:enchant', labelcn: '附魔符文光芒 (enchant)', labelen: 'enchant' },
+                    { value: 'minecraft:campfire_cosy_smoke', labelcn: '篝火浓烟 (smoke)', labelen: 'smoke' }
+                ],
+                default: 'minecraft:happy_villager',
+                placeholder: 'e.g. minecraft:flame'
+            },
+            { key: 'coords', labelcn: '生成坐标', labelen: 'Coords', type: 'text', default: '~ ~1 ~', placeholder: 'e.g. ~ ~1 ~' },
+            { key: 'count', labelcn: '粒子数量', labelen: 'Count', type: 'number', default: 30 },
+            { key: 'speed', labelcn: '运动速度', labelen: 'Speed', type: 'number', default: 0.1 }
+        ],
+        assemble: (p) => `particle ${p.particle || 'minecraft:flame'} ${p.coords || '~ ~1 ~'} 0.5 0.5 0.5 ${p.speed || 0.1} ${p.count || 20} normal`
+    },
+    bossbar: {
+        titlecn: '管理屏幕顶部 Boss 栏 (Bossbar)',
+        titleen: 'Manage Screen Bossbar',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'list', labelcn: '查看所有 Boss 栏 (list)', labelen: 'list' },
+                    { value: 'add', labelcn: '创建新 Boss 栏 (add)', labelen: 'add' },
+                    { value: 'set_players', labelcn: '设置可见玩家 (set players)', labelen: 'set players' },
+                    { value: 'set_value', labelcn: '设置进度数值 (set value)', labelen: 'set value' },
+                    { value: 'set_max', labelcn: '设置最大数值 (set max)', labelen: 'set max' },
+                    { value: 'set_color', labelcn: '设置条形颜色 (set color)', labelen: 'set color' },
+                    { value: 'remove', labelcn: '删除 Boss 栏 (remove)', labelen: 'remove' }
+                ],
+                default: 'list'
+            },
+            { key: 'id', labelcn: 'Boss 栏 ID', labelen: 'Bar ID', type: 'text', vif: (p) => p.action !== 'list', default: 'custom:event_bar', placeholder: 'e.g. custom:event_bar' },
+            { key: 'name', labelcn: '显示文本', labelen: 'Title Text', type: 'text', vif: (p) => p.action === 'add', default: '全服活动进行中', placeholder: '输入标题' },
+            { key: 'target', labelcn: '可见玩家', labelen: 'Players', type: 'player_select', vif: (p) => p.action === 'set_players', default: '@a' },
+            { key: 'value', labelcn: '数值', labelen: 'Value', type: 'number', vif: (p) => p.action === 'set_value' || p.action === 'set_max', default: 100 },
+            {
+                key: 'color',
+                labelcn: '条形颜色',
+                labelen: 'Color',
+                type: 'select',
+                vif: (p) => p.action === 'set_color',
+                options: [
+                    { value: 'blue', labelcn: '蓝色 (blue)', labelen: 'blue' },
+                    { value: 'purple', labelcn: '紫色 (purple)', labelen: 'purple' },
+                    { value: 'red', labelcn: '红色 (red)', labelen: 'red' },
+                    { value: 'green', labelcn: '绿色 (green)', labelen: 'green' },
+                    { value: 'yellow', labelcn: '黄色 (yellow)', labelen: 'yellow' },
+                    { value: 'white', labelcn: '白色 (white)', labelen: 'white' }
+                ],
+                default: 'blue'
+            }
+        ],
+        assemble: (p) => {
+            if (p.action === 'list') return 'bossbar list';
+            if (p.action === 'add') return `bossbar add ${p.id || 'custom:bar'} {"text":"${p.name || ''}"}`;
+            if (p.action === 'set_players') return `bossbar set ${p.id || 'custom:bar'} players ${p.target || '@a'}`;
+            if (p.action === 'set_value') return `bossbar set ${p.id || 'custom:bar'} value ${p.value || 100}`;
+            if (p.action === 'set_max') return `bossbar set ${p.id || 'custom:bar'} max ${p.value || 100}`;
+            if (p.action === 'set_color') return `bossbar set ${p.id || 'custom:bar'} color ${p.color || 'blue'}`;
+            if (p.action === 'remove') return `bossbar remove ${p.id || 'custom:bar'}`;
+            return 'bossbar list';
+        }
+    },
+    forceload: {
+        titlecn: '区块常载保持 (Forceload)',
+        titleen: 'Force Load Chunks',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'query', labelcn: '查询已常载区块 (query)', labelen: 'query' },
+                    { value: 'add', labelcn: '开启常载指定区块 (add)', labelen: 'add' },
+                    { value: 'remove', labelcn: '取消常载指定区块 (remove)', labelen: 'remove' },
+                    { value: 'remove all', labelcn: '清除所有常载区块 (remove all)', labelen: 'remove all' }
+                ],
+                default: 'query'
+            },
+            { key: 'coords', labelcn: '区块坐标 (X Z)', labelen: 'Chunk Coords', type: 'text', vif: (p) => p.action === 'add' || p.action === 'remove', default: '~ ~', placeholder: '当前区块 ~ ~ 或输入 X Z' }
+        ],
+        assemble: (p) => `forceload ${p.action}${p.coords && p.action !== 'remove all' && p.action !== 'query' ? ' ' + p.coords : ''}`
+    },
+    item: {
+        titlecn: '修改实体或容器槽位物品 (Item)',
+        titleen: 'Modify Slot Item',
+        params: [
+            { key: 'target', labelcn: '目标玩家或实体', labelen: 'Target Entity', type: 'player_select', default: '@s' },
+            {
+                key: 'slot',
+                labelcn: '槽位类型',
+                labelen: 'Slot',
+                type: 'select_input',
+                options: [
+                    { value: 'weapon.mainhand', labelcn: '主手手持 (weapon.mainhand)', labelen: 'weapon.mainhand' },
+                    { value: 'weapon.offhand', labelcn: '副手副武器 (weapon.offhand)', labelen: 'weapon.offhand' },
+                    { value: 'armor.head', labelcn: '头部/头盔 (armor.head)', labelen: 'armor.head' },
+                    { value: 'armor.chest', labelcn: '胸部/胸甲 (armor.chest)', labelen: 'armor.chest' },
+                    { value: 'armor.legs', labelcn: '腿部/护腿 (armor.legs)', labelen: 'armor.legs' },
+                    { value: 'armor.feet', labelcn: '脚部/靴子 (armor.feet)', labelen: 'armor.feet' }
+                ],
+                default: 'weapon.mainhand'
+            },
+            {
+                key: 'item',
+                labelcn: '物品 ID',
+                labelen: 'Item ID',
+                type: 'select_input',
+                options: [
+                    { value: 'minecraft:diamond_sword', labelcn: '钻石剑 (diamond_sword)', labelen: 'diamond_sword' },
+                    { value: 'minecraft:netherite_chestplate', labelcn: '下界合金胸甲', labelen: 'netherite_chestplate' },
+                    { value: 'minecraft:elytra', labelcn: '鞘翅 (elytra)', labelen: 'elytra' },
+                    { value: 'minecraft:shield', labelcn: '盾牌 (shield)', labelen: 'shield' },
+                    { value: 'minecraft:air', labelcn: '清空槽位 (air)', labelen: 'air' }
+                ],
+                default: 'minecraft:diamond_sword'
+            },
+            { key: 'count', labelcn: '数量', labelen: 'Count', type: 'number', default: 1 }
+        ],
+        assemble: (p) => `item replace entity ${p.target || '@s'} ${p.slot || 'weapon.mainhand'} with ${p.item || 'minecraft:diamond_sword'} ${p.count || 1}`
+    },
+    spectate: {
+        titlecn: '附身实体旁观视角 (Spectate)',
+        titleen: 'Spectate an Entity',
+        params: [
+            { key: 'target', labelcn: '附身目标实体或玩家', labelen: 'Target Entity', type: 'text', default: '@e[type=zombie,limit=1]', placeholder: '玩家名 或 @e[type=...]' },
+            { key: 'player', labelcn: '执行旁观的玩家', labelen: 'Spectator Player', type: 'player_select', default: '@s' }
+        ],
+        assemble: (p) => `spectate ${p.target || '@e[limit=1]'} ${p.player || '@s'}`
+    },
+    ride: {
+        titlecn: '实体骑乘与脱离载具 (Ride)',
+        titleen: 'Mount or Dismount',
+        params: [
+            { key: 'target', labelcn: '骑手 (执行骑乘的实体)', labelen: 'Rider', type: 'player_select', default: '@s' },
+            {
+                key: 'action',
+                labelcn: '动作',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'mount', labelcn: '骑乘载具 (mount)', labelen: 'mount' },
+                    { value: 'dismount', labelcn: '脱离下车 (dismount)', labelen: 'dismount' }
+                ],
+                default: 'mount'
+            },
+            { key: 'vehicle', labelcn: '被骑乘目标 (载具)', labelen: 'Vehicle', type: 'text', vif: (p) => p.action === 'mount', default: '@e[type=horse,limit=1]', placeholder: 'e.g. @e[type=horse,limit=1]' }
+        ],
+        assemble: (p) => `ride ${p.target || '@s'} ${p.action}${p.action === 'mount' ? ' ' + (p.vehicle || '@e[limit=1]') : ''}`
+    },
+    rotate: {
+        titlecn: '旋转实体视角朝向 (Rotate)',
+        titleen: 'Rotate Entity Facing',
+        params: [
+            { key: 'target', labelcn: '目标实体/玩家', labelen: 'Target', type: 'player_select', default: '@s' },
+            {
+                key: 'mode',
+                labelcn: '朝向模式',
+                labelen: 'Mode',
+                type: 'select',
+                options: [
+                    { value: 'facing', labelcn: '面向指定坐标 (facing coords)', labelen: 'facing coords' },
+                    { value: 'facing_entity', labelcn: '面向指定实体 (facing entity)', labelen: 'facing entity' },
+                    { value: 'angles', labelcn: '水平角与俯仰角 (yaw pitch)', labelen: 'yaw pitch' }
+                ],
+                default: 'facing'
+            },
+            { key: 'value', labelcn: '坐标 / 实体 / 角度值', labelen: 'Value', type: 'text', default: '~ ~ ~', placeholder: '~ ~ ~ 或 @p 或 0 0' }
+        ],
+        assemble: (p) => p.mode === 'facing' ? `rotate ${p.target || '@s'} facing ${p.value || '~ ~ ~'}` : (p.mode === 'facing_entity' ? `rotate ${p.target || '@s'} facing entity ${p.value || '@p'}` : `rotate ${p.target || '@s'} ${p.value || '0 0'}`)
+    },
+    place: {
+        titlecn: '原地生成结构与地貌特征 (Place)',
+        titleen: 'Place Structure/Feature',
+        params: [
+            {
+                key: 'type',
+                labelcn: '生成类型',
+                labelen: 'Type',
+                type: 'select',
+                options: [
+                    { value: 'structure', labelcn: '大型世界结构 (structure)', labelen: 'structure' },
+                    { value: 'feature', labelcn: '单个地貌植物 (feature)', labelen: 'feature' }
+                ],
+                default: 'structure'
+            },
+            {
+                key: 'id',
+                labelcn: '结构/特征 ID',
+                labelen: 'ID',
+                type: 'select_input',
+                options: [
+                    { value: 'minecraft:village_plains', labelcn: '平原村庄 (village_plains)', labelen: 'village_plains' },
+                    { value: 'minecraft:ancient_city', labelcn: '远古之城 (ancient_city)', labelen: 'ancient_city' },
+                    { value: 'minecraft:bastion_remnant', labelcn: '猪灵残骸堡垒 (bastion_remnant)', labelen: 'bastion_remnant' },
+                    { value: 'minecraft:end_city', labelcn: '末地城 (end_city)', labelen: 'end_city' },
+                    { value: 'minecraft:oak', labelcn: '橡树 (oak)', labelen: 'oak' }
+                ],
+                default: 'minecraft:village_plains'
+            },
+            { key: 'coords', labelcn: '生成坐标', labelen: 'Coords', type: 'text', default: '~ ~ ~', placeholder: 'e.g. ~ ~ ~' }
+        ],
+        assemble: (p) => `place ${p.type || 'structure'} ${p.id || 'minecraft:village_plains'} ${p.coords || '~ ~ ~'}`
+    },
+    loot: {
+        titlecn: '战利品表生成与掉落 (Loot)',
+        titleen: 'Loot Tables and Drops',
+        params: [
+            {
+                key: 'action',
+                labelcn: '发放方式',
+                labelen: 'Method',
+                type: 'select',
+                options: [
+                    { value: 'give', labelcn: '直接放入玩家背包 (give)', labelen: 'give' },
+                    { value: 'spawn', labelcn: '在地面生成掉落物 (spawn)', labelen: 'spawn' }
+                ],
+                default: 'give'
+            },
+            { key: 'target', labelcn: '目标玩家或掉落坐标', labelen: 'Target', type: 'text', default: '@s', placeholder: '玩家名/@s 或 坐标 ~ ~ ~' },
+            {
+                key: 'source',
+                labelcn: '战利品来源表',
+                labelen: 'Source',
+                type: 'select_input',
+                options: [
+                    { value: 'loot minecraft:chests/simple_dungeon', labelcn: '地牢宝箱战利品' },
+                    { value: 'loot minecraft:chests/end_city_treasure', labelcn: '末地城宝藏战利品' },
+                    { value: 'loot minecraft:chests/ancient_city', labelcn: '远古之城战利品' },
+                    { value: 'fish minecraft:gameplay/fishing', labelcn: '钓鱼战利品' }
+                ],
+                default: 'loot minecraft:chests/simple_dungeon'
+            }
+        ],
+        assemble: (p) => `loot ${p.action || 'give'} ${p.target || '@s'} ${p.source || 'loot minecraft:chests/simple_dungeon'}`
+    },
+    random: {
+        titlecn: '随机数发生器与掷骰 (Random)',
+        titleen: 'Random Value Generator',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'value', labelcn: '生成指定范围随机整数 (value)', labelen: 'value' },
+                    { value: 'roll', labelcn: '模拟掷骰子投点 (roll)', labelen: 'roll' },
+                    { value: 'reset', labelcn: '重置随机数序列 (reset)', labelen: 'reset' }
+                ],
+                default: 'value'
+            },
+            { key: 'range', labelcn: '随机数范围', labelen: 'Range', type: 'text', vif: (p) => p.action !== 'reset', default: '1..100', placeholder: 'e.g. 1..100 或 1..6' }
+        ],
+        assemble: (p) => `random ${p.action}${p.action !== 'reset' ? ' ' + (p.range || '1..100') : ''}`
+    },
+    'save-all': {
+        titlecn: '保存服务器世界存档 (Save-All)',
+        titleen: 'Save World to Disk',
+        params: [
+            {
+                key: 'mode',
+                labelcn: '保存方式',
+                labelen: 'Mode',
+                type: 'select',
+                options: [
+                    { value: 'save-all', labelcn: '正常保存所有世界数据 (save-all)', labelen: 'save-all' },
+                    { value: 'save-all flush', labelcn: '强制深度刷写所有区块到硬盘 (save-all flush)', labelen: 'save-all flush' }
+                ],
+                default: 'save-all'
+            }
+        ],
+        assemble: (p) => p.mode || 'save-all'
+    },
+    'save-off': {
+        titlecn: '关闭世界自动保存 (Save-Off)',
+        titleen: 'Disable Auto-Save',
+        params: [],
+        assemble: () => 'save-off'
+    },
+    'save-on': {
+        titlecn: '恢复世界自动保存 (Save-On)',
+        titleen: 'Enable Auto-Save',
+        params: [],
+        assemble: () => 'save-on'
+    },
+    stop: {
+        titlecn: '安全关闭服务器 (Stop)',
+        titleen: 'Stop Server Safely',
+        params: [],
+        assemble: () => 'stop'
+    },
+    seed: {
+        titlecn: '查看当前世界生成种子 (Seed)',
+        titleen: 'Display World Seed',
+        params: [],
+        assemble: () => 'seed'
+    },
+    list: {
+        titlecn: '列出当前在线玩家 (List)',
+        titleen: 'List Online Players',
+        params: [
+            {
+                key: 'mode',
+                labelcn: '显示模式',
+                labelen: 'Mode',
+                type: 'select',
+                options: [
+                    { value: 'list', labelcn: '仅列出玩家名字 (list)', labelen: 'list' },
+                    { value: 'list uuids', labelcn: '附带玩家 UUID 详情 (list uuids)', labelen: 'list uuids' }
+                ],
+                default: 'list'
+            }
+        ],
+        assemble: (p) => p.mode || 'list'
+    },
+    help: {
+        titlecn: '服务端指令帮助手册 (Help)',
+        titleen: 'Command Help',
+        params: [
+            { key: 'cmd', labelcn: '查询具体指令', labelen: 'Command Name', type: 'text', optional: true, placeholder: '留空列出所有，或输入如 gamemode' }
+        ],
+        assemble: (p) => p.cmd ? `help ${p.cmd}` : 'help'
+    },
+    fillbiome: {
+        titlecn: '批量填充生物群系 (FillBiome)',
+        titleen: 'Fill Biome in Region',
+        params: [
+            { key: 'from', labelcn: '起始坐标', labelen: 'From', type: 'text', default: '~-10 ~-5 ~-10' },
+            { key: 'to', labelcn: '结束坐标', labelen: 'To', type: 'text', default: '~10 ~5 ~10' },
+            {
+                key: 'biome',
+                labelcn: '目标生物群系',
+                labelen: 'Biome',
+                type: 'select_input',
+                options: [
+                    { value: 'minecraft:plains', labelcn: '平原 (plains)', labelen: 'plains' },
+                    { value: 'minecraft:cherry_grove', labelcn: '樱花林 (cherry_grove)', labelen: 'cherry_grove' },
+                    { value: 'minecraft:desert', labelcn: '沙漠 (desert)', labelen: 'desert' },
+                    { value: 'minecraft:snowy_plains', labelcn: '雪原 (snowy_plains)', labelen: 'snowy_plains' },
+                    { value: 'minecraft:jungle', labelcn: '丛林 (jungle)', labelen: 'jungle' },
+                    { value: 'minecraft:mushroom_fields', labelcn: '蘑菇岛 (mushroom_fields)', labelen: 'mushroom_fields' }
+                ],
+                default: 'minecraft:cherry_grove'
+            }
+        ],
+        assemble: (p) => `fillbiome ${p.from || '~ ~ ~'} ${p.to || '~ ~ ~'} ${p.biome || 'minecraft:plains'}`
+    },
+    scoreboard: {
+        titlecn: '计分板与排行榜系统 (Scoreboard)',
+        titleen: 'Scoreboard System',
+        params: [
+            {
+                key: 'category',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'setdisplay sidebar', labelcn: '侧边栏显示榜单 (setdisplay sidebar)', labelen: 'setdisplay sidebar' },
+                    { value: 'setdisplay below_name', labelcn: '玩家名字下方显示 (setdisplay below_name)', labelen: 'setdisplay below_name' },
+                    { value: 'setdisplay list', labelcn: 'Tab 键列表显示 (setdisplay list)', labelen: 'setdisplay list' },
+                    { value: 'objectives list', labelcn: '列出全部计分项 (objectives list)', labelen: 'objectives list' },
+                    { value: 'objectives add', labelcn: '创建新计分项 (objectives add)', labelen: 'objectives add' },
+                    { value: 'objectives remove', labelcn: '删除计分项 (objectives remove)', labelen: 'objectives remove' },
+                    { value: 'players add', labelcn: '增加玩家分数 (players add)', labelen: 'players add' },
+                    { value: 'players set', labelcn: '设置玩家分数 (players set)', labelen: 'players set' },
+                    { value: 'players reset', labelcn: '清空/重置玩家分数 (players reset)', labelen: 'players reset' },
+                    { value: 'players list', labelcn: '查看玩家得分 (players list)', labelen: 'players list' }
+                ],
+                default: 'setdisplay sidebar'
+            },
+            { key: 'objective', labelcn: '计分项名称', labelen: 'Objective', type: 'text', default: 'coins', placeholder: 'e.g. coins / deaths / kills' },
+            {
+                key: 'criteria',
+                labelcn: '计分准则',
+                labelen: 'Criteria',
+                type: 'select_input',
+                vif: (p) => p.category === 'objectives add',
+                options: [
+                    { value: 'dummy', labelcn: '虚拟记分 (dummy，插件/脚本常用)', labelen: 'dummy' },
+                    { value: 'deathCount', labelcn: '死亡次数 (deathCount)', labelen: 'deathCount' },
+                    { value: 'playerKillCount', labelcn: '击杀玩家数 (playerKillCount)', labelen: 'playerKillCount' },
+                    { value: 'totalKillCount', labelcn: '总击杀数 (totalKillCount)', labelen: 'totalKillCount' },
+                    { value: 'health', labelcn: '玩家生命值 (health)', labelen: 'health' }
+                ],
+                default: 'dummy'
+            },
+            { key: 'target', labelcn: '目标玩家', labelen: 'Target', type: 'player_select', vif: (p) => (p.category || '').startsWith('players '), default: '@s' },
+            { key: 'score', labelcn: '分数值', labelen: 'Score', type: 'number', vif: (p) => p.category === 'players add' || p.category === 'players set', default: 10 }
+        ],
+        assemble: (p) => {
+            const cat = p.category || 'setdisplay sidebar';
+            if (cat === 'objectives list') return 'scoreboard objectives list';
+            if (cat === 'objectives add') return `scoreboard objectives add ${p.objective || 'coins'} ${p.criteria || 'dummy'}`;
+            if (cat === 'objectives remove') return `scoreboard objectives remove ${p.objective || 'coins'}`;
+            if (cat.startsWith('setdisplay')) return `scoreboard ${cat} ${p.objective || 'coins'}`;
+            if (cat === 'players list') return `scoreboard players list ${p.target || '@s'}`;
+            if (cat === 'players reset') return `scoreboard players reset ${p.target || '@s'} ${p.objective || ''}`;
+            return `scoreboard ${cat} ${p.target || '@s'} ${p.objective || 'coins'} ${p.score || 0}`;
+        }
+    },
+    data: {
+        titlecn: 'NBT 数据实体与方块读写 (Data)',
+        titleen: 'NBT Data Manipulation',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'get entity', labelcn: '读取实体 NBT 数据 (get entity)', labelen: 'get entity' },
+                    { value: 'get block', labelcn: '读取方块 NBT 数据 (get block)', labelen: 'get block' },
+                    { value: 'merge entity', labelcn: '修改实体 NBT 标签 (merge entity)', labelen: 'merge entity' },
+                    { value: 'merge block', labelcn: '修改方块 NBT 标签 (merge block)', labelen: 'merge block' }
+                ],
+                default: 'get entity'
+            },
+            { key: 'target', labelcn: '目标实体或方块坐标', labelen: 'Target', type: 'text', default: '@s', placeholder: '@s 或 坐标 X Y Z' },
+            { key: 'path', labelcn: 'NBT 标签路径 (可选)', labelen: 'Path', type: 'text', vif: (p) => (p.action || '').startsWith('get '), optional: true, placeholder: '可留空或输入如 Pos, Health, Inventory' },
+            { key: 'nbt', labelcn: 'NBT 数据体', labelen: 'NBT Tag', type: 'text', vif: (p) => (p.action || '').startsWith('merge '), default: '{NoAI:1b}', placeholder: 'e.g. {NoAI:1b,Invulnerable:1b}' }
+        ],
+        assemble: (p) => {
+            const act = p.action || 'get entity';
+            if (act.startsWith('get ')) return `data ${act} ${p.target || '@s'}${p.path ? ' ' + p.path : ''}`;
+            return `data ${act} ${p.target || '@s'} ${p.nbt || '{}'}`;
+        }
+    },
+    tellraw: {
+        titlecn: '向玩家发送高级富文本 (Tellraw)',
+        titleen: 'Send Formatted JSON Message',
+        params: [
+            { key: 'target', labelcn: '接收玩家', labelen: 'Target', type: 'player_select', default: '@a' },
+            {
+                key: 'color',
+                labelcn: '文字颜色',
+                labelen: 'Color',
+                type: 'select',
+                options: [
+                    { value: 'gold', labelcn: '金色 (gold)', labelen: 'gold' },
+                    { value: 'yellow', labelcn: '黄色 (yellow)', labelen: 'yellow' },
+                    { value: 'green', labelcn: '绿色 (green)', labelen: 'green' },
+                    { value: 'aqua', labelcn: '青色 (aqua)', labelen: 'aqua' },
+                    { value: 'red', labelcn: '红色 (red)', labelen: 'red' },
+                    { value: 'light_purple', labelcn: '粉紫色 (light_purple)', labelen: 'light_purple' },
+                    { value: 'white', labelcn: '白色 (white)', labelen: 'white' }
+                ],
+                default: 'gold'
+            },
+            {
+                key: 'bold',
+                labelcn: '文字加粗',
+                labelen: 'Bold',
+                type: 'select',
+                options: [
+                    { value: 'true', labelcn: '加粗 (bold)', labelen: 'bold' },
+                    { value: 'false', labelcn: '常规字体 (normal)', labelen: 'normal' }
+                ],
+                default: 'true'
+            },
+            { key: 'text', labelcn: '公告内容', labelen: 'Message Text', type: 'text', default: '【系统公告】服务器即将进行维护', placeholder: '输入要发送的公告内容' }
+        ],
+        assemble: (p) => `tellraw ${p.target || '@a'} [{"text":"${p.text || ''}","color":"${p.color || 'gold'}","bold":${p.bold === 'true'}}]`
+    },
+    schedule: {
+        titlecn: '延时与定时任务调度 (Schedule)',
+        titleen: 'Schedule Function',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'function', labelcn: '延迟执行函数 (function)', labelen: 'function' },
+                    { value: 'clear', labelcn: '清除已计划的任务 (clear)', labelen: 'clear' }
+                ],
+                default: 'function'
+            },
+            { key: 'name', labelcn: '函数命名空间路径', labelen: 'Function Path', type: 'text', default: 'custom:timer', placeholder: 'e.g. custom:daily_reward' },
+            { key: 'time', labelcn: '延时时长', labelen: 'Delay Time', type: 'text', vif: (p) => p.action === 'function', default: '10s', placeholder: 'e.g. 5s / 1d / 20t' }
+        ],
+        assemble: (p) => p.action === 'clear' ? `schedule clear ${p.name || ''}` : `schedule function ${p.name || ''} ${p.time || '10s'}`
+    },
+    function: {
+        titlecn: '执行数据包函数脚本 (Function)',
+        titleen: 'Run Datapack Function',
+        params: [
+            { key: 'name', labelcn: '函数命名空间路径', labelen: 'Function Path', type: 'text', default: 'custom:start', placeholder: 'e.g. custom:start' }
+        ],
+        assemble: (p) => `function ${p.name || ''}`
+    },
+    trigger: {
+        titlecn: '触发自定义计分扳机 (Trigger)',
+        titleen: 'Trigger Custom Score',
+        params: [
+            { key: 'objective', labelcn: '扳机计分项名称', labelen: 'Objective', type: 'text', default: 'rtp', placeholder: 'e.g. rtp / home' },
+            {
+                key: 'action',
+                labelcn: '方式',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'set', labelcn: '设为指定数值 (set)', labelen: 'set' },
+                    { value: 'add', labelcn: '增加指定数值 (add)', labelen: 'add' }
+                ],
+                default: 'set'
+            },
+            { key: 'value', labelcn: '数值', labelen: 'Value', type: 'number', default: 1 }
+        ],
+        assemble: (p) => `trigger ${p.objective || 'rtp'} ${p.action || 'set'} ${p.value || 1}`
+    },
+    debug: {
+        titlecn: '服务端性能分析调试 (Debug)',
+        titleen: 'Server Debug Profiler',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'start', labelcn: '开始记录分析 (start)', labelen: 'start' },
+                    { value: 'stop', labelcn: '停止记录并输出结果 (stop)', labelen: 'stop' }
+                ],
+                default: 'start'
+            }
+        ],
+        assemble: (p) => `debug ${p.action || 'start'}`
+    },
+    perf: {
+        titlecn: '专用服务端性能分析 (Perf)',
+        titleen: 'Performance Profiling',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'start', labelcn: '开始性能采样 (start)', labelen: 'start' },
+                    { value: 'stop', labelcn: '停止采样并输出报告 (stop)', labelen: 'stop' }
+                ],
+                default: 'start'
+            }
+        ],
+        assemble: (p) => `perf ${p.action || 'start'}`
+    },
+    jfr: {
+        titlecn: 'Java 飞行记录仪采样 (JFR)',
+        titleen: 'Java Flight Recorder',
+        params: [
+            {
+                key: 'action',
+                labelcn: '操作类别',
+                labelen: 'Action',
+                type: 'select',
+                options: [
+                    { value: 'start', labelcn: '开启 JFR 采样 (start)', labelen: 'start' },
+                    { value: 'stop', labelcn: '停止 JFR 并导出记录 (stop)', labelen: 'stop' }
+                ],
+                default: 'start'
+            }
+        ],
+        assemble: (p) => `jfr ${p.action || 'start'}`
+    },
+    publish: {
+        titlecn: '发布为局域网联机 (Publish)',
+        titleen: 'Publish World to LAN',
+        params: [
+            { key: 'port', labelcn: '联机端口', labelen: 'Port', type: 'number', optional: true, placeholder: '默认 25565' }
+        ],
+        assemble: (p) => p.port ? `publish ${p.port}` : 'publish'
+    },
+    me: {
+        titlecn: '发送动作叙述消息 (Me)',
+        titleen: 'Send Action Message',
+        params: [
+            { key: 'action', labelcn: '动作内容', labelen: 'Action Text', type: 'text', default: '挥了挥手向大家打招呼', placeholder: 'e.g. 挥了挥手' }
+        ],
+        assemble: (p) => `me ${p.action || ''}`
+    },
+    teammsg: {
+        titlecn: '向队伍发送队内消息 (Teammsg)',
+        titleen: 'Send Message to Team',
+        params: [
+            { key: 'message', labelcn: '队内消息', labelen: 'Message', type: 'text', default: '准备集合进攻！', placeholder: '输入队伍频道消息' }
+        ],
+        assemble: (p) => `teammsg ${p.message || ''}`
+    },
+    return: {
+        titlecn: '函数控制流返回值 (Return)',
+        titleen: 'Return Value',
+        params: [
+            { key: 'value', labelcn: '返回值', labelen: 'Value', type: 'number', default: 1 }
+        ],
+        assemble: (p) => `return ${p.value || 1}`
+    },
+    execute: {
+        titlecn: '复合条件链式执行 (Execute)',
+        titleen: 'Execute Condition Runner',
+        params: [
+            { key: 'as', labelcn: '执行身份 (as)', labelen: 'As Entity', type: 'player_select', default: '@a' },
+            {
+                key: 'at',
+                labelcn: '执行坐标环境 (at)',
+                labelen: 'At Location',
+                type: 'select_input',
+                options: [
+                    { value: '@s', labelcn: '自身当前位置 (@s)', labelen: '@s' },
+                    { value: '~ ~ ~', labelcn: '当前基准坐标 (~ ~ ~)', labelen: '~ ~ ~' }
+                ],
+                default: '@s'
+            },
+            { key: 'subcmd', labelcn: '要运行的命令 (run)', labelen: 'Subcommand', type: 'text', default: 'run tellraw @s "Hi"', placeholder: 'e.g. run give @s diamond 1' }
+        ],
+        assemble: (p) => `execute as ${p.as || '@a'} at ${p.at || '@s'} ${p.subcmd || 'run help'}`
+    },
+    reload: {
+        titlecn: '重新加载服务端数据 (Reload)',
+        titleen: 'Reload Datapacks and Resources',
+        params: [],
+        assemble: () => 'reload'
     }
 };
+
+// 指令模式别名映射
+COMMAND_SCHEMAS.tp = COMMAND_SCHEMAS.teleport;
+COMMAND_SCHEMAS.xp = COMMAND_SCHEMAS.experience;
+COMMAND_SCHEMAS.tell = COMMAND_SCHEMAS.msg;
+COMMAND_SCHEMAS.w = COMMAND_SCHEMAS.msg;
 
 const COMMAND_ALIASES = {
     time: [
@@ -1475,6 +2206,33 @@ const COMMAND_ALIASES = {
     ],
     help: [
         '帮助', '指令帮助', '命令列表', 'help'
+    ],
+    tp: [
+        'tp', '传送', '传送到', '瞬移', '拉人', '飞到'
+    ],
+    xp: [
+        'xp', '经验', '加经验', '经验等级', '升级', 'exp'
+    ],
+    tell: [
+        'tell', '私聊', '密聊', '私信'
+    ],
+    w: [
+        'w', '私聊', '密聊', '私信'
+    ],
+    me: [
+        'me', '动作', '动作消息', '动作叙述'
+    ],
+    perf: [
+        'perf', '性能', '性能分析', '服务端采样'
+    ],
+    jfr: [
+        'jfr', '飞行记录仪', '性能记录', 'java采样'
+    ],
+    publish: [
+        'publish', '局域网', '开放局域网', '局域网联机', '单机开服'
+    ],
+    return: [
+        'return', '返回', '函数返回', '返回值'
     ]
 };
 
@@ -1552,6 +2310,15 @@ const MC_COMMANDS = [
     { name: 'execute', syntax: '/execute (run|if|unless|as|at|store|positioned|rotated|facing|align|anchored|in|summon|on)', desc: 'execute_desc', category: 'advanced', quick: false },
     { name: 'bossbar', syntax: '/bossbar (add|remove|list|set|get)', desc: 'bossbar_desc', category: 'advanced', quick: false },
     { name: 'tick', syntax: '/tick (query|rate|step|sprint|unfreeze|freeze)', desc: 'tick_desc', category: 'advanced', quick: true, template: 'tick query' },
+    { name: 'tp', syntax: '/tp (<location>|<destination>|<targets>)', desc: 'tp_desc', category: 'player', quick: true, template: 'tp @s ~ ~ ~' },
+    { name: 'xp', syntax: '/xp (add|set|query) <targets> <amount>', desc: 'xp_desc', category: 'player', quick: true, template: 'xp add @s 100 points' },
+    { name: 'tell', syntax: '/tell <targets> <message>', desc: 'tell_desc', category: 'player', quick: true, template: 'tell ' },
+    { name: 'w', syntax: '/w <targets> <message>', desc: 'w_desc', category: 'player', quick: true, template: 'w ' },
+    { name: 'me', syntax: '/me <action>', desc: 'me_desc', category: 'player', quick: true, template: 'me ' },
+    { name: 'perf', syntax: '/perf (start|stop)', desc: 'perf_desc', category: 'advanced', quick: true, template: 'perf start' },
+    { name: 'jfr', syntax: '/jfr (start|stop)', desc: 'jfr_desc', category: 'advanced', quick: true, template: 'jfr start' },
+    { name: 'publish', syntax: '/publish [<port>]', desc: 'publish_desc', category: 'server', quick: true, template: 'publish' },
+    { name: 'return', syntax: '/return <value>', desc: 'return_desc', category: 'advanced', quick: false },
 ];
 
 export default {
@@ -1608,8 +2375,8 @@ export default {
                 <div ref="miniBarRef"
                      class="mobile-mini-bar cursor-pointer d-md-none"
                      :class="{ 'bar-active': mobileCollapsed, 'bar-inactive': !mobileCollapsed }"
-                     @click="toggleMobileCollapse">
-                    <div class="d-flex align-items-center gap-2 text-truncate min-w-0">
+                     @click="expandMobileStats">
+                    <div class="d-flex align-items-center gap-2 text-truncate min-w-0 w-100">
                         <span class="badge rounded-pill font-monospace" :class="dashboardStatusClass" style="font-size: 0.68rem; padding: 0.25rem 0.55rem;">{{ dashboardStatusText }}</span>
                         <div class="vr mx-0.5 opacity-25"></div>
                         <span class="text-body font-monospace text-truncate"><i class="fa-solid fa-users text-success me-1"></i>{{ store.stats?.mc?.online || 0 }}/{{ store.stats?.mc?.maxPlayers || 0 }}</span>
@@ -1618,39 +2385,14 @@ export default {
                         <div class="vr mx-0.5 opacity-25"></div>
                         <span class="text-body font-monospace"><i class="fa-solid fa-memory text-info me-1"></i>{{ store.stats.mem?.percentage || 0 }}%</span>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 flex-shrink-0 ms-2" style="font-size: 0.72rem;">
-                        <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem;"></i>
-                        <span>{{ $t('dashboard.expand_info') || '展开' }}</span>
-                    </button>
                 </div>
 
                 <!-- 2. Main Stats Content (Desktop full grid, Mobile expanded view) -->
                 <div ref="expandedContentRef"
                      class="stats-expanded-content"
-                     :class="{ 'mobile-content-active': !mobileCollapsed, 'mobile-content-inactive': mobileCollapsed }">
-                    <!-- Mobile Stats Navigation & Toggle (Visible only on mobile: d-md-none) -->
-                    <div class="d-flex d-md-none justify-content-between align-items-center mb-2 px-0.5 flex-shrink-0">
-                        <div class="btn-group btn-group-sm p-0.5 rounded-pill bg-body-tertiary border shadow-sm">
-                            <button type="button" class="btn btn-sm rounded-pill px-2.5 py-1 font-monospace"
-                                    :class="activeMobileCard === 0 ? 'btn-primary shadow-sm' : 'btn-ghost text-muted'"
-                                    @click.stop="setMobileCard(0)">
-                                <i class="fa-solid fa-server me-1"></i>{{ store.lang === 'zh' ? '服务器信息' : 'Server' }}
-                            </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-2.5 py-1 font-monospace"
-                                    :class="activeMobileCard === 1 ? 'btn-primary shadow-sm' : 'btn-ghost text-muted'"
-                                    @click.stop="setMobileCard(1)">
-                                <i class="fa-solid fa-microchip me-1"></i>{{ store.lang === 'zh' ? '系统资源' : 'System' }}
-                            </button>
-                        </div>
-                        
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1 d-flex align-items-center gap-1.5"
-                                @click.stop="toggleMobileCollapse"
-                                :title="$t('dashboard.collapse_info') || '收起'">
-                            <i class="fa-solid fa-chevron-up" style="font-size: 0.65rem;"></i>
-                            <span style="font-size: 0.75rem;">{{ $t('dashboard.collapse_info') || '收起' }}</span>
-                        </button>
-                    </div>
-
+                     :class="{ 'mobile-content-active': !mobileCollapsed, 'mobile-content-inactive': mobileCollapsed }"
+                     @touchstart="handleStatsTouchStart"
+                     @touchend="handleStatsTouchEnd">
                     <!-- System Stats Overview -->
                     <div ref="dashboardGridRef"
                          @scroll="onGridScroll"
@@ -1659,7 +2401,7 @@ export default {
                         <div class="stagger-item w-100" style="min-width: 0;">
                             <div class="stat-card h-100 w-100 d-flex flex-column" style="min-width: 0;">
                                 <div class="stat-card-header flex-shrink-0">
-                                    <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center" style="min-height: 24px;">
                                         <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1 text-truncate pe-2" style="font-size: 0.6875rem;" :title="activeInstanceName || $t('dashboard.server_info')">
                                             <i class="fa-solid fa-server me-2"></i>{{ activeInstanceName || $t('dashboard.server_info') }}
                                         </h6>
@@ -1690,11 +2432,11 @@ export default {
                                             </div>
                                         </div>
                                         
-                                        <div class="progress my-1.5" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);">
+                                        <div class="progress my-1.5" style="height: 5px; border-radius: 999px; background: rgba(128, 128, 128, 0.15);margin: 5px 0;">
                                             <div class="progress-bar" :class="(store.serverStatus === 'running' || store.isRunning) ? 'bg-success' : 'bg-secondary'" :style="{width: (store.stats?.mc?.maxPlayers > 0 ? ((store.stats.mc.online / store.stats.mc.maxPlayers) * 100) : 0) + '%'}"></div>
                                         </div>
 
-                                        <div class="d-flex align-items-center justify-content-between text-muted font-monospace px-2.5 py-1 rounded-2 mt-1.5" style="font-size: 0.72rem; min-height: 26px; background: rgba(128, 128, 128, 0.08);">
+                                        <div class="d-flex align-items-center justify-content-between text-muted font-monospace px-2.5 py-1 rounded-2 mt-1.5" style="font-size: 0.72rem; min-height: 26px; background: rgba(128, 128, 128, 0.08);padding: 0 10px">
                                             <div class="d-flex align-items-center text-truncate min-w-0 me-2">
                                                 <i class="fa-solid fa-quote-left me-1.5 opacity-50 flex-shrink-0" style="font-size: 0.65rem;"></i>
                                                 <span class="text-truncate" :title="displayMotd">{{ displayMotd }}</span>
@@ -1706,8 +2448,8 @@ export default {
                                     <!-- 2. Server Metadata 2x2 Grid -->
                                     <div class="row g-2 g-md-2.5 flex-grow-1">
                                         <!-- Game Version -->
-                                        <div class="col-6">
-                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100 flex-grow-1">
                                                 <div class="resource-icon-badge text-success flex-shrink-0" style="background: rgba(25, 135, 84, 0.12);">
                                                     <i class="fa-solid fa-cube"></i>
                                                 </div>
@@ -1721,8 +2463,8 @@ export default {
                                         </div>
 
                                         <!-- Loader / Core -->
-                                        <div class="col-6">
-                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100 flex-grow-1">
                                                 <div class="resource-icon-badge flex-shrink-0" style="color: #a855f7; background: rgba(168, 85, 247, 0.12);">
                                                     <i class="fa-solid fa-layer-group"></i>
                                                 </div>
@@ -1736,8 +2478,8 @@ export default {
                                         </div>
 
                                         <!-- Java Environment -->
-                                        <div class="col-6">
-                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100 flex-grow-1">
                                                 <div class="resource-icon-badge text-warning flex-shrink-0" style="background: rgba(255, 170, 0, 0.12);">
                                                     <i class="fa-solid fa-mug-hot"></i>
                                                 </div>
@@ -1751,8 +2493,8 @@ export default {
                                         </div>
 
                                         <!-- Server Port -->
-                                        <div class="col-6">
-                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-meta-tile p-2 p-md-2.5 rounded-3 border bg-body-tertiary d-flex align-items-center gap-2 gap-md-2.5 h-100 flex-grow-1">
                                                 <div class="resource-icon-badge text-info flex-shrink-0" style="background: rgba(13, 202, 240, 0.12);">
                                                     <i class="fa-solid fa-network-wired"></i>
                                                 </div>
@@ -1765,19 +2507,37 @@ export default {
                                             </div>
                                         </div>
                                     </div>
+                                    <!-- Mobile Inner Carousel Dots -->
+                                    <div class="d-flex d-md-none justify-content-center align-items-center pt-2 pb-0.5 flex-shrink-0" style="gap: 6px;" @click.stop>
+                                        <span class="rounded-pill" 
+                                              @click.stop="setMobileCard(0)"
+                                              style="cursor: pointer;"
+                                              :style="{ width: activeMobileCard === 0 ? '16px' : '6px', height: '4px', background: activeMobileCard === 0 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                                        <span class="rounded-pill" 
+                                              @click.stop="setMobileCard(1)"
+                                              style="cursor: pointer;"
+                                              :style="{ width: activeMobileCard === 1 ? '16px' : '6px', height: '4px', background: activeMobileCard === 1 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="stagger-item w-100" style="animation-delay: 0.1s; min-width: 0;">
                              <div class="stat-card h-100 w-100 d-flex flex-column" style="min-width: 0;">
                                 <div class="stat-card-header flex-shrink-0">
-                                    <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;"><i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}</h6>
+                                    <div class="d-flex justify-content-between align-items-center" style="min-height: 24px;">
+                                        <h6 class="text-uppercase text-muted small fw-bold m-0 letter-spacing-1" style="font-size: 0.6875rem;">
+                                            <i class="fa-solid fa-microchip me-2"></i>{{ $t('dashboard.system_resource') }}
+                                        </h6>
+                                        <span class="badge rounded-pill bg-body-tertiary text-muted border font-monospace d-inline-block" style="font-size: 0.65rem; padding: 0.2rem 0.5rem;">
+                                            HOST
+                                        </span>
+                                    </div>
                                 </div>
                                 <div class="stat-card-body d-flex flex-column justify-content-between flex-grow-1" style="min-width: 0;">
-                                    <div class="row g-2 g-md-3 h-100">
+                                    <div class="row g-2 g-md-3 flex-grow-1">
                                         <!-- 1. CPU -->
-                                        <div class="col-6">
-                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 flex-grow-1 d-flex flex-column justify-content-between">
                                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                                     <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
                                                         <div class="resource-icon-badge text-primary" style="background: rgba(var(--c-primary-rgb), 0.12);">
@@ -1804,8 +2564,8 @@ export default {
                                             </div>
                                         </div>
                                         <!-- 2. RAM -->
-                                        <div class="col-6">
-                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 flex-grow-1 d-flex flex-column justify-content-between">
                                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                                     <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
                                                         <div class="resource-icon-badge text-warning" style="background: rgba(255, 170, 0, 0.12);">
@@ -1832,8 +2592,8 @@ export default {
                                             </div>
                                         </div>
                                         <!-- 3. SWAP -->
-                                        <div class="col-6">
-                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 flex-grow-1 d-flex flex-column justify-content-between">
                                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                                     <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
                                                         <div class="resource-icon-badge text-info" style="background: rgba(13, 202, 240, 0.12);">
@@ -1867,8 +2627,8 @@ export default {
                                             </div>
                                         </div>
                                         <!-- 4. DISK -->
-                                        <div class="col-6">
-                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                        <div class="col-6 d-flex flex-column">
+                                            <div class="resource-widget p-2 p-md-3 rounded-3 border h-100 flex-grow-1 d-flex flex-column justify-content-between">
                                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                                     <div class="d-flex align-items-center gap-1.5 gap-md-2 min-w-0">
                                                         <div class="resource-icon-badge text-success" style="background: rgba(25, 135, 84, 0.12);">
@@ -1895,21 +2655,32 @@ export default {
                                             </div>
                                         </div>
                                     </div>
+                                    <!-- Mobile Inner Carousel Dots -->
+                                    <div class="d-flex d-md-none justify-content-center align-items-center pt-2 pb-0.5 flex-shrink-0" style="gap: 6px;" @click.stop>
+                                        <span class="rounded-pill" 
+                                              @click.stop="setMobileCard(0)"
+                                              style="cursor: pointer;"
+                                              :style="{ width: activeMobileCard === 0 ? '16px' : '6px', height: '4px', background: activeMobileCard === 0 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                                        <span class="rounded-pill" 
+                                              @click.stop="setMobileCard(1)"
+                                              style="cursor: pointer;"
+                                              :style="{ width: activeMobileCard === 1 ? '16px' : '6px', height: '4px', background: activeMobileCard === 1 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                                    </div>
                                 </div>
                              </div>
                         </div>
                     </div>
 
-                    <!-- Mobile Carousel Dot Indicators (Visible only on mobile: d-md-none) -->
-                    <div class="d-flex d-md-none justify-content-center gap-1.5 mt-2 mb-1 flex-shrink-0">
-                        <span class="rounded-pill" 
-                              @click.stop="setMobileCard(0)"
-                              style="cursor: pointer;"
-                              :style="{ width: activeMobileCard === 0 ? '16px' : '6px', height: '5px', background: activeMobileCard === 0 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
-                        <span class="rounded-pill" 
-                              @click.stop="setMobileCard(1)"
-                              style="cursor: pointer;"
-                              :style="{ width: activeMobileCard === 1 ? '16px' : '6px', height: '5px', background: activeMobileCard === 1 ? 'var(--c-primary)' : 'rgba(128, 128, 128, 0.35)', transition: 'all 0.25s ease' }"></span>
+                    <!-- Mobile Bottom Handle (Visible only on mobile: d-md-none, outside cards) -->
+                    <div class="mobile-stats-bottom-bar d-flex d-md-none align-items-center justify-content-center py-2 flex-shrink-0 cursor-pointer user-select-none"
+                         @click.stop="collapseMobileStats"
+                         @touchstart="handleHandleTouchStart"
+                         @touchend="handleHandleTouchEnd"
+                         :title="$t('dashboard.collapse_info') || '向上滑动或点击收起'">
+                        <!-- Swipe Up Handle Pill -->
+                        <div class="mobile-swipe-pill">
+                            <span class="swipe-pill-bar"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1998,22 +2769,26 @@ export default {
 
             <!-- Mobile Bottom Sheet (Teleported to body, Mobile <= 768px) -->
             <Teleport to="body">
-                <div v-if="isMobile && showCmdPanel" class="cmd-mobile-wrapper">
-                    <!-- Backdrop -->
-                    <Transition name="cmd-fade" appear>
-                        <div class="cmd-mobile-backdrop" @click="showCmdPanel = false"></div>
-                    </Transition>
+                <!-- Backdrop -->
+                <Transition name="cmd-fade">
+                    <div v-if="isMobile && showCmdPanel" class="cmd-mobile-backdrop" @click="showCmdPanel = false"></div>
+                </Transition>
 
-                    <!-- Bottom Sheet -->
-                    <Transition name="cmd-sheet" appear>
-                        <div class="cmd-mobile-sheet">
-                            <!-- Drag Handle Area -->
-                            <div class="cmd-sheet-handle-area" @click="showCmdPanel = false">
-                                <div class="cmd-sheet-handle"></div>
-                            </div>
+                <!-- Bottom Sheet -->
+                <Transition name="cmd-sheet">
+                    <div v-if="isMobile && showCmdPanel" class="cmd-mobile-sheet">
+                        <!-- Drag Handle Area -->
+                        <div class="cmd-sheet-handle-area" 
+                             @touchstart="handleSheetTouchStart" 
+                             @touchend="handleSheetTouchEnd" 
+                             @click="showCmdPanel = false">
+                            <div class="cmd-sheet-handle"></div>
+                        </div>
 
-                            <!-- Sheet Header -->
-                            <div class="cmd-sheet-header px-3 pb-2 pt-1 d-flex align-items-center justify-content-between">
+                        <!-- Sheet Header -->
+                        <div class="cmd-sheet-header px-3 pb-2 pt-1 d-flex align-items-center justify-content-between"
+                             @touchstart="handleSheetTouchStart" 
+                             @touchend="handleSheetTouchEnd">
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="cmd-sheet-icon">
                                         <i class="fa-solid fa-terminal text-primary"></i>
@@ -2047,16 +2822,16 @@ export default {
 
                             <!-- Category Chips (Single-line horizontal swipe, NO WRAPPING!) -->
                             <div class="cmd-mobile-cats px-3 pb-2.5 d-flex flex-nowrap overflow-x-auto no-scrollbar gap-1.5">
-                                <button type="button" class="btn btn-sm rounded-pill flex-shrink-0 text-nowrap px-3 py-1 font-monospace"
+                                <button type="button" class="btn btn-sm rounded-pill flex-shrink-0 text-nowrap font-monospace d-inline-flex align-items-center"
                                         :class="cmdCategory === 'all' ? 'btn-primary shadow-sm' : 'btn-outline-secondary'"
-                                        style="font-size: 0.76rem;"
+                                        style="font-size: 0.72rem; padding: 0.2rem 0.65rem; min-height: 26px;"
                                         @click="cmdCategory = 'all'">
                                     {{ $t('dashboard.cmd_all') }}
                                 </button>
                                 <button v-for="cat in cmdCategories" :key="cat.key"
-                                        type="button" class="btn btn-sm rounded-pill flex-shrink-0 text-nowrap px-3 py-1 font-monospace"
+                                        type="button" class="btn btn-sm rounded-pill flex-shrink-0 text-nowrap font-monospace d-inline-flex align-items-center"
                                         :class="cmdCategory === cat.key ? 'btn-' + cat.color + ' text-white shadow-sm' : 'btn-outline-secondary'"
-                                        style="font-size: 0.76rem;"
+                                        style="font-size: 0.72rem; padding: 0.2rem 0.65rem; min-height: 26px;"
                                         @click="cmdCategory = cat.key">
                                     <i :class="cat.icon" class="me-1"></i>{{ $t('dashboard.cmd_cat_' + cat.key) }}
                                 </button>
@@ -2068,7 +2843,7 @@ export default {
                                      class="cmd-mobile-card p-2.5 mb-2 rounded-3 border bg-body-tertiary cursor-pointer"
                                      @click="useCommand(cmd)">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
-                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap min-w-0 flex-grow-1 me-2">
                                             <code class="text-primary fw-bold font-monospace" style="font-size: 0.85rem;">/{{ cmd.name }}</code>
                                             <span class="fw-bold small text-body" style="font-size: 0.8rem;">{{ getCmdTitle(cmd) }}</span>
                                             <span class="badge rounded-pill bg-body-secondary text-muted font-monospace" style="font-size: 0.65rem;">
@@ -2078,19 +2853,20 @@ export default {
                                                 {{ cmd._matchBadge }}
                                             </span>
                                         </div>
-                                        <div class="d-flex align-items-center gap-1">
+                                        <div class="d-flex align-items-center gap-1.5 flex-shrink-0">
                                             <button v-if="hasSchema(cmd.name)"
-                                                    class="btn btn-sm btn-primary-subtle text-primary py-0.5 px-2 rounded-pill font-monospace"
-                                                    style="font-size: 0.7rem;">
+                                                    class="btn btn-sm btn-primary-subtle text-primary rounded-pill font-monospace text-nowrap d-inline-flex align-items-center justify-content-center"
+                                                    style="font-size: 0.68rem; height: 24px; padding: 0 8px; line-height: 1;">
                                                 <i class="fa-solid fa-sliders me-1"></i>配置
                                             </button>
                                             <button v-else
-                                                    class="btn btn-sm btn-outline-secondary py-0.5 px-2 rounded-pill font-monospace"
-                                                    style="font-size: 0.7rem;">
+                                                    class="btn btn-sm btn-outline-secondary rounded-pill font-monospace text-nowrap d-inline-flex align-items-center justify-content-center"
+                                                    style="font-size: 0.68rem; height: 24px; padding: 0 8px; line-height: 1;">
                                                 <i class="fa-solid fa-arrow-turn-down me-1"></i>填入
                                             </button>
                                             <button v-if="cmd.quick"
-                                                    class="btn btn-sm btn-outline-warning py-0.5 px-1.5 rounded-pill"
+                                                    class="btn btn-sm btn-outline-warning rounded-circle p-0 d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                                    style="width: 24px; height: 24px; min-width: 24px; min-height: 24px; font-size: 0.7rem;"
                                                     :title="$t('dashboard.cmd_quick')"
                                                     @click.stop="sendQuickCommand(cmd.template)">
                                                 <i class="fa-solid fa-bolt"></i>
@@ -2114,7 +2890,6 @@ export default {
                             </div>
                         </div>
                     </Transition>
-                </div>
             </Teleport>
         </div>
 
@@ -2278,9 +3053,62 @@ export default {
             if (dashboardGridRef.value) {
                 const children = dashboardGridRef.value.children;
                 if (children && children[index]) {
-                    children[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+                    const childLeft = children[index].offsetLeft;
+                    dashboardGridRef.value.scrollTo({ left: childLeft, behavior: 'smooth' });
                 }
             }
+        };
+
+        const syncCardHeights = () => {
+            if (typeof window === 'undefined' || !dashboardGridRef.value) return;
+            const grid = dashboardGridRef.value;
+            const cardWrappers = grid.querySelectorAll('.stagger-item');
+            if (cardWrappers.length < 2) return;
+
+            if (window.innerWidth > 768) {
+                cardWrappers.forEach(w => {
+                    w.style.height = '';
+                    const card = w.querySelector('.stat-card');
+                    if (card) {
+                        card.style.height = '';
+                        card.style.minHeight = '';
+                    }
+                });
+                return;
+            }
+
+            const cards = [cardWrappers[0].querySelector('.stat-card'), cardWrappers[1].querySelector('.stat-card')];
+            if (!cards[0] || !cards[1]) return;
+
+            cards[0].style.height = '';
+            cards[0].style.minHeight = '';
+            cards[1].style.height = '';
+            cards[1].style.minHeight = '';
+            cardWrappers[0].style.height = '';
+            cardWrappers[1].style.height = '';
+
+            const h0 = cards[0].scrollHeight || cards[0].offsetHeight;
+            const h1 = cards[1].scrollHeight || cards[1].offsetHeight;
+            const targetHeight = Math.max(h0, h1);
+
+            if (targetHeight > 0) {
+                const targetPx = targetHeight + 'px';
+                cards[0].style.minHeight = targetPx;
+                cards[0].style.height = targetPx;
+                cards[1].style.minHeight = targetPx;
+                cards[1].style.height = targetPx;
+                cardWrappers[0].style.height = targetPx;
+                cardWrappers[1].style.height = targetPx;
+            }
+        };
+
+        let syncHeightRaf = null;
+        const requestSyncCardHeights = () => {
+            if (syncHeightRaf) cancelAnimationFrame(syncHeightRaf);
+            syncHeightRaf = requestAnimationFrame(() => {
+                syncCardHeights();
+                syncHeightRaf = null;
+            });
         };
 
         const onGridScroll = (e) => {
@@ -2347,6 +3175,9 @@ export default {
 
                 expanded.style.visibility = 'visible';
                 expanded.style.position = 'absolute';
+                expanded.style.width = '100%';
+                
+                syncCardHeights();
                 const targetH = expanded.scrollHeight || 268;
 
                 section.style.height = startH + 'px';
@@ -2366,10 +3197,100 @@ export default {
                         section.style.height = '';
                         section.style.overflow = '';
                         section.style.transition = '';
-                        if (expanded) expanded.style.position = '';
+                        if (expanded) {
+                            expanded.style.position = '';
+                            expanded.style.visibility = '';
+                            expanded.style.width = '';
+                        }
+                        requestSyncCardHeights();
                     }
                     collapseTransitionTimer = null;
                 }, 360);
+            }
+        };
+
+        const collapseMobileStats = () => {
+            if (!mobileCollapsed.value) {
+                toggleMobileCollapse();
+            }
+        };
+
+        const expandMobileStats = () => {
+            if (mobileCollapsed.value) {
+                toggleMobileCollapse();
+            }
+        };
+
+        let statsTouchStartY = 0;
+        let statsTouchStartX = 0;
+        let statsTouchFromBottom = false;
+
+        const handleStatsTouchStart = (e) => {
+            if (mobileCollapsed.value || !e.touches || e.touches.length === 0) return;
+            const touch = e.touches[0];
+            statsTouchStartX = touch.clientX;
+            statsTouchStartY = touch.clientY;
+
+            // 判定触摸起始点是否位于卡片下半区域（底部 45% 或 Handle）
+            const rect = expandedContentRef.value?.getBoundingClientRect();
+            if (rect) {
+                const relativeY = touch.clientY - rect.top;
+                statsTouchFromBottom = relativeY >= (rect.height * 0.55);
+            } else {
+                statsTouchFromBottom = true;
+            }
+        };
+
+        const handleStatsTouchEnd = (e) => {
+            if (mobileCollapsed.value || !e.changedTouches || e.changedTouches.length === 0) return;
+            const touch = e.changedTouches[0];
+            const deltaX = touch.clientX - statsTouchStartX;
+            const deltaY = touch.clientY - statsTouchStartY;
+
+            // 当起始点在下半区域、向上滑动超过 25px、且垂直位移明显大于水平位移时触发收起
+            if (statsTouchFromBottom && deltaY < -25 && Math.abs(deltaY) > Math.abs(deltaX) * 1.1) {
+                collapseMobileStats();
+            }
+            statsTouchFromBottom = false;
+        };
+
+        const handleHandleTouchStart = (e) => {
+            if (mobileCollapsed.value || !e.touches || e.touches.length === 0) return;
+            const touch = e.touches[0];
+            statsTouchStartX = touch.clientX;
+            statsTouchStartY = touch.clientY;
+            statsTouchFromBottom = true;
+        };
+
+        const handleHandleTouchEnd = (e) => {
+            if (mobileCollapsed.value || !e.changedTouches || e.changedTouches.length === 0) return;
+            const touch = e.changedTouches[0];
+            const deltaX = touch.clientX - statsTouchStartX;
+            const deltaY = touch.clientY - statsTouchStartY;
+
+            // 底部手柄区域向上滑动超过 18px 即可平滑触发收起
+            if (deltaY < -18 && Math.abs(deltaY) > Math.abs(deltaX)) {
+                collapseMobileStats();
+            }
+            statsTouchFromBottom = false;
+        };
+
+        let sheetTouchStartX = 0;
+        let sheetTouchStartY = 0;
+
+        const handleSheetTouchStart = (e) => {
+            if (!e.touches || e.touches.length === 0) return;
+            sheetTouchStartX = e.touches[0].clientX;
+            sheetTouchStartY = e.touches[0].clientY;
+        };
+
+        const handleSheetTouchEnd = (e) => {
+            if (!e.changedTouches || e.changedTouches.length === 0) return;
+            const deltaX = e.changedTouches[0].clientX - sheetTouchStartX;
+            const deltaY = e.changedTouches[0].clientY - sheetTouchStartY;
+            // 移动端指令助手手柄/头部向下滑动超过 25px 且竖直位移明显大于水平位移，平滑收起
+            if (deltaY > 25 && deltaY > Math.abs(deltaX) * 1.1) {
+                showCmdPanel.value = false;
             }
         };
 
@@ -2724,22 +3645,36 @@ export default {
         };
 
         watch(() => store.logs.length, scrollToBottom);
+        watch(() => store.stats, () => {
+            if (!mobileCollapsed.value) {
+                requestSyncCardHeights();
+            }
+        }, { deep: true });
 
         onMounted(() => {
             updateMobile();
             window.addEventListener('resize', updateMobile);
+            window.addEventListener('resize', requestSyncCardHeights);
+            window.addEventListener('orientationchange', requestSyncCardHeights);
             window.addEventListener('keydown', handleGlobalKeydown);
             document.addEventListener('click', handleGlobalClick);
             scrollToBottom();
             setTimeout(scrollToBottom, 100);
+            nextTick(() => {
+                requestSyncCardHeights();
+                setTimeout(requestSyncCardHeights, 150);
+            });
             startupModal.value = new bootstrap.Modal(document.getElementById('startupModal'));
             cmdParamModalInstance.value = new bootstrap.Modal(document.getElementById('cmdParamModal'));
         });
 
         onUnmounted(() => {
             window.removeEventListener('resize', updateMobile);
+            window.removeEventListener('resize', requestSyncCardHeights);
+            window.removeEventListener('orientationchange', requestSyncCardHeights);
             window.removeEventListener('keydown', handleGlobalKeydown);
             document.removeEventListener('click', handleGlobalClick);
+            if (syncHeightRaf) cancelAnimationFrame(syncHeightRaf);
         });
 
         const dashboardStatusClass = computed(() => {
@@ -2873,6 +3808,8 @@ export default {
             // Mobile stats state & handlers
             activeMobileCard, mobileCollapsed, dashboardGridRef, setMobileCard, onGridScroll, toggleMobileCollapse, isMobile,
             statsSectionRef, miniBarRef, expandedContentRef,
+            collapseMobileStats, expandMobileStats, handleStatsTouchStart, handleStatsTouchEnd, handleHandleTouchStart, handleHandleTouchEnd,
+            handleSheetTouchStart, handleSheetTouchEnd,
 
             // 指令助手参数配置相关返回
             selectedSchema, paramValues, assembledCommand, insertCommand, executeConfiguredCommand

@@ -34,7 +34,7 @@ export default {
                     </div>
                     <div class="col-12 col-md-auto">
                         <div class="file-search-container d-flex align-items-center px-2.5 rounded-3 border" 
-                             style="background-color: var(--c-surface); border-color: rgba(255,255,255,0.1) !important; min-height: 38px; min-width: 200px;">
+                             style="background-color: var(--c-surface); border-color: rgba(255,255,255,0.1) !important; min-height: 45px; min-width: 200px;padding: 0 10px">
                             <i class="fa-solid fa-magnifying-glass text-muted me-2" style="font-size: 0.8rem;"></i>
                             <input type="text" 
                                    class="file-search-input bg-transparent border-0 p-0 text-body flex-grow-1" 

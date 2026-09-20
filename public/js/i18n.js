@@ -319,7 +319,16 @@ export const messages = {
             cmd_whitelist_desc: '管理白名单',
             cmd_execute_desc: '条件执行命令',
             cmd_bossbar_desc: '管理Boss栏',
-            cmd_tick_desc: '查询/修改游戏刻速率'
+            cmd_tick_desc: '查询/修改游戏刻速率',
+            cmd_tp_desc: '快速传送实体到目标或坐标',
+            cmd_tell_desc: '向玩家发送私聊消息',
+            cmd_w_desc: '私聊密语发送消息',
+            cmd_xp_desc: '增减或设置玩家经验等级',
+            cmd_me_desc: '发送动作叙述广播消息',
+            cmd_perf_desc: '服务端专用性能分析采样',
+            cmd_jfr_desc: 'Java飞行记录仪性能分析',
+            cmd_publish_desc: '开放为局域网联机模式',
+            cmd_return_desc: '从函数控制流返回指定数值'
         },
         files: {
             path: '路径',
@@ -1485,7 +1494,16 @@ export const messages = {
             cmd_whitelist_desc: 'Manage whitelist',
             cmd_execute_desc: 'Execute command conditionally',
             cmd_bossbar_desc: 'Manage boss bars',
-            cmd_tick_desc: 'Query/modify game tick rate'
+            cmd_tick_desc: 'Query/modify game tick rate',
+            cmd_tp_desc: 'Teleport entities to destination or coordinates',
+            cmd_tell_desc: 'Send private message to player',
+            cmd_w_desc: 'Send whisper message to player',
+            cmd_xp_desc: 'Add, set, or query player experience',
+            cmd_me_desc: 'Send action message to chat',
+            cmd_perf_desc: 'Server performance profiling',
+            cmd_jfr_desc: 'Java Flight Recorder profiling',
+            cmd_publish_desc: 'Publish world to LAN',
+            cmd_return_desc: 'Return value from function'
         },
         files: {
             path: 'Path',

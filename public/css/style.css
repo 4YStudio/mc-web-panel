@@ -3164,6 +3164,7 @@ h3 { font-size: 1.25rem; }
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
+        align-items: stretch !important;
         overflow-x: auto !important;
         overflow-y: hidden !important;
         scroll-snap-type: x mandatory !important;
@@ -3185,25 +3186,53 @@ h3 { font-size: 1.25rem; }
         scroll-snap-align: start !important;
         scroll-snap-stop: always !important;
         box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-self: stretch !important;
+        height: 100% !important;
     }
-    .stat-card {
+    .dashboard-grid .stat-card {
         min-width: 0 !important;
         max-width: 100% !important;
         width: 100% !important;
-        height: auto !important;
-        min-height: auto !important;
+        height: 100% !important;
+        min-height: 100% !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 100% !important;
     }
-    .stat-card-header {
+    .dashboard-grid .stat-card-header {
         padding: 0.625rem 0.875rem 0.375rem !important;
+        flex-shrink: 0 !important;
     }
-    .stat-card-body {
+    .dashboard-grid .stat-card-body {
         padding: 0.375rem 0.875rem 0.625rem !important;
         min-width: 0 !important;
         max-width: 100% !important;
         overflow: hidden !important;
         word-break: break-word !important;
+        flex: 1 1 auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+    }
+    .dashboard-grid .stat-card-body > .row {
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        align-content: stretch !important;
+    }
+    .dashboard-grid .stat-card-body > .row > div {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .dashboard-grid .resource-widget {
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
     }
     .console-output {
         padding: 0.625rem 0.875rem !important;
@@ -3311,6 +3340,33 @@ h3 { font-size: 1.25rem; }
         visibility: hidden;
         z-index: 1;
     }
+
+    /* 移动端底部手势滑柄（置于卡片外部，作为收起把手） */
+    .mobile-stats-bottom-bar {
+        width: 100%;
+        touch-action: pan-x;
+        -webkit-tap-highlight-color: transparent;
+        padding-top: 0.35rem !important;
+        padding-bottom: 0.35rem !important;
+    }
+    .mobile-swipe-pill {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+    .swipe-pill-bar {
+        width: 36px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(128, 128, 128, 0.35);
+        transition: background var(--transition-fast), width var(--transition-fast), transform var(--transition-fast);
+    }
+    .mobile-stats-bottom-bar:active .swipe-pill-bar,
+    .mobile-stats-bottom-bar:hover .swipe-pill-bar {
+        background: var(--c-primary);
+        width: 44px;
+    }
 }
 
 /* ==========================================================================
@@ -3356,6 +3412,8 @@ h3 { font-size: 1.25rem; }
     flex-direction: column;
     overflow: hidden;
     padding-bottom: env(safe-area-inset-bottom, 12px);
+    transform: translateY(0);
+    will-change: transform;
 }
 
 .cmd-sheet-handle-area {
@@ -3413,27 +3471,36 @@ h3 { font-size: 1.25rem; }
     border-color: rgba(var(--c-primary-rgb), 0.3) !important;
 }
 
-/* 动效：移动端抽屉平滑滑入/滑出 */
-.cmd-sheet-enter-active,
+/* 动效：移动端抽屉平滑滑入/滑出 (Native Bottom Sheet 体验) */
+.cmd-sheet-enter-active {
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+}
+
 .cmd-sheet-leave-active {
-    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    transition: transform 0.26s cubic-bezier(0.32, 0, 0.67, 0);
+    will-change: transform;
 }
 
 .cmd-sheet-enter-from,
 .cmd-sheet-leave-to {
-    transform: translateY(100%);
-    opacity: 0;
+    transform: translateY(100%) !important;
 }
 
 /* 动效：暗色毛玻璃遮罩淡入/淡出 */
-.cmd-fade-enter-active,
-.cmd-fade-leave-active {
+.cmd-fade-enter-active {
     transition: opacity 0.28s ease;
+    will-change: opacity;
+}
+
+.cmd-fade-leave-active {
+    transition: opacity 0.25s ease;
+    will-change: opacity;
 }
 
 .cmd-fade-enter-from,
 .cmd-fade-leave-to {
-    opacity: 0;
+    opacity: 0 !important;
 }
 
 /* Card Hover Swap Animation */

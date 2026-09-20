@@ -6,7 +6,7 @@ import { toasts, removeToast, modalData, confirmModalAction, initModal, showToas
 // 导入所有组件
 import Login from './components/Login.js';
 import Sidebar from './components/Sidebar.js?v=1.5.0';
-import Dashboard from './components/Dashboard.js?v=2.4.3';
+import Dashboard from './components/Dashboard.js?v=2.4.7';
 import ModsManager from './components/ModsManager.js';
 import FileManager from './components/FileManager.js';
 import PlayerManager from './components/PlayerManager.js';
@@ -22,7 +22,7 @@ import JavaManager from './components/JavaManager.js';
 import InstanceManager from './components/InstanceManager.js';
 import CustomSelect from './components/CustomSelect.js';
 import ScrollManager from './components/ScrollManager.js';
-import { createI18n, messages } from './i18n.js?v=2.4.1';
+import { createI18n, messages } from './i18n.js?v=2.4.2';
 import { socket } from './socket.js';
 
 const app = createApp({
