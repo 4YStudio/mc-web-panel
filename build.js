@@ -68,8 +68,11 @@ async function prepareBuildDir() {
 
     console.log('Pruning...');
     try {
-        execSync(`find node_modules -type f \\( -name "*.ts" -o -name "*.md" -o -name "LICENSE" -o -name "*.map" \\) -delete`, { cwd: BUILD_DIR });
-        execSync(`find node_modules -type d \\( -name "test" -o -name "tests" -o -name "example" -o -name "examples" -o -name "docs" \\) -exec rm -rf {} +`, { cwd: BUILD_DIR });
+        // 1. 移除 bare-* 等原生依赖中包含的 android, ios, darwin, win32 等非 Linux 预编译二进制
+        execSync(`find node_modules -type d -path "*/prebuilds/*" ! -name "linux-*" -exec rm -rf {} +`, { cwd: BUILD_DIR });
+        // 2. 移除文档、类型定义、源码映射、日志与冗余测试文件
+        execSync(`find node_modules -type f \\( -name "*.ts" -o -name "*.md" -o -name "LICENSE*" -o -name "*.map" -o -name "CHANGELOG*" -o -name "*.d.ts" \\) -delete`, { cwd: BUILD_DIR });
+        execSync(`find node_modules -type d \\( -name "test" -o -name "tests" -o -name "example" -o -name "examples" -o -name "docs" -o -name ".github" \\) -exec rm -rf {} +`, { cwd: BUILD_DIR });
     } catch (e) { }
     console.log('Removing all .bin directories...');
     try {
@@ -82,31 +85,21 @@ async function prepareBuildDir() {
 async function buildTarget(target) {
     console.log(`\n=== Building for ${target.name} ===`);
 
-    const isWin = target.name.startsWith('win');
-    const ext = isWin ? '.zip' : '.tar.xz';
+    const ext = '.tar.xz';
     const distName = `node-${NODE_VERSION}-${target.nodeArch}`;
     const fileName = `${distName}${ext}`;
     const filePath = path.join(CACHE_DIR, fileName);
     const url = `https://nodejs.org/dist/${NODE_VERSION}/${fileName}`;
-    const nodeBinName = isWin ? 'node.exe' : 'node';
-    const localNodeBin = path.join(BUILD_DIR, nodeBinName);
+    const localNodeBin = path.join(BUILD_DIR, 'node');
 
     if (fs.existsSync(filePath)) console.log(`Using cached ${fileName}`);
     else downloadFile(url, filePath);
 
     console.log('Extracting Node.js...');
     try {
-        if (isWin) {
-            const extractDir = path.join(CACHE_DIR, distName);
-            if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true, force: true });
-            execSync(`unzip -q "${filePath}" -d "${CACHE_DIR}"`);
-            fs.copyFileSync(path.join(extractDir, 'node.exe'), localNodeBin);
-            fs.rmSync(extractDir, { recursive: true, force: true });
-        } else {
-            execSync(`tar -xf "${filePath}" -C "${CACHE_DIR}"`);
-            fs.copyFileSync(path.join(CACHE_DIR, distName, 'bin', 'node'), localNodeBin);
-            fs.rmSync(path.join(CACHE_DIR, distName), { recursive: true, force: true });
-        }
+        execSync(`tar -xf "${filePath}" -C "${CACHE_DIR}"`);
+        fs.copyFileSync(path.join(CACHE_DIR, distName, 'bin', 'node'), localNodeBin);
+        fs.rmSync(path.join(CACHE_DIR, distName), { recursive: true, force: true });
         fs.chmodSync(localNodeBin, '755');
     } catch (e) {
         console.error(`Failed to extract/setup node for ${target.name}`, e);
@@ -120,11 +113,7 @@ async function buildTarget(target) {
 
     const stubMap = {
         'linux-x64': 'stub--linux--x64',
-        'linux-arm64': 'stub--linux--arm64',
-        'win-x64': 'stub--win32--x64',
-        'win-arm64': 'stub--win32--x64',
-        'macos-x64': 'stub--darwin--x64',
-        'macos-arm64': 'stub--darwin--arm64'
+        'linux-arm64': 'stub--linux--arm64'
     };
     const stubName = stubMap[target.name];
     const caxaPkgPath = path.join(path.dirname(require.resolve('caxa')), '..');
@@ -137,7 +126,7 @@ async function buildTarget(target) {
 
     try {
         const caxaPath = path.join(__dirname, 'node_modules', '.bin', 'caxa');
-        execSync(`"${caxaPath}" --no-dedupe --stub "${stubPath}" --input "${BUILD_DIR}" --output "${outputPath}" -- "{{caxa}}/${nodeBinName}" "{{caxa}}/server.js"`, { stdio: 'inherit' });
+        execSync(`"${caxaPath}" --no-include-node --no-dedupe --stub "${stubPath}" --input "${BUILD_DIR}" --output "${outputPath}" -- "{{caxa}}/node" "{{caxa}}/server.js"`, { stdio: 'inherit' });
 
         console.log(`Success: ${outputPath}`);
     } catch (e) {

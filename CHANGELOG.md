@@ -1,5 +1,43 @@
 # MC Web Panel 更新日志
 
+## [2.5.2] - 2026-09-20
+
+### 🐧 代码库 Linux 纯粹化与历史遗留 Windows 代码彻底清理
+
+- **面向官方支持系统（Linux）的代码纯粹化**：
+  - **路径与系统调用精简**：
+    - `isPathInside`：移除 `win32` 平台不区分大小写的冗余分支，收敛为严格可靠的标准 Linux 路径安全判定；
+    - `resolveJavaPath`：移除 `os.platform() === 'win32' ? 'java.exe' : 'java'`，统一收敛为标准 POSIX `bin/java`；
+    - `Java 自动下载解压引擎`：移除多余的 Windows tar 解压判断、`java.exe` 路径拼接与 `chmod` 保护开关，直接使用统一高效的 `tar -xzf` 解压与赋权通道；
+    - `系统 Java 探针`：移除 Windows `where java` 探针回退，统一使用精简标准的 `which java`；
+    - `备份解压与还原权限修复`：移除 `process.platform !== 'win32'` 判定，统一对文件与脚本直接安全赋权；
+    - `Forge / NeoForge 启动管道`：彻底清理 Windows 下的 `run.bat` 与 `cmd.exe /c run.bat` 调度分支，统一直接由 `/bin/bash` 调度执行 `run.sh nogui` 并写入 JVM 启动参数与赋予执行权限；
+    - `版本自更新平台探测`：移除冗余跨平台三元表达式，收敛为统一的 `linux-${archStr}` 平台匹配与更新下载逻辑；
+    - `Adoptium 镜像与环境诊断`：将平台类型识别统一收敛为 `'linux'`。
+- **系统更新机制与 GitHub 代理极速下载重构**：
+  - **版本号单一真相源（Single Source of Truth）**：彻底解决 `package.json` 与 `server.js` 双重版本硬编码脱节的痛点，`server.js` 启动时直接从 `package.json` 动态挂载 `APP_VERSION`，修改版本只需改动一处即可全系统生效；
+  - **健壮语义化版本比较算法 (`compareSemver`)**：内置标准多段 SemVer 比较引擎，智能容错大写 `V`、小写 `v` 前缀及预发布后缀，杜绝版本号判定失真；
+  - **GitHub 代理极速下载引擎优化（100KB/s $\to$ MB/s+ 质的飞跃）**：
+    - **规避 CDN 脚本限速**：注入真实浏览器 `User-Agent` 与 `Accept-Encoding: identity`，彻底规避代理节点与 Cloudflare 对未知爬虫/默认 `axios` 的 100KB/s 强制 QoS 限速；
+    - **流式背压保护**：采用专业 `Transform` 进度流替换原 `on('data')` 监听，保护 Node.js stream pipeline 不受干扰；
+    - **1MB 磁盘高速缓冲**：为写入流配置 1MB `highWaterMark`，消除磁盘 I/O 对网络套接字窗口的背压卡顿；
+    - **覆盖 S3 重定向代理**：升级 `applyGithubProxy` 自动识别 `s3.amazonaws.com` 与 Release 存储桶重定向，彻底根除 302 丢失代理问题；
+    - **前端代理快捷列表更新**：在面板设置中新增香港节点 `https://hk.gh-proxy.org` 快捷选项。
+- **打包构建系统 (`build.js`) 现代化精简与体积暴瘦（114MB $\to$ 63MB，立省 45%）**：
+  - **消除双份 Node.js 运行时**：修复 caxa 默认打包宿主机 node 的缺陷，传递 `--no-include-node`，彻底消除安装包内双重 Node.js 的冗余，单项直接释放约 47MB 压缩体积；
+  - **原生依赖多平台死代码裁剪**：在构建时自动清理 `bare-*` 等依赖包内部包含的 Android, iOS, macOS, Windows 等非 Linux 预编译二进制；
+  - **高清验证码背景图高保真压缩**：将原本 4K~8K 超大壁纸优化为匹配面板比例的 760×480 Retina 规格，画质细腻的同时将图片总体积从 6.0MB 锐减至 856KB；
+  - **移除 Windows 废弃构建逻辑**：移除 `isWin`、Windows `.zip` 压缩包处理、`node.exe` 提取与 `unzip` 命令分支，统一使用 Node.js 官方 `.tar.xz`；
+  - 移除 stubMap 中多余的 `win-x64`、`win-arm64`、`macos-x64`、`macos-arm64` 预设，仅保留官方支持的 `linux-x64` 与 `linux-arm64` 目标；
+  - 打包调用参数统一为 `{{caxa}}/node`；
+  - 清理 `package.json` 中已废弃的 Windows PE 资源修改与图标转换依赖（`rcedit`、`resedit-cli`、`png-to-ico`）。
+- **卷轴管理系统（ScrollEngine）更新与版本对比体验修复**：
+  - **修复更新解析旧版本号丢失与空白缺陷**：修复卷轴上传解析接口（`/api/scrolls/upload`）中将内部 `record` 误当作清单对象读取 `existing.version` 导致版本号为 `undefined` 的缺陷；改由优先从内存 `record.manifest` 及物理磁盘 `readManifest` 提取完整元数据，确保已安装卷轴准确读取旧版本号与详情；
+  - **前端版本渲染健壮化与容错**：新增 `formatVersion` 格式化工具函数，杜绝版本号丢失时仅显示单个 `v` 的尴尬排版，自动规范化大小写 `v` 前缀及未定义状态（如优雅保底）；
+  - **版本降级与市场更新智能判定**：新增 `compareVersions` 语义化版本算法，更新模态框中自动检测并提示版本降级警告（`downgrade_warning`），同时规范卷轴市场中的版本比对逻辑。
+- **文档规范同步 (`README.md`)**：
+  - 明确更新系统支持说明：官方开箱预编译发布仅支持 Linux (x64 / ARM64)，如需在其他操作系统运行，用户可克隆仓库稍作修改后自行从源码启动或打包。
+
 ## [2.5.1] - 2026-09-20
 
 ### ⚡ 控制台指令助手图形化配置 100% 全覆盖与移动端 UI 紧凑精致化重构

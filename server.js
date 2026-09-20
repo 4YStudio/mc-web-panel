@@ -24,10 +24,14 @@ const PropertiesReader = require('properties-reader');
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const { pipeline } = require('node:stream/promises');
+const { Transform } = require('stream');
 const PluginLoader = require('./plugin-loader');
 const sharp = require('sharp');
 
-const APP_VERSION = '2.5.1';
+const pkgInfo = (() => {
+    try { return require('./package.json'); } catch (e) { return { version: '2.5.2' }; }
+})();
+const APP_VERSION = pkgInfo.version || '2.5.2';
 const STARTUP_TIME = Date.now();
 const APP_CODENAME = 'Advanced Backups Support';
 const MODRINTH_UA = `CloudSpeak/MC-Panel/${APP_VERSION} (henvei@cloudspeak.com)`;
@@ -677,11 +681,6 @@ function isPathInside(target, base) {
     if (!target || !base) return false;
     const resolvedTarget = path.resolve(target);
     const resolvedBase = path.resolve(base);
-    if (process.platform === 'win32') {
-        const lowerTarget = resolvedTarget.toLowerCase();
-        const lowerBase = resolvedBase.toLowerCase();
-        return lowerTarget === lowerBase || lowerTarget.startsWith(lowerBase + path.sep);
-    }
     return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path.sep);
 }
 
@@ -728,11 +727,20 @@ function nativeHttpGet(urlStr, options = {}) {
 // GitHub 代理加速
 function applyGithubProxy(url) {
     if (!url || typeof url !== 'string') return url;
-    if (appConfig.githubProxy && (url.includes('github.com') || url.includes('githubusercontent.com'))) {
-        let proxy = appConfig.githubProxy;
-        if (!proxy.endsWith('/')) proxy += '/';
-        // 防重复叠加检查
-        if (url.startsWith(proxy)) return url;
+    if (!appConfig.githubProxy) return url;
+    let proxy = appConfig.githubProxy.trim();
+    if (!proxy) return url;
+    if (!proxy.endsWith('/')) proxy += '/';
+
+    // 防重复叠加检查
+    if (url.startsWith(proxy)) return url;
+
+    // 匹配 GitHub 相关域名与 Release 存储桶
+    const isGithubHost = url.includes('github.com') ||
+                         url.includes('githubusercontent.com') ||
+                         url.includes('github-cloud.s3.amazonaws.com') ||
+                         url.includes('github-production-release-asset');
+    if (isGithubHost) {
         return proxy + url;
     }
     return url;
@@ -1424,7 +1432,7 @@ if (cluster.isPrimary) {
         if (!inputPath) return '';
         try {
             if (fs.existsSync(inputPath) && fs.statSync(inputPath).isFile()) return inputPath;
-            const binJava = path.join(inputPath, 'bin', os.platform() === 'win32' ? 'java.exe' : 'java');
+            const binJava = path.join(inputPath, 'bin', 'java');
             if (fs.existsSync(binJava)) return binJava;
         } catch (e) { }
         return inputPath;
@@ -2131,7 +2139,7 @@ if (cluster.isPrimary) {
             const source = req.query.source || 'adoptium';
             const baseUrl = ADOPTIUM_SOURCES[source] || ADOPTIUM_SOURCES.adoptium;
             const arch = os.arch() === 'x64' ? 'x64' : os.arch() === 'arm64' ? 'aarch64' : os.arch();
-            const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'mac' : 'windows';
+            const osType = 'linux';
 
             // Get available feature versions from Adoptium API
             let featureVersions = [8, 11, 17, 21, 22]; // Fallback
@@ -2298,7 +2306,7 @@ if (cluster.isPrimary) {
                     const filename = path.basename(downloadUrl);
                     const imageType = downloadUrl.includes('-jdk_') ? 'jdk' : 'jre';
                     const arch = os.arch() === 'x64' ? 'x64' : os.arch() === 'arm64' ? 'aarch64' : os.arch();
-                    const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'mac' : 'windows';
+                    const osType = 'linux';
                     const autoMirrorUrl = `${ADOPTIUM_SOURCES.tuna}/${featureVersion}/${imageType}/${arch}/${osType}/${filename}`;
                     if (!urlsToTry.some(u => u.url === autoMirrorUrl)) {
                         urlsToTry.push({ url: autoMirrorUrl, label: '清华镜像(自动)' });
@@ -2372,25 +2380,16 @@ if (cluster.isPrimary) {
 
             // Extract
             const { execSync } = require('child_process');
-            if (process.platform === 'win32') {
-                // Windows: use tar (available since Win10 1803)
-                execSync(`tar -xzf "${tmpFile}" -C "${installDir}" --strip-components=1`, { timeout: 120000 });
-            } else {
-                execSync(`tar -xzf "${tmpFile}" -C "${installDir}" --strip-components=1`, { timeout: 120000 });
-            }
+            execSync(`tar -xzf "${tmpFile}" -C "${installDir}" --strip-components=1`, { timeout: 120000 });
 
             // Clean up archive
             await fs.remove(tmpFile);
 
             // Detect java binary path
-            const javaBin = process.platform === 'win32'
-                ? path.join(installDir, 'bin', 'java.exe')
-                : path.join(installDir, 'bin', 'java');
+            const javaBin = path.join(installDir, 'bin', 'java');
 
-            // Make executable on unix
-            if (process.platform !== 'win32') {
-                try { execSync(`chmod +x "${javaBin}"`); } catch (e) { }
-            }
+            // Make executable
+            try { execSync(`chmod +x "${javaBin}"`); } catch (e) { }
 
             // Verify
             const detectedVer = await checkJavaVersion(javaBin);
@@ -2509,7 +2508,7 @@ if (cluster.isPrimary) {
         const { execSync } = require('child_process');
         let systemPath = '';
         try {
-            systemPath = execSync('which java 2>/dev/null || where java 2>nul', { encoding: 'utf8' }).trim().split('\n')[0];
+            systemPath = execSync('which java 2>/dev/null', { encoding: 'utf8' }).trim().split('\n')[0];
         } catch (e) { }
         res.json({ version: systemVer, path: systemPath });
     });
@@ -2541,7 +2540,7 @@ if (cluster.isPrimary) {
     app.get('/api/java/diagnose', requireAuth, async (req, res) => {
         const results = {};
         const arch = os.arch() === 'x64' ? 'x64' : os.arch() === 'arm64' ? 'aarch64' : os.arch();
-        const osType = process.platform === 'linux' ? 'linux' : process.platform === 'darwin' ? 'mac' : 'windows';
+        const osType = 'linux';
         const fv = 17;
 
         results.system = { arch, os: osType, nodeVersion: process.version, platform: process.platform };
@@ -3776,7 +3775,7 @@ threaded_server_support=false
     /**
      * 高可用、无损系统备份解压管道
      * 1. 优先调用系统原生 unzip，重置 UNZIP/ZIPINFO 环境变量，100% 还原 0755 权限与符号链接，且流式解压无需将数 GB 读入 V8 堆内存；
-     * 2. 备用尝试系统原生 tar (Windows 10/11 和 Linux 原生支持 tar -xf)；
+     * 2. 备用尝试系统原生 tar (Linux 原生支持 tar -xf)；
      * 3. 终极降级方案：使用 AdmZip 解压，并逐项恢复 entry.attr 记录的 POSIX 文件权限与软链接。
      */
     const extractBackupArchive = async (zipPath, targetDir) => {
@@ -3829,7 +3828,7 @@ threaded_server_support=false
                 }
             } else {
                 fs.writeFileSync(outPath, entry.getData());
-                if (mode && process.platform !== 'win32') {
+                if (mode) {
                     try {
                         fs.chmodSync(outPath, mode);
                     } catch (_) {}
@@ -4222,16 +4221,14 @@ threaded_server_support=false
                     await fs.copy(instancesRestoreDir, INSTANCES_DIR, { overwrite: true });
                 }
 
-                // 5. Linux 环境下校验并修复 Java 与可执行脚本权限（额外安全兜底）
-                if (process.platform !== 'win32') {
-                    try {
-                        const { execSync } = require('child_process');
-                        const javaDir = path.join(DATA_DIR, 'java');
-                        if (fs.existsSync(javaDir)) {
-                            execSync(`find "${javaDir}" -type f -name "java" -exec chmod 755 {} +`, { stdio: 'ignore' });
-                        }
-                    } catch (_) {}
-                }
+                // 5. 校验并修复 Java 与可执行脚本权限（额外安全兜底）
+                try {
+                    const { execSync } = require('child_process');
+                    const javaDir = path.join(DATA_DIR, 'java');
+                    if (fs.existsSync(javaDir)) {
+                        execSync(`find "${javaDir}" -type f -name "java" -exec chmod 755 {} +`, { stdio: 'ignore' });
+                    }
+                } catch (_) {}
 
                 // 6. 完成并准备重启
                 await fs.remove(tempExtractDir).catch(() => { });
@@ -4984,28 +4981,17 @@ threaded_server_support=false
             let spawnCmd, spawnArgs, spawnOpts = { cwd: instDir };
 
             const runSh = path.join(instDir, 'run.sh');
-            const runBat = path.join(instDir, 'run.bat');
             const userJvmArgs = path.join(instDir, 'user_jvm_args.txt');
-            const isWindows = process.platform === 'win32';
-            const hasRunScript = (loaderType === 'forge' || loaderType === 'neoforge') && (isWindows ? (fs.existsSync(runBat) || fs.existsSync(runSh)) : fs.existsSync(runSh));
+            const hasRunScript = (loaderType === 'forge' || loaderType === 'neoforge') && fs.existsSync(runSh);
 
             if (hasRunScript) {
                 const jvmArgsContent = javaArgs.map(a => a.trim()).filter(a => a).join('\n') + '\n';
                 await fs.writeFile(userJvmArgs, jvmArgsContent);
-                const scriptName = (isWindows && fs.existsSync(runBat)) ? 'run.bat' : 'run.sh';
-                appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : 'Forge'} (${scriptName} 模式)\n`);
+                appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : 'Forge'} (run.sh 模式)\n`);
                 appendLog(instanceId, `[系统] JVM 参数已写入 user_jvm_args.txt\n`);
-                if (isWindows && scriptName === 'run.bat') {
-                    spawnCmd = 'cmd.exe';
-                    spawnArgs = ['/c', 'run.bat', 'nogui'];
-                } else if (isWindows) {
-                    spawnCmd = 'bash';
-                    spawnArgs = [runSh, 'nogui'];
-                } else {
-                    spawnCmd = '/bin/bash';
-                    spawnArgs = [runSh, 'nogui'];
-                    try { await fs.chmod(runSh, 0o755); } catch (e) { }
-                }
+                spawnCmd = '/bin/bash';
+                spawnArgs = [runSh, 'nogui'];
+                try { await fs.chmod(runSh, 0o755); } catch (e) { }
             } else {
                 appendLog(instanceId, `[系统] 加载器: ${loaderType === 'neoforge' ? 'NeoForge' : loaderType.charAt(0).toUpperCase() + loaderType.slice(1)} (jar 模式)\n`);
                 spawnCmd = javaPath;
@@ -5886,30 +5872,54 @@ threaded_server_support=false
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    // 规范化 SemVer 版本对比 (返回值 > 0 表示 v1 比 v2 新)
+    const compareSemver = (v1, v2) => {
+        const parse = (v) => {
+            if (!v || typeof v !== 'string') return [0, 0, 0];
+            const clean = v.trim().replace(/^[vV]/, '');
+            return clean.split('.').map(part => {
+                const num = parseInt(part.replace(/[^\d]/g, ''), 10);
+                return isNaN(num) ? 0 : num;
+            });
+        };
+        const p1 = parse(v1);
+        const p2 = parse(v2);
+        const maxLen = Math.max(p1.length, p2.length, 3);
+        for (let i = 0; i < maxLen; i++) {
+            const n1 = p1[i] || 0;
+            const n2 = p2[i] || 0;
+            if (n1 > n2) return 1;
+            if (n1 < n2) return -1;
+        }
+        return 0;
+    };
+
     app.get('/api/system/update_check', requireAuth, async (req, res) => {
         try {
-            const currentVersion = require('./package.json').version;
-            // Fetch GitHub Releases
-            const gh = await axios.get('https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest', {
-                headers: { 'User-Agent': 'MC-Web-Panel' },
-                timeout: 5000
-            });
-            const latestTag = gh.data.tag_name; // e.g. "v1.5.1"
-            const latestVersion = latestTag.replace(/^v/, '');
-
-            // Simple semver comparison (assuming x.y.z)
-            const isNewer = (v1, v2) => {
-                const p1 = v1.split('.').map(Number);
-                const p2 = v2.split('.').map(Number);
-                for (let i = 0; i < 3; i++) {
-                    if (p1[i] > p2[i]) return true;
-                    if (p1[i] < p2[i]) return false;
-                }
-                return false;
+            const currentVersion = APP_VERSION;
+            const apiUrl = 'https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest';
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'application/vnd.github.v3+json'
             };
 
+            let gh;
+            try {
+                gh = await axios.get(apiUrl, { headers, timeout: 6000 });
+            } catch (err) {
+                if (appConfig.githubProxy) {
+                    gh = await axios.get(applyGithubProxy(apiUrl), { headers, timeout: 8000 });
+                } else {
+                    throw err;
+                }
+            }
+
+            const latestTag = gh.data.tag_name || '';
+            const latestVersion = latestTag.trim().replace(/^[vV]/, '');
+            const hasUpdate = compareSemver(latestVersion, currentVersion) > 0;
+
             res.json({
-                hasUpdate: isNewer(latestVersion, currentVersion),
+                hasUpdate,
                 latestVersion,
                 currentVersion,
                 url: gh.data.html_url,
@@ -5918,7 +5928,7 @@ threaded_server_support=false
             });
         } catch (e) {
             console.error('Update check failed:', e.message);
-            res.status(500).json({ error: 'Failed to check updates' });
+            res.status(500).json({ error: 'Failed to check updates: ' + e.message });
         }
     });
 
@@ -5938,15 +5948,25 @@ threaded_server_support=false
             }
 
             // 1. 获取最新版本信息
-            const gh = await axios.get('https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest', {
-                headers: { 'User-Agent': 'MC-Web-Panel' },
-                timeout: 5000
-            });
+            const apiUrl = 'https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest';
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'application/vnd.github.v3+json'
+            };
+            let gh;
+            try {
+                gh = await axios.get(apiUrl, { headers, timeout: 6000 });
+            } catch (err) {
+                if (appConfig.githubProxy) {
+                    gh = await axios.get(applyGithubProxy(apiUrl), { headers, timeout: 8000 });
+                } else {
+                    throw err;
+                }
+            }
 
-            const platform = process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'macos' : 'linux';
-            const archStr = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : process.arch;
-            const arch = `${platform}-${archStr}`;
-            const version = gh.data.tag_name.replace(/^v/, '');
+            const archStr = process.arch === 'arm64' ? 'arm64' : 'x64';
+            const arch = `linux-${archStr}`;
+            const version = (gh.data.tag_name || '').replace(/^[vV]/, '');
             const versionCompact = version.replace(/\./g, '');
             const assetName = `MWP-${versionCompact}-${arch}`;
             
@@ -5966,7 +5986,7 @@ threaded_server_support=false
             if (!asset) {
                 console.log(`[Update] Fuzzy match failed, trying keyword match...`);
                 asset = gh.data.assets.find(a => 
-                    (a.name.includes(platform) || a.name.includes(process.platform)) &&
+                    (a.name.includes('linux') || a.name.includes(process.platform)) &&
                     (a.name.includes(archStr) || a.name.includes(process.arch)) &&
                     a.name.startsWith('MWP-')
                 );
@@ -5984,18 +6004,25 @@ threaded_server_support=false
             const newExePath = APP_EXECUTABLE + '.new';
             const oldExePath = APP_EXECUTABLE + '.old';
 
-            console.log(`[Update] Downloading ${assetName} from ${downloadUrl}...`);
+            console.log(`[Update] Downloading ${asset.name} from ${downloadUrl}...`);
             io.emit('update_status', { step: 'downloading', message: '正在下载新版本...' });
 
             const controller = new AbortController();
             activeDownloads.set('system_update', controller);
 
-            const writer = fs.createWriteStream(newExePath);
+            // 1MB 写入缓冲区，避免磁盘 IO 阻塞 TCP 套接字窗口
+            const writer = fs.createWriteStream(newExePath, { highWaterMark: 1024 * 1024 });
 
             let currentUrl = downloadUrl;
             let response = null;
             let redirectsFollowed = 0;
-            const maxRedirects = 5;
+            const maxRedirects = 10;
+
+            const downloadHeaders = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Encoding': 'identity'
+            };
 
             while (redirectsFollowed < maxRedirects) {
                 console.log(`[Update] Requesting download chunk: ${currentUrl}`);
@@ -6005,6 +6032,8 @@ threaded_server_support=false
                     responseType: 'stream',
                     signal: controller.signal,
                     maxRedirects: 0,
+                    headers: downloadHeaders,
+                    timeout: 60000,
                     validateStatus: (status) => (status >= 200 && status < 400)
                 });
 
@@ -6022,33 +6051,37 @@ threaded_server_support=false
                 throw new Error(`Failed to download update, server returned status: ${response ? response.status : 'unknown'}`);
             }
 
-            // 追踪进度
+            // 追踪进度 (使用 Transform 保持流式背压，防止 on('data') 破坏 pipeline 吞吐)
             const totalLength = parseInt(response.headers['content-length'], 10) || 0;
             let downloadedLength = 0;
             let lastUpdateTime = Date.now();
             let lastDownloadedLength = 0;
 
-            response.data.on('data', (chunk) => {
-                downloadedLength += chunk.length;
-                const now = Date.now();
-                if (now - lastUpdateTime >= 1000) {
-                    const speed = (downloadedLength - lastDownloadedLength) / ((now - lastUpdateTime) / 1000);
-                    lastUpdateTime = now;
-                    lastDownloadedLength = downloadedLength;
+            const progressStream = new Transform({
+                transform(chunk, encoding, callback) {
+                    downloadedLength += chunk.length;
+                    const now = Date.now();
+                    if (now - lastUpdateTime >= 800) {
+                        const speed = (downloadedLength - lastDownloadedLength) / ((now - lastUpdateTime) / 1000);
+                        lastUpdateTime = now;
+                        lastDownloadedLength = downloadedLength;
 
-                    const progress = totalLength > 0 ? Math.round((downloadedLength / totalLength) * 100) : 0;
-                    io.emit('update_progress', { 
-                        progress, 
-                        speed,
-                        processedSize: downloadedLength,
-                        totalSize: totalLength
-                    });
+                        const progress = totalLength > 0 ? Math.round((downloadedLength / totalLength) * 100) : 0;
+                        io.emit('update_progress', { 
+                            progress, 
+                            speed,
+                            processedSize: downloadedLength,
+                            totalSize: totalLength
+                        });
+                    }
+                    callback(null, chunk);
                 }
             });
 
             try {
                 await pipeline(
                     response.data,
+                    progressStream,
                     writer,
                     { signal: controller.signal }
                 );

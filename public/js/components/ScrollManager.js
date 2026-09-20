@@ -54,7 +54,7 @@ export default {
                                             </div>
                                             <div>
                                                 <div class="fw-bold text-truncate" style="max-width: 140px;">{{ localize(scroll.name) }}</div>
-                                                <div class="text-muted" style="font-size: 0.72rem;">v{{ scroll.version || '1.0.0' }} · {{ scroll.author || '4YStudio' }}</div>
+                                                <div class="text-muted" style="font-size: 0.72rem;">{{ formatVersion(scroll.version) }} · {{ scroll.author || '4YStudio' }}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -176,7 +176,7 @@ export default {
                                                 </div>
                                                 <p class="text-muted small mb-2" style="line-height: 1.5;">{{ localize(analysisResult.manifest?.description) || '暂无描述' }}</p>
                                                 <div class="d-flex flex-wrap gap-3 small text-muted">
-                                                    <span><i class="fa-solid fa-code-branch me-1"></i>v{{ analysisResult.manifest?.version || '1.0.0' }}</span>
+                                                    <span><i class="fa-solid fa-code-branch me-1"></i>{{ formatVersion(analysisResult.manifest?.version) }}</span>
                                                     <span><i class="fa-solid fa-user me-1"></i>{{ analysisResult.manifest?.author || '4YStudio' }}</span>
                                                     <span v-if="analysisResult.manifest?.category"><i class="fa-solid fa-tag me-1"></i>{{ getCategoryLabel(analysisResult.manifest?.category) }}</span>
                                                 </div>
@@ -189,15 +189,18 @@ export default {
                                             <div class="row g-2 text-center align-items-center">
                                                 <div class="col-5">
                                                     <div class="small text-muted">{{ $t('scrolls.current_version') }}</div>
-                                                    <div class="fw-bold text-danger">v{{ analysisResult.existing.version }}</div>
+                                                    <div class="fw-bold text-danger">{{ formatVersion(analysisResult.existing.version || analysisResult.existing.manifest?.version) }}</div>
                                                 </div>
                                                 <div class="col-2 d-flex align-items-center justify-content-center">
                                                     <i class="fa-solid fa-arrow-right text-muted"></i>
                                                 </div>
                                                 <div class="col-5">
                                                     <div class="small text-muted">{{ $t('scrolls.new_version') }}</div>
-                                                    <div class="fw-bold text-success">v{{ analysisResult.manifest?.version }}</div>
+                                                    <div class="fw-bold text-success">{{ formatVersion(analysisResult.manifest?.version) }}</div>
                                                 </div>
+                                            </div>
+                                            <div v-if="analysisResult.manifest?.version && (analysisResult.existing.version || analysisResult.existing.manifest?.version) && compareVersions(analysisResult.manifest.version, analysisResult.existing.version || analysisResult.existing.manifest.version) < 0" class="mt-2 text-center text-warning small fw-bold">
+                                                <i class="fa-solid fa-triangle-exclamation me-1"></i>{{ $t('scrolls.downgrade_warning') }}
                                             </div>
                                         </div>
 
@@ -418,6 +421,26 @@ export default {
             return String(val);
         }
 
+        function formatVersion(ver) {
+            if (!ver) return '未知';
+            const s = String(ver).trim();
+            return s.startsWith('v') || s.startsWith('V') ? s : `v${s}`;
+        }
+
+        function compareVersions(v1, v2) {
+            if (!v1 || !v2) return 0;
+            const parse = (v) => String(v).replace(/^[vV]/, '').split('.').map(n => parseInt(n, 10) || 0);
+            const p1 = parse(v1);
+            const p2 = parse(v2);
+            for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+                const a = p1[i] || 0;
+                const b = p2[i] || 0;
+                if (a > b) return 1;
+                if (a < b) return -1;
+            }
+            return 0;
+        }
+
         function getCategoryLabel(cat) {
             const map = {
                 tools: '系统运维',
@@ -632,6 +655,8 @@ export default {
             scrolls,
             toggling,
             localize,
+            formatVersion,
+            compareVersions,
             getCategoryLabel,
             fetchScrolls,
             toggleScroll,

@@ -823,7 +823,8 @@ class ScrollEngine {
 
                 // 检查是否为已有卷轴更新
                 const holder = this.getOrCreateHolder(req.instanceId);
-                const existing = holder.scrolls.get(scrollId);
+                const existingRecord = holder.scrolls.get(scrollId);
+                const existingManifest = existingRecord?.manifest || this.readManifest(req.instanceId, scrollId);
 
                 try { fs.unlinkSync(req.file.path); } catch (e) {}
 
@@ -831,8 +832,14 @@ class ScrollEngine {
                     success: true,
                     analysis: {
                         manifest: meta,
-                        existing: existing ? { version: existing.version, name: existing.name, description: existing.description } : null,
-                        isUpdate: !!existing,
+                        existing: existingManifest ? {
+                            id: scrollId,
+                            version: existingManifest.version || '1.0.0',
+                            name: existingManifest.name || scrollId,
+                            description: existingManifest.description || '',
+                            manifest: existingManifest
+                        } : null,
+                        isUpdate: !!existingManifest,
                         tempDir,
                         scrollId
                     }
@@ -946,13 +953,14 @@ class ScrollEngine {
                 const installedMap = new Map();
                 installedList.forEach(s => installedMap.set(s.id, s));
 
+                const cleanVer = (v) => String(v || '').replace(/^[vV]/, '').trim();
                 const result = marketItems.map(item => {
                     const inst = installedMap.get(item.id);
                     return {
                         ...item,
                         installed: !!inst,
                         installedVersion: inst ? inst.version : null,
-                        hasUpdate: inst ? (inst.version !== item.version) : false
+                        hasUpdate: inst ? (cleanVer(inst.version) !== cleanVer(item.version)) : false
                     };
                 });
 

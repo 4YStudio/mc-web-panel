@@ -47,7 +47,7 @@ MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecr
 | 📱 **响应式设计** | 针对移动端和桌面端深度优化的 UI/UX 体验 |
 | 💾 **备份管理** | 强大的备份还原系统（支持快照和增量备份） |
 | 🔒 **安全** | 支持 2FA (Google 身份验证器) 双重验证 |
-| 💻 **多平台支持** | 支持 Linux (x64/ARM64) 和 Windows (x64) |
+| 🐧 **系统支持** | 官方开箱仅支持 **Linux** (x64 / ARM64)；如需在其他系统（如 Windows / macOS）使用，需克隆仓库稍作适配后自行打包 |
 | 🔌 **插件系统** | 模块化架构，支持开发者轻松扩展后端逻辑与前端 UI |
 
 ### 🎯 为什么选择 MC Web Panel？
@@ -78,32 +78,39 @@ MC Web Panel 是一个基于 **Node.js** 和 **Vue 3** 构建的现代化 Minecr
 
 ### 🛠️ 快速开始
 
-#### 方式一：使用可执行文件（推荐）
+> [!NOTE]
+> **系统支持说明**：目前项目官方预编译发布与测试环境仅支持 **Linux** (x64 / ARM64)。若需要在其他操作系统（如 Windows、macOS）运行，需自行克隆仓库后根据目标系统稍作修改并自行打包（或直接从源码启动）。
 
-1. 从 [Releases](https://github.com/4YStudio/mc-web-panel/releases) 页面下载对应平台的执行文件
+#### 方式一：使用预编译可执行文件（推荐，Linux）
+
+1. 从 [Releases](https://github.com/4YStudio/mc-web-panel/releases) 页面下载适用于您 Linux 架构的可执行文件（如 `mc-web-panel-linux-x64` 或 `mc-web-panel-linux-arm64`）
 2. 将其放置在一个空目录中（推荐）
-3. 运行可执行文件：
-   - **Linux**: `./mc-web-panel-linux-x64 start`
-   - **Windows**: 双击 `mc-web-panel-win-x64.exe`
+3. 赋予执行权限并启动：
+   ```bash
+   chmod +x mc-web-panel-linux-x64
+   ./mc-web-panel-linux-x64 start
+   ```
 4. 打开浏览器访问 `http://localhost:3000`
 5. 跟随设置向导安装新的 Minecraft 服务器，或指定现有的服务端 JAR 文件
 
-#### 方式二：从源码运行
+#### 方式二：从源码运行与跨平台自行打包（其他操作系统）
 
-如果您希望从源码运行面板（需要 Node.js 18+）：
+如果您需要在 Windows、macOS 等其他操作系统使用，或希望直接从源码运行面板：
 
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/4YStudio/mc-web-panel.git
 cd mc-web-panel
 
-# 2. 安装依赖
+# 2. 安装依赖 (需要 Node.js 18+)
 npm install
 
-# 3. 启动服务器
+# 3. 从源码直接启动面板
 npm run start
 
-# 4. (可选) 构建可执行文件
+# 4. (可选) 自行适配并打包为可执行文件
+# 目前项目的打包脚本 build.js 默认面向 Linux (x64 / ARM64)。
+# 如需打包到其他操作系统平台，可在 build.js 中稍作修改后执行：
 npm run build
 ```
 
@@ -178,7 +185,7 @@ Whether it's a personal server or a small community, MC Web Panel can provide yo
 | 📱 **Responsive Design** | Optimized UI/UX for both desktop and mobile devices |
 | 💾 **Backup Management** | Powerful backup and restore system (supports snapshots and incremental backups) |
 | 🔒 **Security** | 2FA (Google Authenticator) support |
-| 💻 **Multi-Platform** | Runs on Linux (x64/ARM64) and Windows (x64) |
+| 🐧 **System Support** | Officially supports **Linux** (x64 / ARM64) only. For other OS (e.g., Windows / macOS), users need to clone the repository, adapt slightly, and build/run manually |
 | 🔌 **Plugin System** | Modular architecture allowing developers to extend backend logic and frontend UI easily |
 
 ### 🎯 Why Choose MC Web Panel?
@@ -209,19 +216,24 @@ This panel features dedicated GUI integration for:
 
 ### 🛠️ Quick Start
 
-#### Method 1: Using Executable (Recommended)
+> [!NOTE]
+> **Operating System Notice**: Pre-compiled releases and official testing currently only target **Linux** (x64 / ARM64). If you need to use this panel on other operating systems (e.g. Windows, macOS), please clone the repository, make minor adjustments for your target platform, and build or run directly from source.
 
-1. Download the executable for your platform from the [Releases](https://github.com/4YStudio/mc-web-panel/releases) page
+#### Method 1: Using Pre-built Executable (Recommended for Linux)
+
+1. Download the executable for your Linux architecture from the [Releases](https://github.com/4YStudio/mc-web-panel/releases) page (`mc-web-panel-linux-x64` or `mc-web-panel-linux-arm64`)
 2. Place it in an empty directory (recommended)
-3. Run the executable:
-   - **Linux**: `./mc-web-panel-linux-x64 start`
-   - **Windows**: Double-click `mc-web-panel-win-x64.exe`
+3. Grant execution permissions and run:
+   ```bash
+   chmod +x mc-web-panel-linux-x64
+   ./mc-web-panel-linux-x64 start
+   ```
 4. Open your browser and visit `http://localhost:3000`
 5. Follow the setup wizard to install a Minecraft server or point it to your existing server jar
 
-#### Method 2: Run from Source
+#### Method 2: Run from Source & Self-Packaging (Other Operating Systems)
 
-If you prefer to run the panel from source code (requires Node.js 18+):
+If you wish to run from source code or adapt for other operating systems (requires Node.js 18+):
 
 ```bash
 # 1. Clone the repository
@@ -231,10 +243,12 @@ cd mc-web-panel
 # 2. Install dependencies
 npm install
 
-# 3. Start the server
+# 3. Start the server (source mode)
 npm run start
 
-# 4. (Optional) Build the executable
+# 4. (Optional) Custom build / packaging
+# The built-in build.js currently targets Linux (x64 / ARM64).
+# To package for other operating systems, adjust build.js to target your OS platform and run:
 npm run build
 ```
 

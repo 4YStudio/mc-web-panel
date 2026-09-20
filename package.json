@@ -1,6 +1,6 @@
 {
   "name": "mc-web-panel",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "A web panel for Minecraft servers.",
   "main": "index.js",
   "bin": "server.js",
@@ -45,9 +45,6 @@
     "systeminformation": "^5.27.11"
   },
   "devDependencies": {
-    "caxa": "^3.0.1",
-    "png-to-ico": "^3.0.1",
-    "rcedit": "^5.0.2",
-    "resedit-cli": "^3.0.1"
+    "caxa": "^3.0.1"
   }
 }
