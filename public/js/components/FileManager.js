@@ -1,4 +1,4 @@
-import { ref, reactive, computed, watch, onMounted, onUnmounted, getCurrentInstance } from '/js/vue.esm-browser.js';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, getCurrentInstance, nextTick } from '/js/vue.esm-browser.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal, t, uploadFileWithChunk, isLargeFile } from '../utils.js';
@@ -177,34 +177,241 @@ export default {
                 </div>
             </div>
             
-            <!-- 2. 编辑器视图 (全屏模式) -->
-            <div v-else-if="editingFile" class="d-flex flex-column h-100" key="editor">
-                <div class="card h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden;">
-                    <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2 px-3">
-                        <div class="d-flex align-items-center overflow-hidden">
-                            <i class="fa-solid fa-file-pen me-2 text-warning flex-shrink-0"></i>
-                            <span class="fw-bold text-truncate" style="max-width: 150px; md-width: auto;">{{ editingFile.split('/').pop() }}</span>
-                            <span class="badge bg-secondary ms-2 d-none d-sm-inline" v-if="hasUnsavedChanges">Unsaved</span>
+            <!-- 2. 编辑器视图 (全功能增强与移动端适配) -->
+            <div v-else-if="editingFile" 
+                 class="d-flex flex-column h-100 advanced-editor-container overflow-hidden" 
+                 :class="{ 'is-fullscreen': editorFullscreen }" 
+                 key="editor">
+                 
+                <!-- 工具栏 Header -->
+                <div class="editor-toolbar d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2">
+                    <!-- 左侧：文件信息与未保存标识 -->
+                    <div class="d-flex align-items-center overflow-hidden gap-2">
+                        <i class="fa-solid fa-file-code text-primary fs-5 flex-shrink-0"></i>
+                        <span class="fw-bold text-truncate" style="max-width: 160px; md-max-width: 320px;" :title="editingFile">
+                            {{ editingFile.split('/').pop() }}
+                        </span>
+                        <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle small px-2 py-0.5" v-if="hasUnsavedChanges">
+                            <i class="fa-solid fa-circle-dot me-1" style="font-size: 0.6rem;"></i>{{ $t('files.editor.unsaved') }}
+                        </span>
+                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle small px-2 py-0.5 d-none d-sm-inline" v-else>
+                            <i class="fa-solid fa-check me-1" style="font-size: 0.6rem;"></i>{{ $t('files.editor.saved') }}
+                        </span>
+                    </div>
+
+                    <!-- 右侧：功能按钮群 -->
+                    <div class="d-flex align-items-center gap-1 gap-sm-2 ms-auto flex-wrap">
+                        <!-- 搜索与替换按钮 -->
+                        <button class="btn btn-sm btn-outline-secondary border-0 rounded-3 px-2" 
+                                :class="{ 'btn-primary text-white': editorSearchVisible }"
+                                @click="toggleSearch" 
+                                :title="$t('files.editor.search_tip')">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span class="d-none d-lg-inline ms-1">{{ $t('files.editor.search') }}</span>
+                        </button>
+
+                        <!-- 代码/JSON 格式化 -->
+                        <button class="btn btn-sm btn-outline-secondary border-0 rounded-3 px-2" 
+                                @click="formatContent" 
+                                :title="$t('files.editor.format_tip')">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span class="d-none d-lg-inline ms-1">{{ $t('files.editor.format') }}</span>
+                        </button>
+
+                        <!-- 跳转指定行 -->
+                        <button class="btn btn-sm btn-outline-secondary border-0 rounded-3 px-2" 
+                                @click="goToLinePrompt" 
+                                :title="$t('files.editor.goto_tip')">
+                            <i class="fa-solid fa-arrow-down-9-1"></i>
+                            <span class="d-none d-lg-inline ms-1">{{ $t('files.editor.goto_line') }}</span>
+                        </button>
+
+                        <!-- 自动折行切换 -->
+                        <button class="btn btn-sm btn-outline-secondary border-0 rounded-3 px-2" 
+                                :class="{ 'text-primary fw-bold': editorWrap }"
+                                @click="editorWrap = !editorWrap" 
+                                :title="$t('files.editor.wrap_tip')">
+                            <i class="fa-solid fa-arrow-turn-down"></i>
+                            <span class="d-none d-xl-inline ms-1">{{ editorWrap ? $t('files.editor.wrap_on') : $t('files.editor.wrap_off') }}</span>
+                        </button>
+
+                        <!-- 字号调节 (支持直接输入数字) -->
+                        <div class="d-flex align-items-center bg-body-tertiary border rounded-3 px-1.5 py-0.5 gap-1" :title="$t('files.editor.font_size_tip')">
+                            <i class="fa-solid fa-font text-muted small" style="font-size: 0.75rem;"></i>
+                            <input type="number" 
+                                   min="10" 
+                                   max="40" 
+                                   step="1"
+                                   v-model.number="editorFontSize" 
+                                   @input="onFontSizeInput"
+                                   @change="validateFontSize"
+                                   class="form-control form-control-sm border-0 p-0 text-center bg-transparent fw-bold" 
+                                   style="width: 36px; font-size: 0.8rem; box-shadow: none;" />
+                            <span class="text-muted small" style="font-size: 0.7rem;">px</span>
                         </div>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-success px-2 px-md-3" @click="saveFile">
-                                <i class="fa-solid fa-save me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.save') }}</span>
+
+                        <!-- 全屏切换 -->
+                        <button class="btn btn-sm btn-outline-secondary border-0 rounded-3 px-2" 
+                                @click="editorFullscreen = !editorFullscreen" 
+                                :title="editorFullscreen ? $t('files.editor.exit_fullscreen') : $t('files.editor.fullscreen')">
+                            <i :class="editorFullscreen ? 'fa-solid fa-compress' : 'fa-solid fa-expand'"></i>
+                        </button>
+
+                        <div class="vr mx-1"></div>
+
+                        <!-- 保存 -->
+                        <button class="btn btn-sm btn-success rounded-3 px-2 px-md-3 shadow-sm fw-semibold" @click="saveFile">
+                            <i class="fa-solid fa-floppy-disk me-1"></i><span>{{ $t('common.save') }}</span>
+                        </button>
+
+                        <!-- 关闭 -->
+                        <button class="btn btn-sm btn-secondary rounded-3 px-2 px-md-3 shadow-sm fw-semibold" @click="closeEditor">
+                            <i class="fa-solid fa-xmark me-1"></i><span>{{ $t('common.close') }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 搜索与替换折叠抽屉 -->
+                <div v-if="editorSearchVisible" class="editor-search-panel px-3 py-2 border-bottom shadow-sm">
+                    <!-- 第一行：搜索 -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="input-group input-group-sm flex-nowrap" style="max-width: 320px;">
+                            <span class="input-group-text bg-body border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                            <input type="text" 
+                                   ref="searchInputEl"
+                                   class="form-control border-start-0 px-1" 
+                                   v-model="editorSearchQuery" 
+                                   @input="onSearchInput(false)"
+                                   @keydown.enter.prevent="findNext"
+                                   @keydown.esc.prevent="closeSearch"
+                                   :placeholder="$t('files.editor.search_placeholder')">
+                            <button class="btn btn-outline-secondary" @click="findNext" :disabled="!editorSearchQuery" :title="$t('files.editor.find_next')">
+                                <i class="fa-solid fa-arrow-right"></i>
                             </button>
-                            <button class="btn btn-sm btn-secondary px-2 px-md-3" @click="closeEditor">
-                                <i class="fa-solid fa-xmark me-md-1"></i><span class="d-none d-md-inline">{{ $t('common.close') }}</span>
+                        </div>
+
+                        <!-- 匹配结果指示 -->
+                        <span class="small text-muted font-monospace" style="font-size: 0.78rem; min-width: 50px;">
+                            {{ searchMatches.length ? (currentMatchIndex + 1) + ' / ' + searchMatches.length : (editorSearchQuery ? $t('files.editor.no_match') : '') }}
+                        </span>
+
+                        <!-- 上一个 / 下一个 -->
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" @click="findPrev" :disabled="!searchMatches.length" :title="$t('files.editor.find_prev')">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" @click="findNext" :disabled="!searchMatches.length" :title="$t('files.editor.find_next')">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+
+                        <!-- 大小写敏感 / 全词匹配 -->
+                        <button class="btn btn-sm btn-outline-secondary px-2 font-monospace fw-bold" 
+                                :class="{ 'btn-primary text-white': searchMatchCase }"
+                                @click="searchMatchCase = !searchMatchCase; onSearchInput();" 
+                                title="Match Case (大小写敏感)">
+                            Aa
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary px-2 font-monospace fw-bold" 
+                                :class="{ 'btn-primary text-white': searchMatchWord }"
+                                @click="searchMatchWord = !searchMatchWord; onSearchInput();" 
+                                title="Match Whole Word (全词匹配)">
+                            \\b
+                        </button>
+
+                        <!-- 展开/收起替换条 -->
+                        <button class="btn btn-sm btn-link text-decoration-none text-muted px-1" 
+                                @click="editorReplaceVisible = !editorReplaceVisible">
+                            <i :class="editorReplaceVisible ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"></i>
+                            <span class="small ms-1">{{ $t('files.editor.replace') }}</span>
+                        </button>
+
+                        <!-- 关闭搜索框 -->
+                        <button class="btn btn-sm btn-outline-secondary border-0 ms-auto" @click="closeSearch">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <!-- 第二行：替换条 -->
+                    <div v-if="editorReplaceVisible" class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                        <div class="input-group input-group-sm flex-nowrap" style="max-width: 300px;">
+                            <span class="input-group-text bg-body border-end-0"><i class="fa-solid fa-arrows-rotate text-muted"></i></span>
+                            <input type="text" 
+                                   class="form-control border-start-0 px-1" 
+                                   v-model="editorReplaceQuery" 
+                                   @keydown.enter.prevent="replaceCurrent"
+                                   @keydown.esc.prevent="closeSearch"
+                                   :placeholder="$t('files.editor.replace_placeholder')">
+                        </div>
+
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-secondary px-2" @click="replaceCurrent" :disabled="!searchMatches.length">
+                                {{ $t('files.editor.replace') }}
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary px-2" @click="replaceAll" :disabled="!searchMatches.length">
+                                {{ $t('files.editor.replace_all') }}
                             </button>
                         </div>
                     </div>
-                    
+                </div>
+
+                <!-- 核心编辑区：行号栏 + 文本区域 -->
+                <div class="editor-body flex-grow-1 d-flex overflow-hidden position-relative" style="min-height: 200px;">
+                    <!-- 左侧行号栏 -->
+                    <div ref="gutterArea" class="editor-gutter flex-shrink-0" :style="{ fontSize: editorFontSize + 'px' }">
+                        <div v-for="line in editorLineCount" :key="line" class="editor-gutter-line" @click="goToLine(line)">
+                            {{ line }}
+                        </div>
+                    </div>
+
                     <!-- 文本输入框 -->
                     <textarea 
                         ref="editorArea"
-                        class="form-control border-0 rounded-0 flex-grow-1 p-3 custom-scrollbar" 
-                        style="font-family: 'Consolas', 'Monaco', monospace; resize: none; font-size: 13px; line-height: 1.5; background: var(--c-bg-base);" 
+                        class="form-control editor-textarea flex-grow-1 custom-scrollbar" 
+                        :style="{ 
+                            fontSize: editorFontSize + 'px', 
+                            whiteSpace: editorWrap ? 'pre-wrap' : 'pre',
+                            wordBreak: editorWrap ? 'break-all' : 'normal',
+                            overflowX: editorWrap ? 'hidden' : 'auto'
+                        }" 
                         v-model="fileContent"
-                        @keydown.ctrl.s.prevent="saveFile"
+                        @scroll="onEditorScroll"
+                        @click="updateCursorPos"
+                        @keyup="updateCursorPos"
+                        @select="updateCursorPos"
+                        @keydown="handleEditorKeyDown"
                         spellcheck="false"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
                     ></textarea>
+                </div>
+
+                <!-- 移动端编程快捷辅助符号键盘条 -->
+                <div class="editor-mobile-symbols py-1 px-2 d-flex align-items-center gap-1 shadow-sm">
+                    <button v-for="sym in mobileSymbols" 
+                            :key="sym" 
+                            type="button" 
+                            class="editor-symbol-btn flex-shrink-0" 
+                            @click="insertSymbol(sym)"
+                            :title="sym === 'Tab' ? 'Insert 2 spaces' : sym">
+                        {{ sym }}
+                    </button>
+                </div>
+
+                <!-- 底部状态栏 -->
+                <div class="editor-status-bar d-flex justify-content-between align-items-center px-3 py-1">
+                    <div class="d-flex align-items-center gap-3">
+                        <span>Ln {{ cursorLine }}, Col {{ cursorCol }}</span>
+                        <span class="d-none d-sm-inline">{{ $t('files.editor.lines') }}: {{ editorLineCount }}</span>
+                        <span class="d-none d-md-inline">{{ $t('files.editor.length') }}: {{ fileContent.length }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="d-none d-sm-inline">UTF-8</span>
+                        <span>{{ fileContent.includes('\\r\\n') ? 'CRLF' : 'LF' }}</span>
+                        <span v-if="hasUnsavedChanges" class="text-warning fw-semibold"><i class="fa-solid fa-pen me-1"></i>{{ $t('files.editor.modified') }}</span>
+                        <span v-else class="text-success"><i class="fa-solid fa-check me-1"></i>{{ $t('files.editor.saved') }}</span>
+                    </div>
                 </div>
             </div>
 
@@ -546,8 +753,368 @@ export default {
             processFilesForUpload(allFiles);
         };
 
-        // --- 文件编辑逻辑 (增强版) ---
+        // --- 文件编辑逻辑 (高级增强版与移动端适配) ---
         const EDITABLE_EXTS = ['txt', 'log', 'json', 'yml', 'yaml', 'properties', 'conf', 'toml', 'cfg', 'ini', 'sh', 'bat', 'js', 'md', 'xml'];
+
+        const gutterArea = ref(null);
+        const searchInputEl = ref(null);
+        const editorSearchVisible = ref(false);
+        const editorReplaceVisible = ref(false);
+        const editorSearchQuery = ref('');
+        const editorReplaceQuery = ref('');
+        const searchMatchCase = ref(false);
+        const searchMatchWord = ref(false);
+        const searchMatches = ref([]);
+        const currentMatchIndex = ref(-1);
+
+        const editorWrap = ref(true);
+        const editorFontSize = ref(13);
+        const editorFullscreen = ref(false);
+        const cursorLine = ref(1);
+        const cursorCol = ref(1);
+
+        const mobileSymbols = ['Tab', '{', '}', '[', ']', '(', ')', '"', "'", ':', ';', '=', ',', '.', '/', '\\', '_', '-', '#', '<', '>', '$', '%'];
+
+        const editorLineCount = computed(() => {
+            if (!fileContent.value) return 1;
+            return fileContent.value.split('\n').length;
+        });
+
+        const updateCursorPos = () => {
+            const el = editorArea.value;
+            if (!el) return;
+            const start = el.selectionStart || 0;
+            const before = fileContent.value.substring(0, start);
+            const lines = before.split('\n');
+            cursorLine.value = lines.length;
+            cursorCol.value = lines[lines.length - 1].length + 1;
+        };
+
+        const onEditorScroll = () => {
+            if (gutterArea.value && editorArea.value) {
+                gutterArea.value.scrollTop = editorArea.value.scrollTop;
+            }
+        };
+
+        const onFontSizeInput = () => {
+            const size = Number(editorFontSize.value);
+            if (!isNaN(size) && size >= 8 && size <= 48) {
+                // 即时动态调整
+            }
+        };
+
+        const validateFontSize = () => {
+            let size = parseInt(editorFontSize.value, 10);
+            if (isNaN(size) || size < 10) size = 10;
+            if (size > 40) size = 40;
+            editorFontSize.value = size;
+        };
+
+        const toggleSearch = () => {
+            editorSearchVisible.value = !editorSearchVisible.value;
+            if (editorSearchVisible.value) {
+                nextTick(() => {
+                    searchInputEl.value?.focus();
+                    searchInputEl.value?.select();
+                    onSearchInput(false);
+                });
+            } else {
+                searchMatches.value = [];
+                currentMatchIndex.value = -1;
+                editorArea.value?.focus();
+            }
+        };
+
+        const closeSearch = () => {
+            editorSearchVisible.value = false;
+            editorReplaceVisible.value = false;
+            searchMatches.value = [];
+            currentMatchIndex.value = -1;
+            editorArea.value?.focus();
+        };
+
+        const highlightMatch = (index) => {
+            if (index < 0 || index >= searchMatches.value.length) return;
+            const match = searchMatches.value[index];
+            const el = editorArea.value;
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(match.start, match.end);
+            updateCursorPos();
+
+            // 滚动到该位置附近居中
+            const textBefore = fileContent.value.substring(0, match.start);
+            const lineNum = textBefore.split('\n').length;
+            const lineHeight = editorFontSize.value * 1.5;
+            const targetScrollTop = (lineNum - 5) * lineHeight;
+            el.scrollTop = Math.max(0, targetScrollTop);
+        };
+
+        const onSearchInput = (autoHighlight = false) => {
+            const q = editorSearchQuery.value;
+            if (!q) {
+                searchMatches.value = [];
+                currentMatchIndex.value = -1;
+                return;
+            }
+
+            try {
+                let pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                if (searchMatchWord.value) pattern = `\\b${pattern}\\b`;
+                const flags = searchMatchCase.value ? 'g' : 'gi';
+                const regex = new RegExp(pattern, flags);
+                const text = fileContent.value;
+                const matches = [];
+                let m;
+                while ((m = regex.exec(text)) !== null) {
+                    matches.push({ start: m.index, end: m.index + m[0].length });
+                    if (matches.length > 2000) break;
+                }
+                searchMatches.value = matches;
+                if (matches.length > 0) {
+                    const selStart = editorArea.value?.selectionStart || 0;
+                    let nearestIdx = matches.findIndex(item => item.start >= selStart);
+                    if (nearestIdx === -1) nearestIdx = 0;
+                    currentMatchIndex.value = nearestIdx;
+                    // 仅当明确指定自动高亮时才聚焦到 textarea，输入打字时绝不抢夺焦点
+                    if (autoHighlight) {
+                        highlightMatch(nearestIdx);
+                    }
+                } else {
+                    currentMatchIndex.value = -1;
+                }
+            } catch (e) {
+                searchMatches.value = [];
+                currentMatchIndex.value = -1;
+            }
+        };
+
+        const findNext = () => {
+            if (!searchMatches.value.length) {
+                onSearchInput(true);
+                return;
+            }
+            currentMatchIndex.value = (currentMatchIndex.value + 1) % searchMatches.value.length;
+            highlightMatch(currentMatchIndex.value);
+        };
+
+        const findPrev = () => {
+            if (!searchMatches.value.length) {
+                onSearchInput(true);
+                return;
+            }
+            currentMatchIndex.value = (currentMatchIndex.value - 1 + searchMatches.value.length) % searchMatches.value.length;
+            highlightMatch(currentMatchIndex.value);
+        };
+
+        const replaceCurrent = () => {
+            if (!searchMatches.value.length || currentMatchIndex.value < 0) return;
+            const match = searchMatches.value[currentMatchIndex.value];
+            const text = fileContent.value;
+            const replacement = editorReplaceQuery.value || '';
+            fileContent.value = text.substring(0, match.start) + replacement + text.substring(match.end);
+            nextTick(() => {
+                onSearchInput(false);
+            });
+        };
+
+        const replaceAll = () => {
+            if (!searchMatches.value.length) return;
+            const count = searchMatches.value.length;
+            let pattern = editorSearchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (searchMatchWord.value) pattern = `\\b${pattern}\\b`;
+            const flags = searchMatchCase.value ? 'g' : 'gi';
+            const regex = new RegExp(pattern, flags);
+            fileContent.value = fileContent.value.replace(regex, editorReplaceQuery.value || '');
+            showToast($t('files.editor.replace_count', { count }), 'success');
+            nextTick(() => {
+                onSearchInput(false);
+            });
+        };
+
+        const formatContent = () => {
+            const fileName = (editingFile.value || '').toLowerCase();
+            const original = fileContent.value;
+            if (!original || !original.trim()) {
+                showToast('files.editor.already_formatted', 'info');
+                return;
+            }
+
+            let formatted = null;
+            const isJson = fileName.endsWith('.json') || fileName.endsWith('.json5') || original.trim().startsWith('{') || original.trim().startsWith('[');
+            const isProperties = fileName.endsWith('.properties') || fileName.endsWith('.ini') || fileName.endsWith('.cfg') || fileName.endsWith('.conf');
+
+            if (isJson) {
+                // 1. 先尝试直接标准 JSON 解析
+                try {
+                    const parsed = JSON.parse(original);
+                    formatted = JSON.stringify(parsed, null, 2);
+                } catch (e1) {
+                    // 2. 容错尝试：去除单行/多行注释、结尾逗号、单引号等
+                    try {
+                        const cleaned = original
+                            .replace(/\/\*[\s\S]*?\*\//g, '')
+                            .replace(/\/\/.*/g, '')
+                            .replace(/,\s*([}\]])/g, '$1');
+                        const parsed = JSON.parse(cleaned);
+                        formatted = JSON.stringify(parsed, null, 2);
+                    } catch (e2) {
+                        showToast(t('files.editor.format_json_fail') + ' (' + e1.message + ')', 'danger');
+                        return;
+                    }
+                }
+            } else if (isProperties) {
+                // Properties/INI 规范化：保留注释行，规范化 key=value，去除多余空白行
+                const lines = original.split('\n');
+                const outLines = [];
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const trimmed = line.trim();
+                    if (!trimmed) {
+                        if (outLines.length > 0 && outLines[outLines.length - 1] !== '') {
+                            outLines.push('');
+                        }
+                        continue;
+                    }
+                    if (trimmed.startsWith('#') || trimmed.startsWith('!')) {
+                        outLines.push(trimmed);
+                        continue;
+                    }
+                    const eqIdx = line.indexOf('=');
+                    const colonIdx = line.indexOf(':');
+                    const sepIdx = (eqIdx !== -1) ? eqIdx : colonIdx;
+                    if (sepIdx !== -1) {
+                        const k = line.substring(0, sepIdx).trim();
+                        const v = line.substring(sepIdx + 1).trim();
+                        const sep = (eqIdx !== -1) ? '=' : ': ';
+                        outLines.push(`${k}${sep}${v}`);
+                    } else {
+                        outLines.push(trimmed);
+                    }
+                }
+                formatted = outLines.join('\n');
+            } else {
+                // 通用文本与代码美化：清理每行行末空格，压缩连续多余空行
+                const lines = original.split('\n').map(l => l.trimEnd());
+                const cleanLines = [];
+                let consecutiveEmpty = 0;
+                for (const l of lines) {
+                    if (l === '') {
+                        consecutiveEmpty++;
+                        if (consecutiveEmpty <= 1) cleanLines.push('');
+                    } else {
+                        consecutiveEmpty = 0;
+                        cleanLines.push(l);
+                    }
+                }
+                formatted = cleanLines.join('\n');
+            }
+
+            if (formatted !== null) {
+                if (original.includes('\r\n')) {
+                    formatted = formatted.replace(/\n/g, '\r\n');
+                }
+                if (formatted === original) {
+                    showToast('files.editor.already_formatted', 'info');
+                } else {
+                    fileContent.value = formatted;
+                    showToast('files.editor.format_success', 'success');
+                    updateCursorPos();
+                }
+            }
+        };
+
+        const goToLine = (targetLine) => {
+            const lines = fileContent.value.split('\n');
+            const l = Math.max(1, Math.min(targetLine, lines.length));
+            let charIndex = 0;
+            for (let i = 0; i < l - 1; i++) {
+                charIndex += lines[i].length + 1;
+            }
+            const el = editorArea.value;
+            if (el) {
+                el.focus();
+                el.setSelectionRange(charIndex, charIndex);
+                updateCursorPos();
+                const lineHeight = editorFontSize.value * 1.5;
+                el.scrollTop = Math.max(0, (l - 5) * lineHeight);
+            }
+        };
+
+        const goToLinePrompt = () => {
+            openModal({
+                title: $t('files.editor.goto_line'),
+                message: $t('files.editor.goto_prompt', { max: editorLineCount.value }),
+                mode: 'input',
+                inputValue: cursorLine.value.toString(),
+                placeholder: '1 - ' + editorLineCount.value,
+                callback: (input) => {
+                    if (!input) return;
+                    const num = parseInt(input, 10);
+                    if (!isNaN(num)) {
+                        goToLine(num);
+                    }
+                }
+            });
+        };
+
+        const insertSymbol = (sym) => {
+            const el = editorArea.value;
+            if (!el) return;
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const text = fileContent.value;
+            const insertStr = (sym === 'Tab') ? '  ' : sym;
+            fileContent.value = text.substring(0, start) + insertStr + text.substring(end);
+            nextTick(() => {
+                el.focus();
+                const newPos = start + insertStr.length;
+                el.setSelectionRange(newPos, newPos);
+                updateCursorPos();
+            });
+        };
+
+        const handleEditorKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                saveFile();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                e.preventDefault();
+                editorSearchVisible.value = true;
+                nextTick(() => {
+                    searchInputEl.value?.focus();
+                    searchInputEl.value?.select();
+                    onSearchInput();
+                });
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
+                e.preventDefault();
+                editorSearchVisible.value = true;
+                editorReplaceVisible.value = true;
+                nextTick(() => {
+                    searchInputEl.value?.focus();
+                    onSearchInput();
+                });
+                return;
+            }
+            if (e.key === 'Escape') {
+                if (editorSearchVisible.value) {
+                    closeSearch();
+                    return;
+                }
+                if (editorFullscreen.value) {
+                    editorFullscreen.value = false;
+                    return;
+                }
+            }
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                insertSymbol('Tab');
+            }
+        };
 
         const editFile = async (name) => {
             const ext = name.split('.').pop().toLowerCase();
@@ -558,7 +1125,16 @@ export default {
                     fileContent.value = res.data.content;
                     originalContent.value = res.data.content;
                     editingFile.value = fullPath;
-                } catch (e) { showToast(t('files.error_read'), 'danger'); }
+                    cursorLine.value = 1;
+                    cursorCol.value = 1;
+                    editorSearchVisible.value = false;
+                    editorReplaceVisible.value = false;
+                    nextTick(() => {
+                        editorArea.value?.focus();
+                        editorArea.value?.setSelectionRange(0, 0);
+                        updateCursorPos();
+                    });
+                } catch (e) { showToast($t('files.error_read'), 'danger'); }
             };
 
             if (!EDITABLE_EXTS.includes(ext) && name.includes('.')) {
@@ -582,12 +1158,29 @@ export default {
             } catch (e) { showToast($t('common.error'), 'danger'); }
         };
 
-        const closeEditor = () => {
-            if (hasUnsavedChanges.value) {
-                if (!confirm(t('common.unsaved_changes'))) return;
-            }
+        const doCloseEditor = () => {
             editingFile.value = null;
             fileContent.value = '';
+            originalContent.value = '';
+            editorFullscreen.value = false;
+            editorSearchVisible.value = false;
+            editorReplaceVisible.value = false;
+            searchMatches.value = [];
+            currentMatchIndex.value = -1;
+        };
+
+        const closeEditor = () => {
+            if (hasUnsavedChanges.value) {
+                openModal({
+                    title: $t('common.tip') || '提示',
+                    message: $t('common.unsaved_changes'),
+                    callback: () => {
+                        doCloseEditor();
+                    }
+                });
+                return;
+            }
+            doCloseEditor();
         };
 
         // --- 基础文件操作 ---
@@ -860,7 +1453,14 @@ export default {
             editFile, saveFile, closeEditor, refreshFiles, askRename, askNewFile, askNewFolder,
             previewImage, previewArchive, closePreview,
             toggleActionMenu, activeActionMenu,
-            uploadConfirmModal, checkedCount, hasAnySelectedFiles, confirmUploadFromModal
+            uploadConfirmModal, checkedCount, hasAnySelectedFiles, confirmUploadFromModal,
+            gutterArea, searchInputEl,
+            editorSearchVisible, editorReplaceVisible, editorSearchQuery, editorReplaceQuery,
+            searchMatchCase, searchMatchWord, searchMatches, currentMatchIndex,
+            editorWrap, editorFontSize, editorFullscreen, cursorLine, cursorCol,
+            mobileSymbols, editorLineCount,
+            updateCursorPos, onEditorScroll, onFontSizeInput, validateFontSize, toggleSearch, closeSearch, onSearchInput,
+            findNext, findPrev, replaceCurrent, replaceAll, formatContent, goToLine, goToLinePrompt, insertSymbol, handleEditorKeyDown
         };
     }
 };

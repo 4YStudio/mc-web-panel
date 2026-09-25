@@ -3567,6 +3567,7 @@ threaded_server_support=false
             let metadata = modMetadataCache.get(hash);
 
             if (!metadata) {
+                // 1. 尝试从 Modrinth 远程接口查询
                 try {
                     const response = await axios.post('https://api.modrinth.com/v2/version_files', {
                         hashes: [hash],
@@ -3587,12 +3588,27 @@ threaded_server_support=false
                             title: projectRes.data.title,
                             icon_url: projectRes.data.icon_url,
                             version: version.version_number,
-                            project_id: version.project_id
+                            project_id: version.project_id,
+                            description: projectRes.data.description || '',
+                            source: 'modrinth'
                         };
                         modMetadataCache.set(hash, metadata);
                     }
                 } catch (e) {
                     console.error(`[Mods] Modrinth lookup failed for ${file}:`, e.message);
+                }
+
+                // 2. Modrinth 未收录或查询失败时，从本地 JAR 文件深度解析
+                if (!metadata) {
+                    try {
+                        const localMeta = parseLocalModJar(filePath);
+                        if (localMeta) {
+                            metadata = localMeta;
+                            modMetadataCache.set(hash, metadata);
+                        }
+                    } catch (err) {
+                        console.warn(`[Mods] Local jar parse error for ${file}:`, err.message);
+                    }
                 }
             }
 
@@ -3601,6 +3617,204 @@ threaded_server_support=false
             res.status(500).json({ error: e.message });
         }
     });
+
+    /**
+     * 深度解析本地 Minecraft 模组 JAR 包元数据
+     * 支持 Fabric (fabric.mod.json), Quilt (quilt.mod.json), Forge/NeoForge (mods.toml, neoforge.mods.toml, mcmod.info), MANIFEST.MF 及文件名兜底
+     */
+    function parseLocalModJar(filePath) {
+        const filename = path.basename(filePath);
+        try {
+            const zip = new AdmZip(filePath);
+            const entries = zip.getEntries();
+            const entryMap = new Map();
+            for (const entry of entries) {
+                entryMap.set(entry.entryName.toLowerCase(), entry);
+            }
+
+            let name = null;
+            let version = null;
+            let description = '';
+            let iconPath = null;
+            let modId = '';
+
+            // 1. 尝试 Fabric (fabric.mod.json)
+            const fabricEntry = entryMap.get('fabric.mod.json');
+            if (fabricEntry) {
+                try {
+                    const meta = JSON.parse(fabricEntry.getData().toString('utf8'));
+                    name = meta.name || meta.id;
+                    version = meta.version;
+                    description = meta.description || '';
+                    modId = meta.id || '';
+                    if (typeof meta.icon === 'string') {
+                        iconPath = meta.icon;
+                    } else if (typeof meta.icon === 'object' && meta.icon) {
+                        iconPath = meta.icon['512'] || meta.icon['128'] || meta.icon['64'] || Object.values(meta.icon)[0];
+                    }
+                } catch (_) {}
+            }
+
+            // 2. 尝试 Quilt (quilt.mod.json)
+            if (!name) {
+                const quiltEntry = entryMap.get('quilt.mod.json');
+                if (quiltEntry) {
+                    try {
+                        const meta = JSON.parse(quiltEntry.getData().toString('utf8'));
+                        const qmeta = meta.quilt_loader?.metadata || meta;
+                        name = qmeta.name || qmeta.id;
+                        version = meta.quilt_loader?.version || qmeta.version;
+                        description = qmeta.description || '';
+                        modId = qmeta.id || '';
+                        if (typeof qmeta.icon === 'string') iconPath = qmeta.icon;
+                    } catch (_) {}
+                }
+            }
+
+            // 3. 尝试 Forge / NeoForge 现代版 (META-INF/neoforge.mods.toml 或 META-INF/mods.toml)
+            if (!name) {
+                const tomlEntry = entryMap.get('meta-inf/neoforge.mods.toml') || entryMap.get('meta-inf/mods.toml');
+                if (tomlEntry) {
+                    try {
+                        const tomlStr = tomlEntry.getData().toString('utf8');
+                        const getTomlVal = (key) => {
+                            const reg = new RegExp('^\\s*' + key + '\\s*=\\s*["\']([^"\']+)["\']', 'm');
+                            const m = tomlStr.match(reg);
+                            return m ? m[1].trim() : null;
+                        };
+                        const getTomlMulti = (key) => {
+                            const reg = new RegExp('^\\s*' + key + '\\s*=\\s*\'\'\'([\\s\\S]*?)\'\'\'', 'm');
+                            const m = tomlStr.match(reg);
+                            if (m) return m[1].trim();
+                            return getTomlVal(key);
+                        };
+
+                        modId = getTomlVal('modId') || '';
+                        name = getTomlVal('displayName') || modId;
+                        version = getTomlVal('version');
+                        description = getTomlMulti('description') || '';
+                        iconPath = getTomlVal('logoFile');
+
+                        if (version && (version.includes('${') || version === '${file.jarVersion}')) {
+                            version = null;
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            // 4. 尝试 Forge 传统版 (mcmod.info)
+            if (!name) {
+                const infoEntry = entryMap.get('mcmod.info');
+                if (infoEntry) {
+                    try {
+                        let raw = infoEntry.getData().toString('utf8').trim();
+                        if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+                        const parsed = JSON.parse(raw);
+                        const list = Array.isArray(parsed) ? parsed : (parsed.modList || []);
+                        if (list.length > 0) {
+                            const m = list[0];
+                            name = m.name || m.modid;
+                            version = m.version;
+                            description = m.description || '';
+                            modId = m.modid || '';
+                            iconPath = m.logoFile;
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            // 5. 辅助兜底：如果版本号依然为空，尝试从 MANIFEST.MF 补充
+            if (!version) {
+                const mfEntry = entryMap.get('meta-inf/manifest.mf');
+                if (mfEntry) {
+                    const mf = mfEntry.getData().toString('utf8');
+                    const mVer = mf.match(/Implementation-Version:\s*([^\r\n]+)/i) ||
+                                 mf.match(/Specification-Version:\s*([^\r\n]+)/i);
+                    if (mVer) version = mVer[1].trim();
+                    if (!name) {
+                        const mName = mf.match(/Implementation-Title:\s*([^\r\n]+)/i) ||
+                                      mf.match(/Specification-Title:\s*([^\r\n]+)/i);
+                        if (mName) name = mName[1].trim();
+                    }
+                }
+            }
+
+            // 6. 辅助兜底：从文件名提取 Name 与 Version
+            if (!name || !version) {
+                const clean = filename.replace(/\.jar$/i, '');
+                const m = clean.match(/^([A-Za-z0-9_\u4e00-\u9fa5]+?)[-+]([0-9]+(\.[0-9]+)+.*)$/);
+                if (m) {
+                    if (!name) name = m[1];
+                    if (!version) version = m[2];
+                } else {
+                    if (!name) name = clean;
+                }
+            }
+
+            // 7. 提取与转换 Logo 图片为 Base64 Data URL
+            let icon_url = null;
+            const findImageEntry = () => {
+                if (iconPath) {
+                    const cleanIcon = iconPath.replace(/^\//, '').toLowerCase();
+                    if (entryMap.has(cleanIcon)) return entryMap.get(cleanIcon);
+                    if (modId) {
+                        const candidate1 = 'assets/' + modId.toLowerCase() + '/' + cleanIcon;
+                        if (entryMap.has(candidate1)) return entryMap.get(candidate1);
+                        const candidate2 = 'assets/' + modId.toLowerCase() + '/textures/gui/title/' + cleanIcon;
+                        if (entryMap.has(candidate2)) return entryMap.get(candidate2);
+                    }
+                    const baseIconName = path.basename(cleanIcon);
+                    for (const [key, ent] of entryMap.entries()) {
+                        if (key.endsWith('/' + baseIconName) || key === baseIconName) {
+                            return ent;
+                        }
+                    }
+                }
+                const genericIcons = ['icon.png', 'pack.png', 'logo.png'];
+                for (const g of genericIcons) {
+                    if (entryMap.has(g)) return entryMap.get(g);
+                }
+                for (const [key, ent] of entryMap.entries()) {
+                    if ((key.startsWith('assets/') && (key.endsWith('/icon.png') || key.endsWith('/logo.png'))) ||
+                        key.endsWith('icon.png') || key.endsWith('logo.png')) {
+                        return ent;
+                    }
+                }
+                return null;
+            };
+
+            const imgEntry = findImageEntry();
+            if (imgEntry) {
+                try {
+                    const buf = imgEntry.getData();
+                    if (buf && buf.length > 0 && buf.length <= 1024 * 1024) {
+                        let mime = 'image/png';
+                        const lowerName = imgEntry.entryName.toLowerCase();
+                        if (lowerName.endsWith('.webp')) mime = 'image/webp';
+                        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mime = 'image/jpeg';
+                        else if (lowerName.endsWith('.svg')) mime = 'image/svg+xml';
+                        icon_url = 'data:' + mime + ';base64,' + buf.toString('base64');
+                    }
+                } catch (_) {}
+            }
+
+            return {
+                title: name || filename,
+                version: version || '未知版本',
+                description: (description || '').slice(0, 500),
+                icon_url,
+                source: 'local'
+            };
+        } catch (e) {
+            return {
+                title: filename,
+                version: '未知版本',
+                description: '',
+                icon_url: null,
+                source: 'local'
+            };
+        }
+    }
 
     // 2. 保存面板配置
     app.post('/api/panel/config', requirePermission('panel.settings'), async (req, res) => {

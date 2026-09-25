@@ -135,7 +135,7 @@ export default {
                         </div>
 
                         <!-- 卡片 3: GitHub 代理加速 -->
-                        <div class="settings-card">
+                        <div class="settings-card" style="position: relative; z-index: 5;">
                             <div class="settings-card-header">
                                 <h6 class="settings-card-title">
                                     <i class="fa-brands fa-github text-secondary"></i>GitHub 代理加速通道
@@ -145,11 +145,11 @@ export default {
                             <div class="settings-card-body">
                                 <label class="form-label small fw-bold text-muted">{{ $t('panel_settings.github_proxy') }}</label>
                                 <div class="input-group">
-                                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
                                         <i class="fa-solid fa-bolt-lightning text-warning"></i>
                                         <span>快速选择</span>
                                     </button>
-                                    <ul class="dropdown-menu shadow-sm border-0">
+                                    <ul class="dropdown-menu shadow border" style="max-height: 290px; overflow-y: auto; z-index: 1050; min-width: 260px;">
                                          <li><a class="dropdown-item small py-2 px-3 fw-medium" href="#" @click.prevent="config.githubProxy = ''"><i class="fa-solid fa-ban me-2 opacity-50"></i>{{ $t('common.disabled') }} (不使用代理)</a></li>
                                          <li><hr class="dropdown-divider opacity-50"></li>
                                          <li><a class="dropdown-item small py-2 px-3 fw-medium d-flex justify-content-between align-items-center" href="#" @click.prevent="config.githubProxy = 'https://hk.gh-proxy.org'"><span>hk.gh-proxy.org</span><span class="badge bg-success-subtle text-success ms-2">高速 (香港)</span></a></li>

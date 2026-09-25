@@ -3,6 +3,8 @@ import { api } from '../api.js';
 import { store } from '../store.js';
 import { showToast, openModal, uploadFileWithChunk, isLargeFile } from '../utils.js';
 
+const DEFAULT_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0icmdiKDEwOCwgMTE3LCAxMjUpIiBvcGFjaXR5PSIuNSI+PHBhdGggZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNXYtMTBMMTIgMnptMCAyLjg2bDcuNSAzLjc1LTMuNSAxLjc1LTcuNS0zLjc1IDMuNS0xLjc1em0tOC41IDUuNTVMTEUgMTQuMXY3LjNsLTcuNS0zLjc1di03LjN6TTIyIDE3LjI1bC03LjUgMy43NXYtNy4zbDcuNS0zLjc1djcuM3oiLz48L3N2Zz4=';
+
 const LazyModRow = {
     props: ['file', 'selectedFiles'],
     emits: ['update:selectedFiles', 'click-mod'],
@@ -46,8 +48,6 @@ const LazyModRow = {
         const row = ref(null);
         const hasLoaded = ref(false);
         const iconError = ref(false);
-
-        const DEFAULT_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0icmdiKDEwOCwgMTE3LCAxMjUpIiBvcGFjaXR5PSIuNSI+PHBhdGggZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNXYtMTBMMTIgMnptMCAyLjg2bDcuNSAzLjc1LTMuNSAxLjc1LTcuNS0zLjc1IDMuNS0xLjc1em0tOC41IDUuNTVMTEUgMTQuMXY3LjNsLTcuNS0zLjc1di03LjN6TTIyIDE3LjI1bC03LjUgMy43NXYtNy4zbDcuNS0zLjc1djcuM3oiLz48L3N2Zz4=';
 
         const iconUrl = computed(() => {
             if (iconError.value) return DEFAULT_ICON;
@@ -132,8 +132,6 @@ const LazyModCard = {
         const cardEl = ref(null);
         const hasLoaded = ref(false);
         const iconError = ref(false);
-
-        const DEFAULT_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0icmdiKDEwOCwgMTE3LCAxMjUpIiBvcGFjaXR5PSIuNSI+PHBhdGggZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNXYtMTBMMTIgMnptMCAyLjg2bDcuNSAzLjc1LTMuNSAxLjc1LTcuNS0zLjc1IDMuNS0xLjc1em0tOC41IDUuNTVMTEUgMTQuMXY3LjNsLTcuNS0zLjc1di03LjN6TTIyIDE3LjI1bC03LjUgMy43NXYtNy4zbDcuNS0zLjc1djcuM3oiLz48L3N2Zz4=';
 
         const iconUrl = computed(() => {
             if (iconError.value) return DEFAULT_ICON;
@@ -335,6 +333,10 @@ export default {
                                 <template v-if="selectedMod.project">
                                     [{{ $t('mods.modrinth.types.' + selectedMod.project.project_type) }}] {{ selectedMod.project.title }}
                                 </template>
+                                <template v-else-if="selectedMod.file.metadata?.title">
+                                    <span class="badge bg-white text-primary rounded-pill me-2 small fw-bold" style="font-size: 0.75rem;">{{ $t('mods.source_local') }}</span>
+                                    {{ selectedMod.file.metadata.title }}
+                                </template>
                                 <template v-else>{{ selectedMod.file.name }}</template>
                             </h5>
                             <button type="button" class="btn-close btn-close-white" @click="selectedMod = null"></button>
@@ -344,7 +346,7 @@ export default {
                             <!-- Mod Info & Introduction -->
                             <div class="col-12 overflow-auto p-3 p-md-4 custom-scrollbar" style="background: var(--c-surface);">
                                 <div class="d-flex flex-column flex-sm-row gap-3 gap-md-4 mb-4" v-if="selectedMod.project">
-                                    <img :src="selectedMod.project.icon_url" class="rounded-4 border shadow-sm bg-white mx-auto mx-sm-0" width="100" height="100" style="object-fit: contain;">
+                                    <img :src="selectedMod.project.icon_url || DEFAULT_ICON" class="rounded-4 border shadow-sm bg-white mx-auto mx-sm-0" width="100" height="100" style="object-fit: contain;">
                                     <div class="flex-grow-1 min-width-0 text-center text-sm-start">
                                         <h4 class="fw-bold mb-1">{{ selectedMod.project.title }}</h4>
                                         <div class="text-muted small mb-3 text-truncate-3">
@@ -352,11 +354,34 @@ export default {
                                         </div>
                                         <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-sm-start">
                                             <div class="badge rounded-pill px-2 py-1 small fw-bold border bg-primary-subtle text-primary border-primary-subtle">
-                                                <i class="fa-solid fa-code-version me-1"></i>{{ selectedMod.file.metadata?.version }}
+                                                <i class="fa-solid fa-code-version me-1"></i>{{ selectedMod.file.metadata?.version || '-' }}
                                             </div>
                                             <div class="badge rounded-pill px-2 py-1 small fw-bold border"
                                                  :class="selectedMod.project.server_side === 'required' ? 'bg-success-subtle text-success border-success-subtle' : 'bg-secondary-subtle text-secondary border-secondary-subtle'">
                                                 <i class="fa-solid fa-server me-1"></i><span class="d-none d-sm-inline">{{ $t('mods.modrinth.env_server') }}:</span> {{ $t('mods.modrinth.env_' + selectedMod.project.server_side) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-column flex-sm-row gap-3 gap-md-4 mb-4" v-else-if="selectedMod.file.metadata">
+                                    <img :src="selectedMod.file.metadata.icon_url || DEFAULT_ICON" class="rounded-4 border shadow-sm bg-white mx-auto mx-sm-0" width="100" height="100" style="object-fit: contain;">
+                                    <div class="flex-grow-1 min-width-0 text-center text-sm-start">
+                                        <div class="d-flex align-items-center justify-content-center justify-content-sm-start gap-2 mb-1 flex-wrap">
+                                            <h4 class="fw-bold mb-0">{{ selectedMod.file.metadata.title || selectedMod.file.name.split('/').pop() }}</h4>
+                                            <span class="badge rounded-pill bg-info-subtle text-info border border-info-subtle small fw-bold">{{ $t('mods.source_local') }}</span>
+                                        </div>
+                                        <div class="text-muted small mb-3">
+                                            {{ selectedMod.file.metadata.description || $t('mods.no_desc') }}
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-sm-start">
+                                            <div v-if="selectedMod.file.metadata.version" class="badge rounded-pill px-2 py-1 small fw-bold border bg-primary-subtle text-primary border-primary-subtle">
+                                                <i class="fa-solid fa-code-version me-1"></i>{{ selectedMod.file.metadata.version }}
+                                            </div>
+                                            <div class="badge rounded-pill px-2 py-1 small fw-bold border bg-secondary-subtle text-secondary border-secondary-subtle">
+                                                <i class="fa-solid fa-hard-drive me-1"></i>{{ (selectedMod.file.size/1024/1024).toFixed(2) }} MB
+                                            </div>
+                                            <div v-if="selectedMod.file.metadata.mod_id" class="badge rounded-pill px-2 py-1 small fw-bold border bg-body-secondary text-body-secondary">
+                                                ID: {{ selectedMod.file.metadata.mod_id }}
                                             </div>
                                         </div>
                                     </div>
@@ -380,6 +405,23 @@ export default {
                                     </div>
                                     <div class="mod-description-container bg-body-tertiary p-3 rounded-4 small text-body overflow-auto" style="max-height: 400px;"
                                          v-html="renderMarkdown(bodyTranslations[selectedMod.project.id] || selectedMod.project.body)"></div>
+                                </div>
+                                <div v-else-if="selectedMod.file.metadata" class="border-top pt-4">
+                                    <label class="form-label fw-bold text-uppercase text-muted mb-2 d-flex align-items-center">
+                                        <i class="fa-solid fa-circle-info me-2 text-primary"></i>{{ $t('mods.file_info') }}
+                                    </label>
+                                    <div class="bg-body-tertiary p-3 rounded-4 small">
+                                        <div class="row g-2">
+                                            <div class="col-12 col-sm-6 text-truncate"><strong>{{ $t('mods.filename') }}:</strong> {{ selectedMod.file.name.split('/').pop() }}</div>
+                                            <div class="col-12 col-sm-6" v-if="selectedMod.file.metadata.version"><strong>{{ $t('mods.version') }}:</strong> {{ selectedMod.file.metadata.version }}</div>
+                                            <div class="col-12 col-sm-6" v-if="selectedMod.file.metadata.mod_id"><strong>Mod ID:</strong> {{ selectedMod.file.metadata.mod_id }}</div>
+                                            <div class="col-12 col-sm-6"><strong>{{ $t('mods.filesize') }}:</strong> {{ (selectedMod.file.size/1024/1024).toFixed(2) }} MB</div>
+                                            <div class="col-12 mt-2" v-if="selectedMod.file.metadata.description">
+                                                <strong>{{ $t('mods.description') }}:</strong>
+                                                <p class="mt-1 mb-0 text-muted">{{ selectedMod.file.metadata.description }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div v-else class="text-center py-5 opacity-50">
                                     {{ $t('mods.no_info') || 'No additional information available for this mod.' }}
@@ -672,6 +714,21 @@ export default {
         };
 
         const showModDetails = async (file) => {
+            if (!file.metadata) {
+                loadingDetails.value = true;
+                try {
+                    const metaRes = await api.get(`/api/mods/local/metadata?file=${encodeURIComponent(file.name)}`);
+                    if (metaRes.data?.metadata) {
+                        file.metadata = metaRes.data.metadata;
+                        file.hash = metaRes.data.hash;
+                    }
+                } catch (err) {
+                    console.error('Failed to get local metadata for details', err);
+                } finally {
+                    loadingDetails.value = false;
+                }
+            }
+
             const projectId = file.metadata?.project_id;
             if (!projectId) {
                 selectedMod.value = { file, project: null };
@@ -1059,7 +1116,8 @@ export default {
             nonCompliantCheckedCount, hasAnySelectedFiles, handleDrop, confirmUploadFromModal,
             formatSize, duplicateModGroups, resolveConflictKeep, getEarliestTime, formatModTime,
             uploadDropdownVisible, toggleUploadDropdown,
-            conflictModal, openConflictModal
+            conflictModal, openConflictModal,
+            DEFAULT_ICON
         };
     }
 };
