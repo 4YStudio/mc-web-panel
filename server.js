@@ -6146,21 +6146,25 @@ threaded_server_support=false
         }
     });
 
-    app.post('/api/system/update', requireAuth, async (req, res) => {
+    // 系统更新全局状态追踪（支持客户端断线重连、页面刷新状态恢复与安全重启轮询）
+    let systemUpdateState = {
+        isUpdating: false,
+        step: 'idle', // 'idle' | 'downloading' | 'applying' | 'restarting' | 'error' | 'cancelled'
+        message: '',
+        progress: 0,
+        speed: 0,
+        processedSize: 0,
+        totalSize: 0,
+        error: null
+    };
+
+    async function runSystemUpdate() {
+        const newExePath = APP_EXECUTABLE + '.new';
+        const oldExePath = APP_EXECUTABLE + '.old';
+        const controller = new AbortController();
+        activeDownloads.set('system_update', controller);
+
         try {
-            if (!APP_EXECUTABLE) {
-                return res.status(400).json({ error: '未检测到独立运行环境，无法自动更新' });
-            }
-
-            const runningInstances = instanceConfig.instances.filter(inst => {
-                const state = getOrCreateInstanceState(inst.id);
-                return state.process !== null;
-            });
-            if (runningInstances.length > 0) {
-                const names = runningInstances.map(i => i.name).join('、');
-                return res.status(409).json({ error: `存在正在运行的实例（${names}），请先手动关闭所有运行中的实例后再执行更新操作` });
-            }
-
             // 1. 获取最新版本信息
             const apiUrl = 'https://api.github.com/repos/4YStudio/mc-web-panel/releases/latest';
             const headers = {
@@ -6169,10 +6173,11 @@ threaded_server_support=false
             };
             let gh;
             try {
-                gh = await axios.get(apiUrl, { headers, timeout: 6000 });
+                gh = await axios.get(apiUrl, { headers, timeout: 10000, signal: controller.signal });
             } catch (err) {
+                if (controller.signal.aborted) throw err;
                 if (appConfig.githubProxy) {
-                    gh = await axios.get(applyGithubProxy(apiUrl), { headers, timeout: 8000 });
+                    gh = await axios.get(applyGithubProxy(apiUrl), { headers, timeout: 12000, signal: controller.signal });
                 } else {
                     throw err;
                 }
@@ -6208,21 +6213,30 @@ threaded_server_support=false
 
             if (!asset) {
                 const availableAssets = gh.data.assets.map(a => a.name).join(', ');
+                const errMsg = `未找到对应架构 ( ${arch} ) 的发布文件，可用文件: ${availableAssets}`;
                 console.error(`[Update] Asset "${assetName}" not found. Available: ${availableAssets}`);
-                return res.status(404).json({ error: `未找到对应架构 ( ${arch} ) 的发布文件，可用文件: ${availableAssets}` });
+                systemUpdateState = {
+                    isUpdating: false,
+                    step: 'error',
+                    message: errMsg,
+                    progress: 0,
+                    speed: 0,
+                    processedSize: 0,
+                    totalSize: 0,
+                    error: errMsg
+                };
+                io.emit('update_status', { step: 'error', message: errMsg });
+                return;
             }
             
             console.log(`[Update] Found asset: ${asset.name}`);
 
             const downloadUrl = applyGithubProxy(asset.browser_download_url);
-            const newExePath = APP_EXECUTABLE + '.new';
-            const oldExePath = APP_EXECUTABLE + '.old';
 
             console.log(`[Update] Downloading ${asset.name} from ${downloadUrl}...`);
+            systemUpdateState.step = 'downloading';
+            systemUpdateState.message = '正在下载新版本...';
             io.emit('update_status', { step: 'downloading', message: '正在下载新版本...' });
-
-            const controller = new AbortController();
-            activeDownloads.set('system_update', controller);
 
             // 1MB 写入缓冲区，避免磁盘 IO 阻塞 TCP 套接字窗口
             const writer = fs.createWriteStream(newExePath, { highWaterMark: 1024 * 1024 });
@@ -6247,7 +6261,7 @@ threaded_server_support=false
                     signal: controller.signal,
                     maxRedirects: 0,
                     headers: downloadHeaders,
-                    timeout: 60000,
+                    timeout: 600000, // 10分钟超时，避免大文件因慢速网络被截断
                     validateStatus: (status) => (status >= 200 && status < 400)
                 });
 
@@ -6281,6 +6295,11 @@ threaded_server_support=false
                         lastDownloadedLength = downloadedLength;
 
                         const progress = totalLength > 0 ? Math.round((downloadedLength / totalLength) * 100) : 0;
+                        systemUpdateState.progress = progress;
+                        systemUpdateState.speed = speed;
+                        systemUpdateState.processedSize = downloadedLength;
+                        systemUpdateState.totalSize = totalLength;
+
                         io.emit('update_progress', { 
                             progress, 
                             speed,
@@ -6292,104 +6311,173 @@ threaded_server_support=false
                 }
             });
 
+            await pipeline(
+                response.data,
+                progressStream,
+                writer,
+                { signal: controller.signal }
+            );
+
+            console.log('[Update] Download complete. Applying update...');
+            systemUpdateState.step = 'applying';
+            systemUpdateState.message = '正在应用更新...';
+            systemUpdateState.progress = 100;
+            io.emit('update_status', { step: 'applying', message: '正在应用更新...' });
+
+            // 给予执行权限
+            await fs.chmod(newExePath, '755');
+
+            // 使用实际的 asset 文件名（支持模糊匹配）
+            const newVersionedName = asset.name;
+            const newVersionedPath = path.join(path.dirname(APP_EXECUTABLE), newVersionedName);
+
+            // 备份旧版本
+            if (await fs.pathExists(oldExePath)) await fs.remove(oldExePath);
+            await fs.move(APP_EXECUTABLE, oldExePath);
+
+            // 替换为新版本（使用新版本名称）
+            await fs.move(newExePath, newVersionedPath);
+
+            // 更新 APP_EXECUTABLE 指向新路径
+            APP_EXECUTABLE = newVersionedPath;
+
+            // 更新持久化路径
             try {
-                await pipeline(
-                    response.data,
-                    progressStream,
-                    writer,
-                    { signal: controller.signal }
-                );
+                const dataDir = path.join(path.dirname(APP_EXECUTABLE), 'data');
+                fs.ensureDirSync(dataDir);
+                fs.writeFileSync(path.join(dataDir, 'executable_path.txt'), APP_EXECUTABLE);
+            } catch (e) { }
 
-                console.log('[Update] Download complete. Applying update...');
-                io.emit('update_status', { step: 'applying', message: '正在应用更新...' });
+            console.log(`[Update] Update applied. New executable: ${APP_EXECUTABLE}. Restarting...`);
+            systemUpdateState.step = 'restarting';
+            systemUpdateState.message = '更新成功，正在重启面板...';
+            io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
 
-                // 给予执行权限
-                await fs.chmod(newExePath, '755');
+            setTimeout(() => {
+                process.send({ type: 'restart_master', newExecutable: APP_EXECUTABLE });
+                process.exit(100);
+            }, 2000);
 
-                // 使用实际的 asset 文件名（支持模糊匹配）
-                const newVersionedName = asset.name;
-                const newVersionedPath = path.join(path.dirname(APP_EXECUTABLE), newVersionedName);
-
-                // 备份旧版本
-                if (await fs.pathExists(oldExePath)) await fs.remove(oldExePath);
-                await fs.move(APP_EXECUTABLE, oldExePath);
-
-                // 替换为新版本（使用新版本名称）
-                await fs.move(newExePath, newVersionedPath);
-
-                // 更新 APP_EXECUTABLE 指向新路径
-                APP_EXECUTABLE = newVersionedPath;
-
-                // 更新持久化路径
-                try {
-                    const dataDir = path.join(path.dirname(APP_EXECUTABLE), 'data');
-                    fs.ensureDirSync(dataDir);
-                    fs.writeFileSync(path.join(dataDir, 'executable_path.txt'), APP_EXECUTABLE);
-                } catch (e) { }
-
-                console.log(`[Update] Update applied. New executable: ${APP_EXECUTABLE}. Restarting...`);
-                io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
-
-                setTimeout(() => {
-                    process.send({ type: 'restart_master', newExecutable: APP_EXECUTABLE });
-                    process.exit(100);
-                }, 2000);
-
-                res.json({ success: true, message: '更新已下载并应用，正在重启...' });
-
-            } catch (err) {
-                if (err.name === 'AbortError' || err.code === 'ERR_CANCELED' || controller.signal.aborted) {
-                    console.log('[Update] Update cancelled by user.');
-                    io.emit('update_status', { step: 'cancelled', message: '已取消更新' });
-                } else {
-                    console.error('[Update] Error during update:', err);
-                    io.emit('update_status', { step: 'error', message: '更新失败: ' + err.message });
-                }
-
-                // Cleanup temporary files
-                try {
-                    if (await fs.pathExists(newExePath)) await fs.remove(newExePath);
-                } catch (cleanupErr) {
-                    console.error('[Update] Failed to cleanup .new file:', cleanupErr);
-                }
-
-                // If we aborted and hadn't yet moved the old executable, no recovery needed.
-                // If we were in the middle of moving, try to ensure APP_EXECUTABLE exists.
-                if (await fs.pathExists(oldExePath) && !await fs.pathExists(APP_EXECUTABLE)) {
-                    await fs.move(oldExePath, APP_EXECUTABLE);
-                }
-
-                // Don't res.json here if headers sent
-                if (!res.headersSent) {
-                    res.status(500).json({ error: err.message });
-                }
-            } finally {
-                activeDownloads.delete('system_update');
-            }
-
-            // End of update block
-
-        } catch (e) {
-            if (axios.isCancel(e)) {
-                console.log('[Update] Cancelled by user');
-                io.emit('update_status', { step: 'error', message: '更新已取消' });
+        } catch (err) {
+            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED' || controller.signal.aborted) {
+                console.log('[Update] Update cancelled by user.');
+                systemUpdateState = {
+                    isUpdating: false,
+                    step: 'cancelled',
+                    message: '已取消更新',
+                    progress: 0,
+                    speed: 0,
+                    processedSize: 0,
+                    totalSize: 0,
+                    error: null
+                };
+                io.emit('update_status', { step: 'cancelled', message: '已取消更新' });
             } else {
-                console.error('[Update] Error:', e);
-                io.emit('update_status', { step: 'error', message: '更新失败: ' + e.message });
+                console.error('[Update] Error during update:', err);
+                const errMsg = '更新失败: ' + err.message;
+                systemUpdateState = {
+                    isUpdating: false,
+                    step: 'error',
+                    message: errMsg,
+                    progress: 0,
+                    speed: 0,
+                    processedSize: 0,
+                    totalSize: 0,
+                    error: err.message
+                };
+                io.emit('update_status', { step: 'error', message: errMsg });
             }
-            // Cleanup
-            try { if (await fs.pathExists(APP_EXECUTABLE + '.new')) await fs.remove(APP_EXECUTABLE + '.new'); } catch (err) { }
+
+            // Cleanup temporary files
+            try {
+                if (await fs.pathExists(newExePath)) await fs.remove(newExePath);
+            } catch (cleanupErr) {
+                console.error('[Update] Failed to cleanup .new file:', cleanupErr);
+            }
+
+            // 尝试恢复
+            if (await fs.pathExists(oldExePath) && !await fs.pathExists(APP_EXECUTABLE)) {
+                try {
+                    await fs.move(oldExePath, APP_EXECUTABLE);
+                } catch (recoveryErr) {
+                    console.error('[Update] Failed to restore old executable:', recoveryErr);
+                }
+            }
         } finally {
             activeDownloads.delete('system_update');
+            if (systemUpdateState.step !== 'restarting') {
+                systemUpdateState.isUpdating = false;
+            }
         }
+    }
+
+    app.post('/api/system/update', requireAuth, async (req, res) => {
+        try {
+            if (!APP_EXECUTABLE) {
+                return res.status(400).json({ error: '未检测到独立运行环境，无法自动更新' });
+            }
+
+            if (systemUpdateState.isUpdating) {
+                return res.status(409).json({ error: '系统更新正在进行中，请勿重复操作' });
+            }
+
+            const runningInstances = instanceConfig.instances.filter(inst => {
+                const state = getOrCreateInstanceState(inst.id);
+                return state.process !== null;
+            });
+            if (runningInstances.length > 0) {
+                const names = runningInstances.map(i => i.name).join('、');
+                return res.status(409).json({ error: `存在正在运行的实例（${names}），请先手动关闭所有运行中的实例后再执行更新操作` });
+            }
+
+            // 初始化更新状态
+            systemUpdateState = {
+                isUpdating: true,
+                step: 'downloading',
+                message: '正在准备下载新版本...',
+                progress: 0,
+                speed: 0,
+                processedSize: 0,
+                totalSize: 0,
+                error: null
+            };
+
+            // 立即响应，避免客户端 HTTP 长连接挂起与代理超时
+            res.json({ success: true, message: '更新任务已启动' });
+
+            // 异步执行更新流程
+            runSystemUpdate().catch(err => {
+                console.error('[Update] Async update process error:', err);
+            });
+
+        } catch (e) {
+            res.status(500).json({ error: '启动更新失败: ' + e.message });
+        }
+    });
+
+    // 查询系统更新状态（供前端断线重连、页面刷新恢复与状态同步）
+    app.get('/api/system/update/status', requireAuth, (req, res) => {
+        res.json(systemUpdateState);
     });
 
     // POST /api/system/update/cancel
     app.post('/api/system/update/cancel', requireAuth, (req, res) => {
         if (activeDownloads.has('system_update')) {
-            activeDownloads.get('system_update').abort();
+            const controller = activeDownloads.get('system_update');
+            controller.abort();
             activeDownloads.delete('system_update');
-            res.json({ success: true, message: '已取消' });
+            systemUpdateState = {
+                isUpdating: false,
+                step: 'cancelled',
+                message: '已取消更新',
+                progress: 0,
+                speed: 0,
+                processedSize: 0,
+                totalSize: 0,
+                error: null
+            };
+            io.emit('update_status', { step: 'cancelled', message: '已取消更新' });
+            res.json({ success: true, message: '已取消更新' });
         } else {
             res.status(404).json({ error: '没有正在进行的更新' });
         }

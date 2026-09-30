@@ -3559,12 +3559,44 @@ h3 { font-size: 1.25rem; }
 .conflict-sidebar {
     width: 300px;
 }
+.conflict-version-card {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.conflict-version-card:hover {
+    border-color: rgba(var(--bs-success-rgb, 25, 135, 84), 0.4) !important;
+}
+.conflict-keep-btn {
+    width: 100%;
+    white-space: nowrap;
+}
+@media (min-width: 576px) {
+    .conflict-keep-btn {
+        width: auto !important;
+    }
+}
 @media (max-width: 576px) {
     .conflict-modal-content {
         height: 88vh !important;
         max-height: 88vh !important;
         margin: 0.5rem !important;
         border-radius: 1rem !important;
+    }
+}
+
+/* 常用响应式尺寸实用类补齐 (保证各端断点类名一致性) */
+@media (min-width: 576px) {
+    .w-sm-auto {
+        width: auto !important;
+    }
+}
+@media (min-width: 768px) {
+    .w-md-auto {
+        width: auto !important;
+    }
+}
+@media (min-width: 992px) {
+    .w-lg-auto {
+        width: auto !important;
     }
 }
 

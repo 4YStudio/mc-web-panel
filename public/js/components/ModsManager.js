@@ -532,7 +532,7 @@ export default {
                 <div v-if="conflictModal.visible" class="modal show d-block" @click.self="conflictModal.visible = false" style="z-index: 2070;">
                     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
                         <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden conflict-modal-content" style="background: var(--c-surface); color: var(--c-text-primary); border: 1px solid var(--c-border); height: 85vh; max-height: 720px;">
-                            <div class="modal-header border-0 bg-warning text-dark py-2.5 py-md-3 px-3 px-md-4 shadow-sm d-flex justify-content-between align-items-center">
+                            <div class="modal-header border-0 bg-warning text-dark py-2 py-md-3 px-3 px-md-4 shadow-sm d-flex justify-content-between align-items-center">
                                 <h5 class="modal-title fw-bold m-0 d-flex align-items-center gap-2 fs-6 fs-md-5">
                                     <i class="fa-solid fa-triangle-exclamation"></i>{{ $t('mods.conflict_title') }}
                                 </h5>
@@ -556,12 +556,12 @@ export default {
                             <div class="modal-body p-0 d-flex flex-column flex-md-row overflow-hidden" style="flex: 1; min-height: 0;">
                                 <!-- 左侧栏：冲突模组列表 (PC保留侧边栏) -->
                                 <div class="d-none d-md-flex border-end flex-column custom-scrollbar overflow-auto conflict-sidebar flex-shrink-0" style="background: var(--c-surface-elevated, rgba(0,0,0,0.02)); border-color: var(--c-border) !important;">
-                                    <div class="p-2.5 p-md-3 border-bottom text-muted small fw-bold bg-body-tertiary" style="border-color: var(--c-border) !important;">
+                                    <div class="p-3 border-bottom text-muted small fw-bold bg-body-tertiary" style="border-color: var(--c-border) !important;">
                                         {{ $t('mods.conflict_list', { count: duplicateModGroups.length }) }}
                                     </div>
                                     <div class="list-group list-group-flush flex-grow-1">
                                         <button v-for="(group, idx) in duplicateModGroups" :key="idx"
-                                            class="list-group-item list-group-item-action border-0 py-2.5 px-3 d-flex flex-column align-items-start gap-1 cursor-pointer"
+                                            class="list-group-item list-group-item-action border-0 py-2 px-3 d-flex flex-column align-items-start gap-1 cursor-pointer"
                                             :class="{ active: conflictModal.selectedGroupIdx === idx }"
                                             @click="conflictModal.selectedGroupIdx = idx"
                                             style="background: transparent; color: var(--c-text-primary);">
@@ -589,23 +589,23 @@ export default {
                                         </div>
                                         
                                         <!-- 版本卡片列表 -->
-                                        <div class="d-flex flex-column gap-2.5 gap-md-3 overflow-auto custom-scrollbar flex-grow-1 pr-1 pb-2">
+                                        <div class="d-flex flex-column gap-2 gap-md-3 overflow-auto custom-scrollbar flex-grow-1 pr-1 pb-2">
                                             <div v-for="(mod, mIdx) in duplicateModGroups[conflictModal.selectedGroupIdx].files" :key="mIdx"
-                                                class="card border rounded-3 p-2.5 p-sm-3 shadow-sm d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2.5 gap-sm-3"
+                                                class="card border rounded-3 p-3 shadow-sm d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 gap-sm-3 conflict-version-card"
                                                 style="background: var(--c-surface-elevated, rgba(0,0,0,0.01)); border-color: var(--c-border) !important;">
-                                                <div class="min-width-0 flex-grow-1">
-                                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                                <div class="d-flex flex-column justify-content-center" style="min-width: 0; flex: 1 1 auto;">
+                                                    <div class="d-flex align-items-center gap-2 mb-1" style="min-width: 0;">
                                                         <i class="fa-solid fa-cube text-success fa-lg flex-shrink-0"></i>
-                                                        <span class="fw-bold text-truncate small" style="color: var(--c-text-primary);" :title="mod.name">{{ mod.name }}</span>
+                                                        <span class="fw-bold text-truncate" style="color: var(--c-text-primary); font-size: 0.875rem;" :title="mod.name">{{ mod.name }}</span>
                                                         <span v-if="mod.isDisabled" class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill flex-shrink-0" style="font-size: 0.65rem;">{{ $t('common.disabled') }}</span>
                                                     </div>
-                                                    <div class="font-monospace text-muted mt-1 d-flex flex-wrap gap-x-3 gap-y-1" style="font-size: 0.72rem;">
-                                                        <span>{{ $t('mods.file_size', { size: formatSize(mod.size) }) }}</span>
-                                                        <span>{{ $t('mods.mtime', { time: formatModTime(mod.mtime) }) }}</span>
-                                                        <span v-if="mod.metadata?.version" class="text-primary fw-bold">{{ $t('mods.metadata_version', { version: mod.metadata.version }) }}</span>
+                                                    <div class="font-monospace text-muted mt-0.5 d-flex flex-wrap align-items-center row-gap-1 column-gap-3" style="font-size: 0.75rem;">
+                                                        <span class="text-nowrap"><i class="fa-regular fa-hard-drive me-1 opacity-75"></i>{{ $t('mods.file_size', { size: formatSize(mod.size) }) }}</span>
+                                                        <span class="text-nowrap"><i class="fa-regular fa-clock me-1 opacity-75"></i>{{ $t('mods.mtime', { time: formatModTime(mod.mtime) }) }}</span>
+                                                        <span v-if="mod.metadata?.version" class="text-primary fw-bold text-nowrap"><i class="fa-solid fa-code-branch me-1"></i>{{ $t('mods.metadata_version', { version: mod.metadata.version }) }}</span>
                                                     </div>
                                                 </div>
-                                                <button class="btn btn-sm btn-outline-success px-3.5 py-1.5 rounded-pill shadow-sm fw-bold small flex-shrink-0 w-100 w-sm-auto"
+                                                <button class="btn btn-sm btn-outline-success px-3 py-1.5 rounded-pill shadow-sm fw-bold small flex-shrink-0 conflict-keep-btn w-100 w-sm-auto"
                                                     @click="resolveConflictKeep(duplicateModGroups[conflictModal.selectedGroupIdx], mod)">
                                                     <i class="fa-solid fa-check me-1"></i>{{ $t('mods.keep_this_version') }}
                                                 </button>
@@ -620,14 +620,14 @@ export default {
                             </div>
                             
                             <!-- 对话框底部 -->
-                            <div class="modal-footer border-0 px-3 px-md-4 py-2.5 py-md-3 d-flex flex-row justify-content-between align-items-center flex-nowrap" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
+                            <div class="modal-footer border-0 px-3 px-md-4 py-2 py-md-3 d-flex flex-row justify-content-between align-items-center flex-nowrap" style="background: var(--c-surface-elevated, var(--c-surface)); border-top: 1px solid var(--c-border) !important;">
                                 <div class="form-check form-switch m-0 d-flex align-items-center gap-2" style="padding-left: 2.8em;">
                                     <input class="form-check-input cursor-pointer m-0" type="checkbox" id="skipConfirmCheck" v-model="conflictModal.skipConfirm" style="cursor: pointer;">
                                     <label class="form-check-label text-muted small cursor-pointer fw-semibold text-truncate" for="skipConfirmCheck" style="font-size: 0.75rem;">
                                         {{ $t('mods.skip_confirm') }}
                                     </label>
                                 </div>
-                                <button type="button" class="btn btn-secondary px-3.5 py-1 rounded-pill shadow-sm fw-bold small flex-shrink-0" @click="conflictModal.visible = false">{{ $t('common.close') }}</button>
+                                <button type="button" class="btn btn-secondary px-3 py-1.5 rounded-pill shadow-sm fw-bold small flex-shrink-0" @click="conflictModal.visible = false">{{ $t('common.close') }}</button>
                             </div>
                         </div>
                     </div>

@@ -53,17 +53,25 @@ async function prepareBuildDir() {
     });
 
     console.log('Installing production dependencies...');
+    // 过滤父级 pnpm 注入的环境变量，避免原生 npm 打印 Unknown env config 警告
+    const cleanNpmEnv = { ...process.env };
+    Object.keys(cleanNpmEnv).forEach(k => {
+        if (k.startsWith('npm_config_') && !['npm_config_registry', 'npm_config_proxy', 'npm_config_https_proxy'].includes(k)) {
+            delete cleanNpmEnv[k];
+        }
+    });
+
     const hasPnpm = fs.existsSync('node_modules/.pnpm') || fs.existsSync('pnpm-lock.yaml');
     if (hasPnpm) {
         console.log('  Detected pnpm node_modules (symlink-based). Using npm install to avoid symlink issues in packaged app...');
-        execSync('npm install --omit=dev --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+        execSync('npm install --omit=dev --no-audit --no-fund --loglevel=error', { cwd: BUILD_DIR, stdio: 'inherit', env: cleanNpmEnv });
     } else if (fs.existsSync('node_modules')) {
         console.log('  Copying node_modules from project root...');
         fs.cpSync('node_modules', path.join(BUILD_DIR, 'node_modules'), { recursive: true });
         console.log('  Pruning devDependencies...');
-        execSync('npm prune --omit=dev --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+        execSync('npm prune --omit=dev --no-audit --no-fund --loglevel=error', { cwd: BUILD_DIR, stdio: 'inherit', env: cleanNpmEnv });
     } else {
-        execSync('npm install --omit=dev --no-package-lock --no-audit --no-fund', { cwd: BUILD_DIR, stdio: 'inherit' });
+        execSync('npm install --omit=dev --no-package-lock --no-audit --no-fund --loglevel=error', { cwd: BUILD_DIR, stdio: 'inherit', env: cleanNpmEnv });
     }
 
     console.log('Pruning...');

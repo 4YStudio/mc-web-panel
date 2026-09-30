@@ -187,9 +187,152 @@ const app = createApp({
             } catch (_) { }
         };
 
+        // 系统更新重启状态守护与轮询检测器
+        let isSystemUpdateRestarting = false;
+        let initialStartupTime = null;
+
+        // 获取当前服务器启动时间基准
+        api.get('/api/system/version').then(res => {
+            if (res.data && res.data.startupTime) {
+                initialStartupTime = res.data.startupTime;
+            }
+        }).catch(() => {});
+
+        // 重启轮询检测器（双阶段保护：防止误判未退出的旧进程，精准检测新服务上线）
+        let autoRefreshPoll = null;
+        const startAutoRefreshPoll = () => {
+            if (autoRefreshPoll) return; // already polling
+            isSystemUpdateRestarting = true;
+            store.task.visible = true;
+            store.task.title = '系统更新';
+            store.task.percent = 100;
+            store.task.message = '更新完成，等待面板重启...';
+            store.task.subMessage = '';
+            store.task.speed = 0;
+            store.task.canCancel = false;
+            store.task.onCancel = null;
+
+            const pollStartTime = Date.now();
+            autoRefreshPoll = setInterval(async () => {
+                // 后端延时 2 秒发送信号退出进程，前 3 秒直接等待，防止探测到尚未退出的旧服务
+                if (Date.now() - pollStartTime < 3000) return;
+
+                try {
+                    const resp = await fetch('/api/system/version?t=' + Date.now(), { cache: 'no-store' });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        // 探测到新服务启动（启动时间变化，或等待超 5 秒且接口响应正常）
+                        if (!initialStartupTime || data.startupTime !== initialStartupTime || (Date.now() - pollStartTime > 5000)) {
+                            clearInterval(autoRefreshPoll);
+                            autoRefreshPoll = null;
+                            store.task.message = '重启成功，正在载入新版本...';
+                            setTimeout(() => {
+                                location.reload();
+                            }, 1000);
+                        }
+                    }
+                } catch (e) {
+                    /* 探测失败表示旧服务正在退出或新服务尚未监听，属正常现象，继续轮询 */
+                }
+            }, 1500);
+        };
+
+        // 同步后台系统更新状态（用于页面初次加载、刷新恢复以及 Socket 断线重连后恢复）
+        const syncUpdateStatus = async () => {
+            if (!store.auth.loggedIn) return;
+            try {
+                const res = await api.get('/api/system/update/status');
+                const data = res.data;
+                if (data && (data.isUpdating || data.step === 'restarting')) {
+                    store.task.visible = true;
+                    store.task.title = '系统更新';
+                    store.task.message = data.message || (data.step === 'restarting' ? '更新完成，等待面板重启...' : '正在更新系统...');
+                    store.task.percent = data.progress || 0;
+                    store.task.subMessage = (data.progress || 0) + '%';
+                    store.task.speed = data.speed || 0;
+                    store.task.processedSize = data.processedSize || 0;
+                    store.task.totalSize = data.totalSize || 0;
+
+                    if (data.step === 'downloading') {
+                        store.task.canCancel = true;
+                        store.task.onCancel = async () => {
+                            try {
+                                store.task.message = '正在取消...';
+                                await api.post('/api/system/update/cancel');
+                            } catch (e) {
+                                console.error('Cancel failed', e);
+                            }
+                        };
+                    } else {
+                        store.task.canCancel = false;
+                        store.task.onCancel = null;
+                    }
+
+                    if (data.step === 'restarting') {
+                        startAutoRefreshPoll();
+                    }
+                }
+            } catch (e) { }
+        };
+
+        socket.on('update_status', (data) => {
+            store.task.visible = true;
+            store.task.title = '系统更新';
+            store.task.message = data.message;
+            if (data.step === 'error' || data.step === 'cancelled') {
+                if (data.step === 'error') {
+                    showToast(data.message, 'danger');
+                } else {
+                    showToast('更新已取消', 'info');
+                }
+                store.task.canCancel = false;
+                store.task.onCancel = null;
+                isSystemUpdateRestarting = false;
+                setTimeout(() => {
+                    store.task.visible = false;
+                }, 3000);
+            }
+            if (data.step === 'downloading') {
+                store.task.canCancel = true;
+                store.task.onCancel = async () => {
+                    try {
+                        store.task.message = '正在取消...';
+                        await api.post('/api/system/update/cancel');
+                    } catch (e) {
+                        console.error('Cancel failed', e);
+                    }
+                };
+            }
+            if (data.step === 'applying') {
+                store.task.canCancel = false;
+                store.task.onCancel = null;
+            }
+            if (data.step === 'restarting') {
+                store.task.canCancel = false;
+                store.task.onCancel = null;
+                startAutoRefreshPoll();
+            }
+        });
+        socket.on('update_progress', (data) => {
+            store.task.percent = data.progress;
+            store.task.subMessage = data.progress + '%';
+            store.task.speed = data.speed || 0;
+            store.task.processedSize = data.processedSize || 0;
+            store.task.totalSize = data.totalSize || 0;
+        });
+
+        // 只有在明确进入了重启阶段，Socket 断开才触发重启轮询
+        // 严禁在下载中或应用阶段因为网络抖动/断线重连而误触发重启轮询与页面刷新
+        socket.on('disconnect', () => {
+            if (isSystemUpdateRestarting) {
+                startAutoRefreshPoll();
+            }
+        });
+
         const postLogin = () => {
             syncConfig();
             loadAppearanceImages();
+            syncUpdateStatus();
             api.get('/api/server/status').then(res => {
                 store.isRunning = res.data.running;
                 store.serverStatus = res.data.status || (res.data.running ? 'running' : 'stopped');
@@ -283,56 +426,6 @@ const app = createApp({
             socket.on('restore_completed', handleRestoreCompleted);
             socket.on('restore_error', handleRestoreError);
 
-            // 更新进度监听
-            let autoRefreshPoll = null;
-            const startAutoRefreshPoll = () => {
-                if (autoRefreshPoll) return; // already polling
-                store.task.percent = 100;
-                store.task.message = '更新完成，等待面板重启...';
-                autoRefreshPoll = setInterval(async () => {
-                    try {
-                        const resp = await fetch('/', { method: 'HEAD', cache: 'no-store' });
-                        if (resp.ok) {
-                            clearInterval(autoRefreshPoll);
-                            autoRefreshPoll = null;
-                            location.reload();
-                        }
-                    } catch (e) { /* server still down */ }
-                }, 2000);
-            };
-
-            socket.on('update_status', (data) => {
-                store.task.visible = true;
-                store.task.title = '系统更新';
-                store.task.message = data.message;
-                if (data.step === 'error') {
-                    showToast(data.message, 'danger');
-                    // Reset cancellation
-                    store.task.canCancel = false;
-                    store.task.onCancel = null;
-                    setTimeout(() => store.task.visible = false, 3000);
-                }
-                if (data.step === 'restarting') {
-                    store.task.canCancel = false;
-                    store.task.onCancel = null;
-                    startAutoRefreshPoll();
-                }
-            });
-            socket.on('update_progress', (data) => {
-                store.task.percent = data.progress;
-                store.task.subMessage = data.progress + '%';
-                store.task.speed = data.speed || 0;
-                store.task.processedSize = data.processedSize || 0;
-                store.task.totalSize = data.totalSize || 0;
-            });
-
-            // Fallback: if socket disconnects during an update, start auto-refresh poll
-            socket.on('disconnect', () => {
-                if (store.task.visible && store.task.title === '系统更新') {
-                    startAutoRefreshPoll();
-                }
-            });
-
             // Instance-specific Socket Switching
             watch(() => store.currentInstanceId, (newId, oldId) => {
                 if (oldId) {
@@ -402,6 +495,7 @@ const app = createApp({
                     socket.emit('req_history');
                     socket.emit('req_players');
                 }
+                syncUpdateStatus();
             });
 
             // Initial fetch

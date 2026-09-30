@@ -144,6 +144,10 @@ export default {
             store.task.title = '系统更新';
             store.task.message = '正在请求更新...';
             store.task.percent = 0;
+            store.task.subMessage = '0%';
+            store.task.speed = 0;
+            store.task.processedSize = 0;
+            store.task.totalSize = 0;
 
             store.task.canCancel = true;
             store.task.onCancel = async () => {
