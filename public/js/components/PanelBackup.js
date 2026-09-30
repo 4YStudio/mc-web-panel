@@ -212,7 +212,13 @@ export default {
                     store.task.visible = true;
                     store.task.title = $t('panel_backup.uploading') || '正在上传备份文件...';
                     store.task.percent = 0;
-                    store.task.message = file.name;
+                    store.task.message = '正在处理切片上传...';
+                    store.task.fileName = file.name;
+                    store.task.processedSize = 0;
+                    store.task.totalSize = file.size;
+                    store.task.speed = 0;
+                    store.task.canCancel = false;
+                    store.task.onCancel = null;
                     const chunkResult = await uploadFileWithChunk(file, {
                         initUrl: `${apiBase}/import-chunk/init`,
                         uploadUrl: `${apiBase}/import-chunk/upload`,
@@ -220,19 +226,40 @@ export default {
                         cancelUrl: `${apiBase}/import-chunk/cancel`,
                         onProgress: (bytesDone, bytesTotal, chunkNum, totalChunks) => {
                             store.task.percent = Math.round((bytesDone * 100) / bytesTotal);
+                            store.task.processedSize = bytesDone;
+                            store.task.totalSize = bytesTotal;
+                            store.task.fileName = file.name;
                             store.task.subMessage = `${chunkNum} / ${totalChunks}`;
                         }
                     });
                     filename = chunkResult.filename;
                     setTimeout(() => { store.task.visible = false; }, 500);
                 } else {
+                    store.task.visible = true;
+                    store.task.title = $t('panel_backup.uploading') || '正在上传备份文件...';
+                    store.task.percent = 0;
+                    store.task.message = '正在上传...';
+                    store.task.fileName = file.name;
+                    store.task.processedSize = 0;
+                    store.task.totalSize = file.size;
+                    store.task.speed = 0;
+                    store.task.canCancel = false;
+                    store.task.onCancel = null;
                     const formData = new FormData();
                     formData.append('backup', file);
-                    showToast($t('panel_backup.uploading') || '正在上传备份文件...', 'info');
                     const uploadRes = await api.post(`${apiBase}/import`, formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' }
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                        onUploadProgress: (p) => {
+                            if (p.total) {
+                                store.task.percent = Math.round((p.loaded * 100) / p.total);
+                                store.task.processedSize = p.loaded;
+                                store.task.totalSize = p.total;
+                                store.task.fileName = file.name;
+                            }
+                        }
                     });
                     filename = uploadRes.data.filename;
+                    setTimeout(() => { store.task.visible = false; }, 500);
                 }
 
                 showToast($t('panel_backup.import_success') || '备份导入成功！', 'success');

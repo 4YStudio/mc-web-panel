@@ -906,7 +906,7 @@ export default {
             store.task.percent = 0;
             store.task.processedSize = 0;
             store.task.totalSize = totalSize;
-            store.task.fileName = '';
+            store.task.fileName = filesToUpload[0]?.relativePath || '';
             store.task.speed = 0;
             store.task.canCancel = true;
             store.task.onCancel = () => {
@@ -940,6 +940,7 @@ export default {
                     for (const item of smallFiles) {
                         if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
                         
+                        store.task.fileName = item.relativePath;
                         const fd = new FormData();
                         fd.append('files', item.file, item.relativePath);
                         fd.append('path', 'mods');
@@ -962,6 +963,7 @@ export default {
 
                 for (const item of largeFiles) {
                     if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                    store.task.fileName = item.relativePath;
                     await uploadFileWithChunk(item.file, {
                         initUrl: '/api/files/chunk/init',
                         completeUrl: '/api/files/chunk/complete',

@@ -247,6 +247,7 @@ const app = createApp({
                     store.task.visible = true;
                     store.task.title = '系统更新';
                     store.task.message = data.message || (data.step === 'restarting' ? '更新完成，等待面板重启...' : '正在更新系统...');
+                    store.task.fileName = data.fileName || '';
                     store.task.percent = data.progress || 0;
                     store.task.subMessage = (data.progress || 0) + '%';
                     store.task.speed = data.speed || 0;
@@ -279,12 +280,14 @@ const app = createApp({
             store.task.visible = true;
             store.task.title = '系统更新';
             store.task.message = data.message;
+            store.task.fileName = data.fileName !== undefined ? data.fileName : (data.step === 'downloading' ? store.task.fileName : '');
             if (data.step === 'error' || data.step === 'cancelled') {
                 if (data.step === 'error') {
                     showToast(data.message, 'danger');
                 } else {
                     showToast('更新已取消', 'info');
                 }
+                store.task.fileName = '';
                 store.task.canCancel = false;
                 store.task.onCancel = null;
                 isSystemUpdateRestarting = false;
@@ -308,6 +311,7 @@ const app = createApp({
                 store.task.onCancel = null;
             }
             if (data.step === 'restarting') {
+                store.task.fileName = '';
                 store.task.canCancel = false;
                 store.task.onCancel = null;
                 startAutoRefreshPoll();
@@ -319,6 +323,9 @@ const app = createApp({
             store.task.speed = data.speed || 0;
             store.task.processedSize = data.processedSize || 0;
             store.task.totalSize = data.totalSize || 0;
+            if (data.fileName) {
+                store.task.fileName = data.fileName;
+            }
         });
 
         // 只有在明确进入了重启阶段，Socket 断开才触发重启轮询

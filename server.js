@@ -6151,6 +6151,7 @@ threaded_server_support=false
         isUpdating: false,
         step: 'idle', // 'idle' | 'downloading' | 'applying' | 'restarting' | 'error' | 'cancelled'
         message: '',
+        fileName: '',
         progress: 0,
         speed: 0,
         processedSize: 0,
@@ -6219,13 +6220,14 @@ threaded_server_support=false
                     isUpdating: false,
                     step: 'error',
                     message: errMsg,
+                    fileName: '',
                     progress: 0,
                     speed: 0,
                     processedSize: 0,
                     totalSize: 0,
                     error: errMsg
                 };
-                io.emit('update_status', { step: 'error', message: errMsg });
+                io.emit('update_status', { step: 'error', message: errMsg, fileName: '' });
                 return;
             }
             
@@ -6236,7 +6238,8 @@ threaded_server_support=false
             console.log(`[Update] Downloading ${asset.name} from ${downloadUrl}...`);
             systemUpdateState.step = 'downloading';
             systemUpdateState.message = '正在下载新版本...';
-            io.emit('update_status', { step: 'downloading', message: '正在下载新版本...' });
+            systemUpdateState.fileName = asset.name;
+            io.emit('update_status', { step: 'downloading', message: '正在下载新版本...', fileName: asset.name });
 
             // 1MB 写入缓冲区，避免磁盘 IO 阻塞 TCP 套接字窗口
             const writer = fs.createWriteStream(newExePath, { highWaterMark: 1024 * 1024 });
@@ -6304,7 +6307,8 @@ threaded_server_support=false
                             progress, 
                             speed,
                             processedSize: downloadedLength,
-                            totalSize: totalLength
+                            totalSize: totalLength,
+                            fileName: asset.name
                         });
                     }
                     callback(null, chunk);
@@ -6321,8 +6325,9 @@ threaded_server_support=false
             console.log('[Update] Download complete. Applying update...');
             systemUpdateState.step = 'applying';
             systemUpdateState.message = '正在应用更新...';
+            systemUpdateState.fileName = asset.name;
             systemUpdateState.progress = 100;
-            io.emit('update_status', { step: 'applying', message: '正在应用更新...' });
+            io.emit('update_status', { step: 'applying', message: '正在应用更新...', fileName: asset.name });
 
             // 给予执行权限
             await fs.chmod(newExePath, '755');
@@ -6351,7 +6356,8 @@ threaded_server_support=false
             console.log(`[Update] Update applied. New executable: ${APP_EXECUTABLE}. Restarting...`);
             systemUpdateState.step = 'restarting';
             systemUpdateState.message = '更新成功，正在重启面板...';
-            io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...' });
+            systemUpdateState.fileName = '';
+            io.emit('update_status', { step: 'restarting', message: '更新成功，正在重启面板...', fileName: '' });
 
             setTimeout(() => {
                 process.send({ type: 'restart_master', newExecutable: APP_EXECUTABLE });
@@ -6365,13 +6371,14 @@ threaded_server_support=false
                     isUpdating: false,
                     step: 'cancelled',
                     message: '已取消更新',
+                    fileName: '',
                     progress: 0,
                     speed: 0,
                     processedSize: 0,
                     totalSize: 0,
                     error: null
                 };
-                io.emit('update_status', { step: 'cancelled', message: '已取消更新' });
+                io.emit('update_status', { step: 'cancelled', message: '已取消更新', fileName: '' });
             } else {
                 console.error('[Update] Error during update:', err);
                 const errMsg = '更新失败: ' + err.message;
@@ -6379,13 +6386,14 @@ threaded_server_support=false
                     isUpdating: false,
                     step: 'error',
                     message: errMsg,
+                    fileName: '',
                     progress: 0,
                     speed: 0,
                     processedSize: 0,
                     totalSize: 0,
                     error: err.message
                 };
-                io.emit('update_status', { step: 'error', message: errMsg });
+                io.emit('update_status', { step: 'error', message: errMsg, fileName: '' });
             }
 
             // Cleanup temporary files
@@ -6435,6 +6443,7 @@ threaded_server_support=false
                 isUpdating: true,
                 step: 'downloading',
                 message: '正在准备下载新版本...',
+                fileName: '',
                 progress: 0,
                 speed: 0,
                 processedSize: 0,
@@ -6470,13 +6479,14 @@ threaded_server_support=false
                 isUpdating: false,
                 step: 'cancelled',
                 message: '已取消更新',
+                fileName: '',
                 progress: 0,
                 speed: 0,
                 processedSize: 0,
                 totalSize: 0,
                 error: null
             };
-            io.emit('update_status', { step: 'cancelled', message: '已取消更新' });
+            io.emit('update_status', { step: 'cancelled', message: '已取消更新', fileName: '' });
             res.json({ success: true, message: '已取消更新' });
         } else {
             res.status(404).json({ error: '没有正在进行的更新' });

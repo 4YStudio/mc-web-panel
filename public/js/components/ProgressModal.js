@@ -1,10 +1,10 @@
-import { store } from '../store.js';
+import { store, resetTask } from '../store.js';
 import { computed } from '/js/vue.esm-browser.js';
 
 export default {
     template: `
     <!-- 遮罩层：毛玻璃背景 -->
-    <Transition name="scale">
+    <Transition name="scale" @after-leave="handleAfterLeave">
     <div v-if="store.task.visible" 
          style="position:fixed; inset:0; z-index:3000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);">
 
@@ -108,6 +108,12 @@ export default {
             if (store.task.onCancel) store.task.onCancel();
         };
 
-        return { store, clampedPercent, iconClass, handleCancel, formattedSpeed, sizeMsg };
+        const handleAfterLeave = () => {
+            if (!store.task.visible) {
+                resetTask();
+            }
+        };
+
+        return { store, clampedPercent, iconClass, handleCancel, handleAfterLeave, formattedSpeed, sizeMsg };
     }
 };

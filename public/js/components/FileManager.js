@@ -1205,7 +1205,7 @@ export default {
             store.task.percent = 0;
             store.task.processedSize = 0;
             store.task.totalSize = totalSize;
-            store.task.fileName = '';
+            store.task.fileName = filesToUpload.length === 1 ? filesToUpload[0].relativePath : `批量上传 ${filesToUpload.length} 个文件`;
             store.task.speed = 0;
             store.task.canCancel = true;
             store.task.onCancel = () => {
@@ -1247,6 +1247,7 @@ export default {
                     const smallTotal = smallFiles.reduce((s, e) => s + e.file.size, 0);
                     
                     const displayNames = fileNames.length === 1 ? fileNames[0] : `批量上传 ${fileNames.length} 个文件`;
+                    store.task.fileName = displayNames;
 
                     await api.post('/api/files/upload', fd, {
                         signal: controller.signal,
@@ -1264,6 +1265,7 @@ export default {
 
                 for (const entry of largeFiles) {
                     if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                    store.task.fileName = entry.relativePath;
                     await uploadFileWithChunk(entry.file, {
                         initUrl: '/api/files/chunk/init',
                         completeUrl: '/api/files/chunk/complete',

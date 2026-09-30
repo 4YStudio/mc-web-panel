@@ -1,5 +1,22 @@
 # MC Web Panel 更新日志
 
+## [2.5.4] - 2026-09-30
+
+### 🐛 全局任务进度弹窗状态生命周期与文件显示 Bug 修复
+
+- **全局任务状态生命周期统一重置与数据隔离 (`resetTask`)**：
+  - **修复历史残留文件名污染新任务的 Bug**：
+    - 根因分析：`store.task` 是全局单例，此前模组或普通文件上传完成后未彻底重置全部字段，`fileName` 仍保留在内存中。当启动“系统更新”或“版本切换”等无文件名/其他文件任务时，弹窗错误渲染了上一轮操作遗留的模组文件名（如 `4YMusic-1.0.1.jar`）；
+    - 在 [`store.js`](file:///home/henvei/文档/云语软件中心相关开发/mc-web-panel/public/js/store.js) 规范化 `store.task` 默认结构，并导出 `resetTask()` 全局重置函数；
+    - 在 [`ProgressModal.js`](file:///home/henvei/文档/云语软件中心相关开发/mc-web-panel/public/js/components/ProgressModal.js) 的 `<Transition>` 上监听 `@after-leave` 事件，弹窗动画彻底退场后自动执行 `resetTask()`，杜绝任何状态跨任务泄露。
+- **文件与模组上传即时设置处理文件名**：
+  - **修复上传初期与快速传输时不显示正在操作文件名的缺陷**：
+    - 在 [`ModsManager.js`](file:///home/henvei/文档/云语软件中心相关开发/mc-web-panel/public/js/components/ModsManager.js) 与 [`FileManager.js`](file:///home/henvei/文档/云语软件中心相关开发/mc-web-panel/public/js/components/FileManager.js) 中，从第 0 秒初始化及每个文件/切片发起请求前，立即同步设置 `store.task.fileName`，消除等待 `onUploadProgress` 回调前的文件名空白期。
+- **面板备份上传进度与文件名统一呈现**：
+  - 在 [`PanelBackup.js`](file:///home/henvei/文档/云语软件中心相关开发/mc-web-panel/public/js/components/PanelBackup.js) 中修正文件名赋值至 `store.task.fileName`；大文件分片与普通上传均接入全局进度弹窗，直观呈现传输文件名与进度百分比。
+- **系统更新下载资产文件名全链路贯通**：
+  - 后端在匹配到发布资产时将真实文件名（如 `mc-web-panel-linux-x64-v2.5.5`）存入 `systemUpdateState.fileName`，并通过 Socket 事件广播；前端实时展示当前正在下载更新的面板二进制包名。
+
 ## [2.5.3] - 2026-09-25
 
 ### ✨ 高级文件编辑器重构扩展、移动端深度适配与本地模组元数据深度解析

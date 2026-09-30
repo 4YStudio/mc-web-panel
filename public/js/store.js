@@ -33,10 +33,13 @@ export const store = reactive({
         title: '',
         message: '',
         subMessage: '',
+        fileName: '',
         percent: 0,
         speed: 0,
         processedSize: 0,
-        totalSize: 0
+        totalSize: 0,
+        canCancel: false,
+        onCancel: null
     },
 
     // --- 插件系统 ---
@@ -44,3 +47,17 @@ export const store = reactive({
     pluginComponents: {},
     dashboardCards: []
 });
+
+export const resetTask = () => {
+    store.task.visible = false;
+    store.task.title = '';
+    store.task.message = '';
+    store.task.subMessage = '';
+    store.task.fileName = '';
+    store.task.percent = 0;
+    store.task.speed = 0;
+    store.task.processedSize = 0;
+    store.task.totalSize = 0;
+    store.task.canCancel = false;
+    store.task.onCancel = null;
+};

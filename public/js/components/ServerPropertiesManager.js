@@ -562,7 +562,13 @@ export default {
                     store.task.visible = true;
                     store.task.title = $t('properties.version_changing');
                     store.task.message = `${selectedMc.value} / ${selectedLoader.value}`;
+                    store.task.fileName = '';
                     store.task.percent = 0;
+                    store.task.processedSize = 0;
+                    store.task.totalSize = 0;
+                    store.task.speed = 0;
+                    store.task.canCancel = false;
+                    store.task.onCancel = null;
                     try {
                         await api.post('/api/loader/change-version', {
                             gameVersion: selectedMc.value,

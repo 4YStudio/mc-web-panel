@@ -143,6 +143,7 @@ export default {
             store.task.visible = true;
             store.task.title = '系统更新';
             store.task.message = '正在请求更新...';
+            store.task.fileName = '';
             store.task.percent = 0;
             store.task.subMessage = '0%';
             store.task.speed = 0;
