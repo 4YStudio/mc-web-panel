@@ -236,8 +236,8 @@ export default {
                         </button>
 
                         <!-- 字号调节 (支持直接输入数字) -->
-                        <div class="d-flex align-items-center bg-body-tertiary border rounded-3 px-1.5 py-0.5 gap-1" :title="$t('files.editor.font_size_tip')">
-                            <i class="fa-solid fa-font text-muted small" style="font-size: 0.75rem;"></i>
+                        <div class="editor-font-size-control" :title="$t('files.editor.font_size_tip')">
+                            <i class="fa-solid fa-font editor-font-icon"></i>
                             <input type="number" 
                                    min="10" 
                                    max="40" 
@@ -245,9 +245,8 @@ export default {
                                    v-model.number="editorFontSize" 
                                    @input="onFontSizeInput"
                                    @change="validateFontSize"
-                                   class="form-control form-control-sm border-0 p-0 text-center bg-transparent fw-bold" 
-                                   style="width: 36px; font-size: 0.8rem; box-shadow: none;" />
-                            <span class="text-muted small" style="font-size: 0.7rem;">px</span>
+                                   class="editor-font-input" />
+                            <span class="editor-font-unit">px</span>
                         </div>
 
                         <!-- 全屏切换 -->
@@ -356,7 +355,7 @@ export default {
                 </div>
 
                 <!-- 核心编辑区：行号栏 + 文本区域 -->
-                <div class="editor-body flex-grow-1 d-flex overflow-hidden position-relative" style="min-height: 200px;">
+                <div class="editor-body flex-grow-1 d-flex overflow-hidden position-relative">
                     <!-- 左侧行号栏 -->
                     <div ref="gutterArea" class="editor-gutter flex-shrink-0" :style="{ fontSize: editorFontSize + 'px' }">
                         <div v-for="line in editorLineCount" :key="line" class="editor-gutter-line" @click="goToLine(line)">
@@ -388,7 +387,7 @@ export default {
                 </div>
 
                 <!-- 移动端编程快捷辅助符号键盘条 -->
-                <div class="editor-mobile-symbols py-1 px-2 d-flex align-items-center gap-1 shadow-sm">
+                <div class="editor-mobile-symbols py-1 px-2 d-flex align-items-center gap-1 shadow-sm flex-shrink-0">
                     <button v-for="sym in mobileSymbols" 
                             :key="sym" 
                             type="button" 
@@ -400,7 +399,7 @@ export default {
                 </div>
 
                 <!-- 底部状态栏 -->
-                <div class="editor-status-bar d-flex justify-content-between align-items-center px-3 py-1">
+                <div class="editor-status-bar d-flex justify-content-between align-items-center px-3 py-1 flex-shrink-0">
                     <div class="d-flex align-items-center gap-3">
                         <span>Ln {{ cursorLine }}, Col {{ cursorCol }}</span>
                         <span class="d-none d-sm-inline">{{ $t('files.editor.lines') }}: {{ editorLineCount }}</span>
@@ -833,6 +832,77 @@ export default {
             editorArea.value?.focus();
         };
 
+        // 核心高精算法：基于 Mirror Div 镜像测量，计算字符在 textarea 内部的绝对渲染像素高度，支持物理换行与自动折行
+        const scrollTextareaToCharIndex = (el, charIndex, center = true) => {
+            if (!el) return;
+            try {
+                const style = window.getComputedStyle(el);
+                const div = document.createElement('div');
+                
+                // 关键排版属性克隆：必须使用完全一致的盒模型与文本折行参数
+                div.style.position = 'absolute';
+                div.style.visibility = 'hidden';
+                div.style.left = '-9999px';
+                div.style.top = '0';
+                div.style.boxSizing = 'border-box';
+                // 扣除 textarea 垂直滚动条宽度，使镜像排版折行点与真实渲染 100% 吻合
+                div.style.width = el.clientWidth + 'px';
+                
+                div.style.fontFamily = style.fontFamily;
+                div.style.fontSize = style.fontSize;
+                div.style.fontWeight = style.fontWeight;
+                div.style.lineHeight = style.lineHeight;
+                div.style.letterSpacing = style.letterSpacing;
+                div.style.whiteSpace = style.whiteSpace;
+                div.style.wordBreak = style.wordBreak;
+                div.style.paddingTop = style.paddingTop;
+                div.style.paddingRight = style.paddingRight;
+                div.style.paddingBottom = style.paddingBottom;
+                div.style.paddingLeft = style.paddingLeft;
+                div.style.tabSize = style.tabSize;
+                
+                const textBefore = el.value.substring(0, charIndex);
+                div.textContent = textBefore;
+                
+                const marker = document.createElement('span');
+                marker.textContent = '|';
+                div.appendChild(marker);
+                
+                document.body.appendChild(div);
+                const markerTop = marker.offsetTop;
+                document.body.removeChild(div);
+                
+                const clientH = el.clientHeight || 300;
+                let targetScrollTop = 0;
+                if (center) {
+                    // 居中模式：让目标行平滑停留于编辑视口正中央
+                    targetScrollTop = markerTop - (clientH / 2) + 12;
+                } else {
+                    const lh = parseFloat(style.lineHeight) || (editorFontSize.value * 1.5);
+                    targetScrollTop = markerTop - lh * 3;
+                }
+                
+                const finalTop = Math.max(0, targetScrollTop);
+                el.scrollTop = finalTop;
+                requestAnimationFrame(() => {
+                    el.scrollTop = finalTop;
+                    if (gutterArea.value) {
+                        gutterArea.value.scrollTop = finalTop;
+                    }
+                });
+            } catch (err) {
+                // 容错兜底
+                const textBefore = el.value.substring(0, charIndex);
+                const lineNum = textBefore.split('\n').length;
+                const lineHeight = editorFontSize.value * 1.5;
+                const targetScrollTop = Math.max(0, (lineNum * lineHeight) - (el.clientHeight / 2));
+                el.scrollTop = targetScrollTop;
+                if (gutterArea.value) {
+                    gutterArea.value.scrollTop = targetScrollTop;
+                }
+            }
+        };
+
         const highlightMatch = (index) => {
             if (index < 0 || index >= searchMatches.value.length) return;
             const match = searchMatches.value[index];
@@ -842,12 +912,8 @@ export default {
             el.setSelectionRange(match.start, match.end);
             updateCursorPos();
 
-            // 滚动到该位置附近居中
-            const textBefore = fileContent.value.substring(0, match.start);
-            const lineNum = textBefore.split('\n').length;
-            const lineHeight = editorFontSize.value * 1.5;
-            const targetScrollTop = (lineNum - 5) * lineHeight;
-            el.scrollTop = Math.max(0, targetScrollTop);
+            // 滚动到该位置正中央（即使开启了自动换行亦能绝对精准居中）
+            scrollTextareaToCharIndex(el, match.start, true);
         };
 
         const onSearchInput = (autoHighlight = false) => {
@@ -1036,8 +1102,7 @@ export default {
                 el.focus();
                 el.setSelectionRange(charIndex, charIndex);
                 updateCursorPos();
-                const lineHeight = editorFontSize.value * 1.5;
-                el.scrollTop = Math.max(0, (l - 5) * lineHeight);
+                scrollTextareaToCharIndex(el, charIndex, true);
             }
         };
 

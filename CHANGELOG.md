@@ -1,6 +1,46 @@
 # MC Web Panel 更新日志
 
-## [2.5.4] - 2026-09-30
+## [2.5.5] - 2026-09-30
+
+### 📝 高级文本编辑器界面呼吸感、弹性布局防挤压与搜索居中精准定位优化
+
+- **顶部字号调节器（Font Size Control）视觉呼吸感与规整优化**：
+  - **根因剖析**：此前使用了未定义的 Bootstrap 工具类（如 `px-1.5`、`py-0.5`），导致外层内边距实际为 0，图标、数字与单位紧贴圆角边框；且原生数字输入框在部分浏览器下渲染了挤压空间的上下箭头，视觉局促；
+  - **修复实现**：定制专属 `.editor-font-size-control` 样式，统一高度至 31px（与相邻操作按钮一致），配置 8px 左右充足呼吸内边距与 6px 元素间距；隐藏原生 spin button 挤压，增加 hover 与 focus-within 主题色平滑高亮。
+- **长文本排版下底部工具栏弹性挤压（Flex-shrink）彻底根治**：
+  - **根因剖析**：当文件包含大量行数与字符时，容器缺乏严格的 `min-height: 0` 约束，且底部快捷符号键盘条（`.editor-mobile-symbols`）与状态栏（`.editor-status-bar`）未声明 `flex-shrink: 0`；Flexbox 算法在内容溢出时强行压缩底部栏，导致移动端符号键盘条只露出一小半被剪切截断；
+  - **修复实现**：在 `.editor-toolbar`、`.editor-search-panel`、`.editor-mobile-symbols` 与 `.editor-status-bar` 上全链路追加 `flex-shrink: 0 !important;` 约束；为 `.editor-body` 配置 `flex: 1 1 0; min-height: 0 !important;` 并移除内联固定高度。无论文件多达数十万字，编辑区自适应弹性滚动，底部栏与顶部栏纹丝不动完整展示。
+- **搜索跳转与行跳转精准垂直居中（基于 Mirror Div 镜像折行算法）**：
+  - **根因剖析**：此前滚动位置依据粗暴的物理换行符 `split('\n').length - 5` 计算。在开启“自动换行”（Word Wrap）模式下，长行折行产生的视觉渲染行远多于物理行，导致计算出来的滚动高度大幅偏小；用户点击下一个匹配项后，高亮区域实际落在可视区域下方之外，必须手动“往下滑”才能看到；
+  - **修复实现**：引入现代富文本编辑器标准的 **Mirror Div 镜像测量算法**（`scrollTextareaToCharIndex`）。完全克隆包含可用排版宽度（排除垂直滚动条）、字体、行高与折行规则（`pre-wrap` / `break-all`）的镜像容器，100% 精确获取字符绝对渲染像素高度（`marker.offsetTop`），并将目标匹配行**平滑对齐至编辑视口垂直正正中心**；行号栏滚动双向加固，搜索与行跳转一览无余。
+
+### 📜 「单人快速跳过夜晚」官方卷轴 (fast-sleep v2.5.0) 核心交互与状态机修复
+
+- **白昼自然降临实时侦测与倒计时自动终止**：
+  - **根因剖析**：当倒计时设置为 10s 或 20s，单人或多名玩家同时在床入睡达到 100 刻（5 秒）时，Minecraft 原生机制已让天亮（`time < 12000`）。原逻辑无视世界真实时间依然盲目倒计时到底，并在倒计时结束时强行执行时间快进，导致逻辑混乱与体验割裂；
+  - **修复实现**：倒计时循环中每秒通过 `time query daytime` 智能采样，一旦检测到白昼已自然降临（`ticks < 12000` 或 `>= 23900`），立刻提前退出倒计时、清理 ActionBar，并自动跳过快进阶段，直接平滑触发清晨祝福结算。
+  - **配置参数扩容**：将 `scroll.json` 和 `index.js` 中的 `countdownSec` 上限由 10 秒提升至 60 秒，满足服主设置 10s、20s 等较长投票缓冲时间的需求。
+- **床铺状态精准追踪与空床即时取消倒计时 (SleepTimer 机制与防抖守护)**：
+  - **根因剖析**：
+    1. Minecraft Java 版玩家实体 NBT 中并无 `Sleeping:1b` 标签（该标签仅存在于村民等生物上），玩家入睡状态由 short 类型的 `SleepTimer` 记录（0s 代表不在床，1s~100s 代表入睡中）。原先检测 `execute if entity @a[nbt={Sleeping:1b}]` 永远返回 `Test failed`，导致刚躺上床第 0 秒即被误判为“已离开床铺”而秒取消；
+    2. 控制台日志回显包含自身发送的 `tellraw` 提示文本中含有 `!sleep`，旧正则宽松匹配误将其判定为控制台发起入睡，导致倒计时被莫名减扣；
+    3. 控制台默认以世界出生点坐标执行 `playsound`，当玩家离出生点较远时产生 `The sound is too far away to be heard` 且玩家听不到声音。
+  - **修复实现**：
+    1. **原生 `fs_sleeptimer` 记分寄存器**：通过 `execute as @a store result score @s fs_sleeptimer run data get entity @s SleepTimer` 结合 `@a[scores={fs_sleeptimer=1..}]` 精准检测是否有玩家在床；
+    2. **安全缓冲与防抖状态机**：入睡启动倒计时的第 0 秒设立安全豁免保护，第 1 秒起开始检测；必须连续 2 次（持续 2 秒无人躺床）且世界仍为黑夜时才判定为起身取消，彻底杜绝秒取消与误取消；
+    3. **控制台指令防误触过滤**：严格剔除所有命令回显、tellraw 文本及广播标识，避免自发自收导致倒计时被扣减；
+    4. **全服玩家精准定位音效**：将所有 `playsound` 重构为 `execute as @a at @s run playsound ... master @s ~ ~ ~`，确保无论玩家在何处均能在耳边清晰听到钟声与破晓音效。
+- **聊天栏富文本点击交互重构（原版 /trigger 协议适配）**：
+  - **根因剖析**：原聊天栏按钮使用 `{ action: 'run_command', value: '!sleep' }`，但 Minecraft 1.19+ 原版客户端会严格限制 `run_command` 必须以 `/` 开头，且普通非 OP 玩家无权执行未注册的自定义命令，导致在聊天栏点击 `[✔ 我也入睡]` 或 `[✖ 我要熬夜]` 完全无反应；
+  - **修复实现**：采用 Minecraft 官方专为无 OP 权限玩家交互设计的 `trigger` 机制：
+    - 启动时自动注册 `scoreboard objectives add fs_sleep trigger` 和 `scoreboard objectives add fs_nosleep trigger`；
+    - 在玩家入场及每次入睡广播时，通过 `scoreboard players enable @a fs_sleep` 为所有玩家激活触发权限；
+    - 聊天栏按钮指令改为 `/trigger fs_sleep` 与 `/trigger fs_nosleep`；
+    - 在 `onLog` 中精准捕获原版服务端返回的 `Triggered [fs_sleep]` 与 `Triggered [fs_nosleep]` 回执，无缝执行入睡与熬夜否决；
+    - 同时保持对后台控制台及聊天栏直接输入 `!sleep` / `!nosleep` 的向下兼容。
+- **官方市场同步分发**：
+  - 同步更新 `default` 模板与运行实例的配置；
+  - 重新压制官方分发包 `docs/scrolls_shop/fast-sleep.zip` 并刷新 `docs/scrolls_shop/scrolls.json`。
 
 ### 🐛 全局任务进度弹窗状态生命周期与文件显示 Bug 修复
 

@@ -4190,6 +4190,7 @@ h3 { font-size: 1.25rem; }
     border-radius: 12px;
     border: 1px solid var(--c-border);
     transition: all 0.2s ease;
+    min-height: 0; /* 允许 flex 容器正确计算剩余高度 */
 }
 
 .advanced-editor-container.is-fullscreen {
@@ -4208,12 +4209,14 @@ h3 { font-size: 1.25rem; }
     border-bottom: 1px solid var(--c-border);
     min-height: 48px;
     user-select: none;
+    flex-shrink: 0 !important; /* 工具栏绝对防挤压 */
 }
 
 .editor-search-panel {
     background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03));
     border-bottom: 1px solid var(--c-border);
     animation: fadeIn 0.15s ease-out;
+    flex-shrink: 0 !important; /* 搜索栏绝对防挤压 */
 }
 
 .editor-search-panel .input-group-text,
@@ -4221,10 +4224,69 @@ h3 { font-size: 1.25rem; }
     font-size: 0.82rem;
 }
 
+/* 顶部字号调节器优化：呼吸感边距与规整布局 */
+.editor-font-size-control {
+    display: inline-flex;
+    align-items: center;
+    background: var(--c-surface-hover, rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 31px;
+    gap: 6px;
+    user-select: none;
+    transition: border-color 0.2s, background-color 0.2s;
+    box-sizing: border-box;
+}
+
+.editor-font-size-control:hover,
+.editor-font-size-control:focus-within {
+    border-color: var(--c-primary, #3b82f6);
+    background: var(--c-surface);
+}
+
+.editor-font-size-control .editor-font-icon {
+    font-size: 0.75rem;
+    color: var(--c-text-tertiary, #888);
+    flex-shrink: 0;
+}
+
+.editor-font-size-control .editor-font-input {
+    width: 28px;
+    height: 22px;
+    line-height: 22px;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    color: var(--c-text-primary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-align: center;
+    box-shadow: none !important;
+    -moz-appearance: textfield;
+}
+
+.editor-font-size-control .editor-font-input::-webkit-outer-spin-button,
+.editor-font-size-control .editor-font-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.editor-font-size-control .editor-font-unit {
+    font-size: 0.75rem;
+    color: var(--c-text-tertiary, #888);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
 .editor-body {
     background: var(--c-bg-base, #1e1e1e);
     position: relative;
     overflow: hidden;
+    flex: 1 1 0;
+    min-height: 0 !important; /* 关键：允许弹性收缩，使内部滚动条生效，杜绝挤压底部工具栏 */
 }
 
 .editor-gutter {
@@ -4270,9 +4332,13 @@ h3 { font-size: 1.25rem; }
     background: var(--c-surface);
     border-top: 1px solid var(--c-border);
     overflow-x: auto;
+    overflow-y: hidden;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none; /* Firefox */
+    flex-shrink: 0 !important; /* 底部符号条绝对防挤压 */
+    height: 38px;
+    box-sizing: border-box;
 }
 
 .editor-mobile-symbols::-webkit-scrollbar {
@@ -4311,6 +4377,8 @@ h3 { font-size: 1.25rem; }
     color: var(--c-text-secondary);
     user-select: none;
     height: 28px;
+    flex-shrink: 0 !important; /* 底部状态栏绝对防挤压 */
+    box-sizing: border-box;
 }
 
 
